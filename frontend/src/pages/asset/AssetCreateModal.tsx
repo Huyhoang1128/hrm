@@ -394,7 +394,7 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
                             value={formData.name}
                             onChange={handleChange}
                             className="input-field mt-1"
-                            placeholder="VD: TA0123131..."
+                            placeholder="VD: MAY-001..."
                           />
                         </div>
 
