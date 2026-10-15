@@ -1,0 +1,62 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+  <div id="content-main">
+    <h1>Upload CSV cập nhật chốt công</h1>
+    <p>Map cột: <strong>ma_nhan_vien/an_vien</strong> → <strong>employee_code</strong>, <strong>nam</strong> → <strong>year</strong>, <strong>thang</strong> → <strong>month</strong></p>
+    <p>Các cột cập nhật: <strong>cong_thu_viec</strong>, <strong>cong_chinh_thuc</strong>, <strong>ho_va_ten</strong>, <strong>ngay_ket_thuc_thu_viec</strong></p>
+
+    <form method="post" enctype="multipart/form-data" style="margin-bottom: 20px;">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit" class="default">Upload & cập nhật</button>
+      <a href="{% url 'admin:hrm_workfinalization_changelist' %}" class="button" style="margin-left: 8px;">Quay lại danh sách</a>
+    </form>
+
+    {% if updated_rows %}
+      <h2>Record cập nhật thành công ({{ updated_rows|length }})</h2>
+      <table class="adminlist" style="width:100%; border-collapse: collapse; margin-bottom: 24px;">
+        <thead>
+          <tr>
+            <th style="text-align:left;">Dòng</th>
+            <th style="text-align:left;">Mã NV</th>
+            <th style="text-align:left;">Họ và tên</th>
+            <th style="text-align:left;">Kỳ công</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in updated_rows %}
+            <tr>
+              <td>{{ item.line }}</td>
+              <td>{{ item.employee_code }}</td>
+              <td>{{ item.ho_va_ten }}</td>
+              <td>{{ item.month }}/{{ item.year }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+
+    {% if error_rows %}
+      <h2>Record lỗi ({{ error_rows|length }})</h2>
+      <table class="adminlist" style="width:100%; border-collapse: collapse;">
+        <thead>
+          <tr>
+            <th style="text-align:left;">Dòng</th>
+            <th style="text-align:left;">Mã NV</th>
+            <th style="text-align:left;">Lỗi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in error_rows %}
+            <tr>
+              <td>{{ item.line }}</td>
+              <td>{{ item.employee_code }}</td>
+              <td>{{ item.error }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </div>
+{% endblock %}

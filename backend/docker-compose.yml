@@ -1,0 +1,101 @@
+services:
+  web:
+    build: .
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Django Settings
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-your-production-secret-key-here}
+      - DJANGO_DEBUG=${DJANGO_DEBUG:-True}
+      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://hrm_user:hrm_password@db:5432/hrm_db}
+      
+      # Cloudfly S3 Configuration
+      - CLOUDFLY_ACCESS_KEY=${CLOUDFLY_ACCESS_KEY}
+      - CLOUDFLY_SECRET_KEY=${CLOUDFLY_SECRET_KEY}
+      - CLOUDFLY_BUCKET=${CLOUDFLY_BUCKET:-user-media}
+      - CLOUDFLY_S3_ENDPOINT=${CLOUDFLY_S3_ENDPOINT:-https://s3.cloudfly.vn}
+      - CLOUDFLY_REGION=${CLOUDFLY_REGION:-us-east-1}
+      - CLOUDFLY_ENABLED=${CLOUDFLY_ENABLED:-True}
+      
+      # Frontend URL
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      
+      # Other Services
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      
+    depends_on:
+      - db
+      - redis
+
+  email_worker:
+    build: .
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+    command: >
+      sh -c "
+        echo 'Email worker started'
+        while true; do
+          echo '--- Running email queue processor ---'
+          python manage.py process_email_queue --batch-size=10 --delay=2
+          echo 'Waiting 5 minutes...'
+          sleep 300
+        done
+      "
+
+  employee_sheet_sync_worker:
+    build: .
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+    command: >
+      sh -c "
+        echo 'Employee master sheet sync worker started'
+        while true; do
+          CURRENT=$$(TZ=Asia/Ho_Chi_Minh date +%H:%M)
+          if [ \"$$CURRENT\" = '02:00' ]; then
+            echo '--- Running sync_employee_master_sheet ---'
+            python manage.py sync_employee_master_sheet
+            sleep 61
+          fi
+          sleep 30
+        done
+      "
+
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-hrm_db}
+      - POSTGRES_USER=${POSTGRES_USER:-hrm_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-hrm_password}
+      - POSTGRES_MAX_CONNECTIONS=200
+      - POSTGRES_SHARED_BUFFERS=256MB
+      - POSTGRES_WORK_MEM=4MB
+      - POSTGRES_MAINTENANCE_WORK_MEM=64MB
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  # Redis is kept for potential future use, but Celery services have been removed
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+volumes:
+  postgres_data:
+  redis_data:

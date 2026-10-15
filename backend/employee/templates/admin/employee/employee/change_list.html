@@ -1,0 +1,16 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools-items %}
+  {% if upload_social_insurance_url %}
+    <li>
+      <a href="{{ upload_social_insurance_url }}">Upload Excel BHXH</a>
+    </li>
+  {% endif %}
+  <li>
+    <a href="{{ upload_salary_csv_url }}">Upload CSV lương</a>
+  </li>
+  <li>
+    <a href="{{ upload_legal_entity_csv_url }}">Upload CSV pháp nhân con</a>
+  </li>
+  {{ block.super }}
+{% endblock %}
