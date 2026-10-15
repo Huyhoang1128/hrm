@@ -1272,6 +1272,31 @@ class WorkFinalizationDetailView(APIView):
         return Response(_serialize_record(record))
 
 
+def _get_dependent_record_counts(employee_ids, period_start, period_end) -> dict:
+    """
+    Số người phụ thuộc có hiệu lực trong kỳ, đếm từ hồ sơ người phụ thuộc.
+
+    Chỉ trả về khoá cho NV ĐÃ có ít nhất một hồ sơ (chưa xoá); NV chưa có hồ sơ nào
+    thì vắng mặt trong kết quả để bảng lương giữ nguyên con số khai trong
+    `payroll_config.taxPolicy.dependentCount`. NV có hồ sơ nhưng không hồ sơ nào
+    phủ kỳ tính thì được 0.
+    """
+    from django.db.models import Q
+    from employee.models import EmployeeDependent
+
+    base = EmployeeDependent.objects.filter(employee_id__in=employee_ids, is_deleted=False)
+    counts = {emp_id: 0 for emp_id in base.values_list('employee_id', flat=True).distinct()}
+    effective = (
+        base.filter(is_active=True)
+        .filter(Q(dependent_from__isnull=True) | Q(dependent_from__lte=period_end))
+        .filter(Q(dependent_to__isnull=True) | Q(dependent_to__gte=period_start))
+        .values_list('employee_id', flat=True)
+    )
+    for emp_id in effective:
+        counts[emp_id] = counts.get(emp_id, 0) + 1
+    return counts
+
+
 class SalaryDepartmentView(APIView):
     """
     GET /hrm/salary/department/
@@ -1353,6 +1378,11 @@ class SalaryDepartmentView(APIView):
                 employee_id__in=employee_ids,
             )
         }
+
+        _, _last_day = cal_module.monthrange(year, month)
+        dependent_records_map = _get_dependent_record_counts(
+            employee_ids, _dt.date(year, month, 1), _dt.date(year, month, _last_day)
+        )
 
         department_name = None
         if department_id:
@@ -1481,7 +1511,10 @@ class SalaryDepartmentView(APIView):
             else:
                 bh_deduction = ins_base * BH_TOTAL_RATE
 
-            dependent_count = max(int(_to_decimal(tax_policy.get('dependentCount'), Decimal('0'))), 0)
+            if employee.id in dependent_records_map:
+                dependent_count = dependent_records_map[employee.id]
+            else:
+                dependent_count = max(int(_to_decimal(tax_policy.get('dependentCount'), Decimal('0'))), 0)
             deductions_config = _as_dict(_as_dict(adjustments.get('payroll_config')).get('deductions'))
             union_fee = _to_decimal(deductions_config.get('unionFee'), Decimal('0'))
             insurance_deduction_for_tax = Decimal('0') if (probation_only or (is_non_official_contract and not mixed_probation_official)) else (ins_base * INSURANCE_RATE)

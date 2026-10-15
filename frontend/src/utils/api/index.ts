@@ -64,6 +64,7 @@ export {
 export { usersAPI, permissionsAPI, rolesAPI, apiKeysAPI } from './users.api';
 export { healthAPI, facebookAPI, dashboardAPI, publicStatsAPI, attendanceAppDownloadAPI } from './system.api';
 export type { AttendanceAppDownloadConfig } from './system.api';
+export type { EmployeeDependent, EmployeeDependentPayload } from './hrm.api';
 export {
   employeesAPI,
   departmentsAPI,
@@ -72,6 +73,7 @@ export {
   sendAccountEmailsAPI,
   birthdayWishesAPI,
   companyUnitsAPI,
+  employeeDependentsAPI,
 } from './hrm.api';
 export {
   assetsAPI,
@@ -100,6 +102,7 @@ import {
   sendAccountEmailsAPI,
   birthdayWishesAPI,
   companyUnitsAPI,
+  employeeDependentsAPI,
 } from './hrm.api';
 import {
   assetsAPI,

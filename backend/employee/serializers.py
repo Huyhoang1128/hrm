@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import BirthdayWish, Employee
+from .models import BirthdayWish, Employee, EmployeeDependent
 
 
 class EmployeeBriefSerializer(serializers.ModelSerializer):
@@ -79,3 +79,39 @@ class BirthdayWishCreateSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         return BirthdayWishSerializer(instance, context=self.context).data
+
+
+class EmployeeDependentSerializer(serializers.ModelSerializer):
+    """Serializer đọc/ghi người phụ thuộc (giảm trừ gia cảnh)"""
+    employee = EmployeeBriefSerializer(read_only=True)
+    employee_id = serializers.PrimaryKeyRelatedField(
+        queryset=Employee.objects.all(),
+        source='employee',
+        write_only=True,
+    )
+    relationship_display = serializers.CharField(source='get_relationship_display', read_only=True)
+
+    class Meta:
+        model = EmployeeDependent
+        fields = [
+            'id', 'employee', 'employee_id', 'full_name', 'date_of_birth',
+            'relationship', 'relationship_display', 'personal_identification_number',
+            'tax_code', 'nationality', 'dependent_from', 'dependent_to',
+            'is_active', 'notes', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def validate(self, attrs):
+        # Gộp với instance để PATCH 1 field vẫn kiểm tra được cặp ngày
+        def current(name):
+            if name in attrs:
+                return attrs[name]
+            return getattr(self.instance, name, None)
+
+        dependent_from = current('dependent_from')
+        dependent_to = current('dependent_to')
+        if dependent_from and dependent_to and dependent_to < dependent_from:
+            raise serializers.ValidationError({
+                'dependent_to': 'Ngày kết thúc giảm trừ phải sau ngày bắt đầu.'
+            })
+        return attrs

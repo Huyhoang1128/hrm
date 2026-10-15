@@ -23,6 +23,7 @@ import {
   PaperClipIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
+import DependentSection from './DependentSection';
 
 // ============================================
 // CONSTANTS
@@ -631,6 +632,9 @@ const EmployeeShow: React.FC = () => {
             <InfoField label="Địa chỉ" value={emp.emergency_contact_address} full />
           </div>
         </div>
+
+        {/* ── Người phụ thuộc (giảm trừ gia cảnh) ── */}
+        <DependentSection employeeId={employee.id} canManage={canManageEmployee} />
 
         {/* ── Hồ sơ đính kèm ── */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
