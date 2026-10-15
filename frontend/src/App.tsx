@@ -64,6 +64,7 @@ import GrantTimingReport from './pages/GrantTimingReport';
 import MyRequests from './pages/MyRequests';
 import SalaryAdvance from './pages/SalaryAdvance';
 import RequestTemplates from './pages/RequestTemplates';
+import PaymentDocuments from './pages/PaymentDocuments';
 import Onboarding from './pages/Onboarding';
 import OnboardingDetail from './pages/OnboardingDetail';
 import Offboarding from './pages/Offboarding';
@@ -802,6 +803,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <SalaryAdvance />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/payment-documents"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'HR']}>
+                <Layout>
+                  <PaymentDocuments />
                 </Layout>
               </ProtectedRoute>
             }

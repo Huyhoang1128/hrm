@@ -3349,3 +3349,26 @@ class FeedbackAdmin(admin.ModelAdmin):
             obj.status = form.initial.get('status')
             obj.change_status(new_status)
         super().save_model(request, obj, form, change)
+
+
+# ══════════════════════════════════════════════════════════════════
+# Phiếu thanh toán / đề xuất mua hàng / đề nghị tạm ứng
+# ══════════════════════════════════════════════════════════════════
+from .payment_document_models import PaymentDocument, PaymentDocumentAttachment  # noqa: E402
+
+
+class PaymentDocumentAttachmentInline(admin.TabularInline):
+    model = PaymentDocumentAttachment
+    extra = 0
+    fields = ('file_name', 'file', 'uploaded_by', 'uploaded_at')
+    readonly_fields = ('uploaded_by', 'uploaded_at')
+
+
+@admin.register(PaymentDocument)
+class PaymentDocumentAdmin(admin.ModelAdmin):
+    list_display = ('code', 'doc_type', 'doc_date', 'employee', 'title', 'amount', 'status', 'reviewed_at', 'is_deleted')
+    list_filter = ('doc_type', 'status', 'is_deleted')
+    search_fields = ('code', 'title', 'payee', 'requester_name', 'employee__full_name', 'employee__employee_id')
+    raw_id_fields = ('employee', 'department', 'reviewed_by', 'created_by', 'updated_by', 'deleted_by')
+    date_hierarchy = 'doc_date'
+    inlines = [PaymentDocumentAttachmentInline]
