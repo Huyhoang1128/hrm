@@ -19,6 +19,7 @@ from .models import (
     DepartmentScheduleChange,
     Employee,
     EmployeeAssignmentHistory,
+    EmployeeDependent,
     Position,
     SOCIAL_INSURANCE_PARTICIPATION_STATUS,
 )
@@ -1007,3 +1008,66 @@ class BirthdayWishAdmin(admin.ModelAdmin):
     def message_preview(self, obj):
         return obj.message[:80] + '…' if len(obj.message) > 80 else obj.message
     message_preview.short_description = "Nội dung"
+
+
+
+# -----------------------------
+# EmployeeDependent Admin
+# -----------------------------
+@admin.register(EmployeeDependent)
+class EmployeeDependentAdmin(admin.ModelAdmin):
+    list_display = ('full_name', 'employee_code', 'employee_name', 'relationship',
+                    'date_of_birth', 'dependent_from', 'dependent_to', 'is_active', 'is_deleted')
+    list_filter = ('relationship', 'is_active', 'is_deleted')
+    actions = ['khoi_phuc', 'xoa_mem']
+    search_fields = ('full_name', 'personal_identification_number', 'tax_code',
+                     'employee__employee_id', 'employee__full_name')
+    raw_id_fields = ('employee',)
+    ordering = ('-created_at',)
+    readonly_fields = ('created_at', 'updated_at', 'deleted_at', 'deleted_by')
+
+    fieldsets = (
+        ('Nhân viên', {
+            'fields': ('employee',)
+        }),
+        ('Thông tin người phụ thuộc', {
+            'fields': ('full_name', 'date_of_birth', 'relationship', 'nationality',
+                       'personal_identification_number', 'tax_code')
+        }),
+        ('Thời gian giảm trừ', {
+            'fields': ('dependent_from', 'dependent_to', 'is_active', 'notes')
+        }),
+        ('Xoá mềm', {
+            'fields': ('is_deleted', 'deleted_at', 'deleted_by'),
+            'description': 'Bản ghi bị xoá ở giao diện chỉ được đánh dấu, không mất dữ liệu. '
+                           'Bỏ tick "Đã xoá" để khôi phục.',
+        }),
+        ('Thời gian', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('employee')
+
+    def employee_code(self, obj):
+        return obj.employee.employee_id
+    employee_code.short_description = 'Mã NV'
+
+    def employee_name(self, obj):
+        return obj.employee.full_name
+    employee_name.short_description = 'Họ tên NV'
+
+    @admin.action(description='Khôi phục bản ghi đã xoá')
+    def khoi_phuc(self, request, queryset):
+        n = queryset.filter(is_deleted=True).update(
+            is_deleted=False, deleted_at=None, deleted_by=None)
+        self.message_user(request, f'Đã khôi phục {n} người phụ thuộc.')
+
+    @admin.action(description='Xoá mềm')
+    def xoa_mem(self, request, queryset):
+        from django.utils import timezone as tz
+        n = queryset.filter(is_deleted=False).update(
+            is_deleted=True, deleted_at=tz.now(), deleted_by=request.user)
+        self.message_user(request, f'Đã xoá mềm {n} người phụ thuộc.')

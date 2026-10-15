@@ -516,3 +516,83 @@ export const companyUnitsAPI = {
     await managementApi.delete(`/api-hrm/company-units/${id}/`);
   },
 };
+
+// ============================================
+// EMPLOYEE DEPENDENTS (Người phụ thuộc - giảm trừ gia cảnh)
+// ============================================
+export interface EmployeeDependent {
+  id: number;
+  employee: {
+    id: number;
+    employee_id: string;
+    full_name: string;
+    avatar_url: string | null;
+  };
+  full_name: string;
+  date_of_birth: string | null;
+  relationship: string | null;
+  relationship_display: string | null;
+  personal_identification_number: string | null;
+  tax_code: string | null;
+  nationality: string | null;
+  dependent_from: string | null;
+  dependent_to: string | null;
+  is_active: boolean;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmployeeDependentPayload {
+  employee_id?: number;
+  full_name: string;
+  date_of_birth?: string | null;
+  relationship?: string | null;
+  personal_identification_number?: string | null;
+  tax_code?: string | null;
+  nationality?: string | null;
+  dependent_from?: string | null;
+  dependent_to?: string | null;
+  is_active?: boolean;
+  notes?: string;
+}
+
+export const employeeDependentsAPI = {
+  list: async (params?: {
+    employee?: number;
+    employee_code?: string;
+    relationship?: string;
+    is_active?: boolean;
+    search?: string;
+    ordering?: string;
+    page?: number;
+    page_size?: number;
+  }): Promise<{
+    count: number;
+    next: string | null;
+    previous: string | null;
+    results: EmployeeDependent[];
+  }> => {
+    const response = await managementApi.get('/api-hrm/employee-dependents/', { params });
+    return response.data;
+  },
+
+  getById: async (id: number): Promise<EmployeeDependent> => {
+    const response = await managementApi.get(`/api-hrm/employee-dependents/${id}/`);
+    return response.data;
+  },
+
+  create: async (data: EmployeeDependentPayload): Promise<EmployeeDependent> => {
+    const response = await managementApi.post('/api-hrm/employee-dependents/', data);
+    return response.data;
+  },
+
+  update: async (id: number, data: Partial<EmployeeDependentPayload>): Promise<EmployeeDependent> => {
+    const response = await managementApi.patch(`/api-hrm/employee-dependents/${id}/`, data);
+    return response.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await managementApi.delete(`/api-hrm/employee-dependents/${id}/`);
+  },
+};

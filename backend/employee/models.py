@@ -901,3 +901,63 @@ class BirthdayWish(models.Model):
         verbose_name = "Lời chúc sinh nhật"
         verbose_name_plural = "Lời chúc sinh nhật"
         ordering = ['-created_at']
+
+
+# -----------------------------
+# Người phụ thuộc (giảm trừ gia cảnh)
+# -----------------------------
+DEPENDENT_RELATIONSHIP = [
+    ('CHILD', 'Con'),
+    ('SPOUSE', 'Vợ/Chồng'),
+    ('PARENT', 'Cha/Mẹ'),
+    ('SIBLING', 'Anh/Chị/Em'),
+    ('GRANDPARENT', 'Ông/Bà'),
+    ('OTHER', 'Khác'),
+]
+
+
+class EmployeeDependent(models.Model):
+    employee = models.ForeignKey(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name='dependents',
+        verbose_name="Nhân viên",
+    )
+    full_name = models.CharField(max_length=255, verbose_name="Họ và tên")
+    date_of_birth = models.DateField(null=True, blank=True, verbose_name="Ngày sinh")
+    relationship = models.CharField(max_length=20, choices=DEPENDENT_RELATIONSHIP,
+                                    blank=True, null=True, verbose_name="Mối quan hệ")
+    personal_identification_number = models.CharField(max_length=20, blank=True, null=True,
+                                                      verbose_name="Số CCCD/Mã định danh")
+    tax_code = models.CharField(max_length=20, blank=True, null=True, verbose_name="Mã số thuế")
+    nationality = models.CharField(max_length=100, blank=True, null=True, verbose_name="Quốc tịch")
+    dependent_from = models.DateField(null=True, blank=True, verbose_name="Giảm trừ từ tháng")
+    dependent_to = models.DateField(null=True, blank=True, verbose_name="Giảm trừ đến tháng")
+    is_active = models.BooleanField(default=True, verbose_name="Đang hiệu lực")
+    notes = models.TextField(blank=True, verbose_name="Ghi chú")
+
+    # Xoá mềm: hồ sơ người phụ thuộc là căn cứ giảm trừ thuế nên không xoá cứng.
+    # `is_active` khác `is_deleted`: ngừng hiệu lực vẫn giữ để tính lại kỳ cũ,
+    # còn đã xoá thì loại khỏi mọi kỳ.
+    is_deleted = models.BooleanField(default=False, verbose_name="Đã xoá")
+    deleted_at = models.DateTimeField(null=True, blank=True, verbose_name="Thời điểm xoá")
+    deleted_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='deleted_employee_dependents', verbose_name="Người xoá")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'employee_dependents'
+        verbose_name = "Người phụ thuộc"
+        verbose_name_plural = "Người phụ thuộc"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['employee', 'is_active']),
+            models.Index(fields=['employee', 'is_deleted']),
+            models.Index(fields=['personal_identification_number']),
+        ]
+
+    def __str__(self):
+        return f"{self.full_name} ({self.employee.employee_id})"
