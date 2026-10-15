@@ -1,0 +1,114 @@
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+  }
+
+  html {
+    font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-medium py-2 px-4 rounded-xl transition-all duration-200 tracking-tight shadow-sm;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-xl transition-all duration-200 tracking-tight;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-medium py-2 px-4 rounded-xl transition-all duration-200 tracking-tight shadow-sm;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-100;
+  }
+
+  .input-field {
+    @apply w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200;
+  }
+
+  .table-header {
+    @apply px-6 py-3 whitespace-nowrap text-center text-sm font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200 last:border-r-0;
+  }
+
+  .table-cell {
+    @apply px-6 py-4 whitespace-nowrap text-sm text-gray-800 text-center align-middle border-r border-gray-200 last:border-r-0;
+  }
+
+  .table-cell-context {
+    @apply px-6 py-4 text-sm text-gray-800;
+    max-width: 16rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .table-cell-context-mobile {
+    @apply px-3 py-4 text-xs text-gray-800;
+    max-width: 8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .split-message {
+    @apply transition-all duration-200 ease-in-out;
+  }
+
+  .split-message:hover {
+    @apply shadow-sm;
+  }
+
+  .split-message:not(:last-child) {
+    @apply mb-1;
+  }
+}
+
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Thanh cuộn ngang NHÌN THẤY ĐƯỢC cho bảng nhiều cột.
+   macOS mặc định dùng overlay scrollbar — ẩn hẳn tới khi người dùng cuộn — nên
+   bảng bị cắt bên phải mà không có dấu hiệu nào là cuộn được (HCNS
+   2026-10-14: "phải có 1 cái horizontal scrollbar chứ"). `-webkit-appearance:
+   none` + height cố định buộc WebKit/Blink vẽ thanh cuộn CHIẾM CHỖ thay vì
+   overlay, nên nó hiện thường trực khi nội dung tràn.
+   Vẫn để overflow-x: auto chứ không phải scroll: màn đủ rộng thì không có
+   thanh cuộn thừa. */
+.scrollbar-x-visible {
+  overflow-x: auto;
+  scrollbar-width: thin;                  /* Firefox */
+  scrollbar-color: #94a3b8 #f1f5f9;       /* slate-400 trên slate-100 */
+}
+.scrollbar-x-visible::-webkit-scrollbar {
+  -webkit-appearance: none;
+  height: 10px;
+}
+.scrollbar-x-visible::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 9999px;
+}
+.scrollbar-x-visible::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 9999px;
+  border: 2px solid #f1f5f9;
+}
+.scrollbar-x-visible::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}

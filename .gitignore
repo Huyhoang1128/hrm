@@ -1,0 +1,8 @@
+# Mỗi thư mục backend/ và frontend/ có .gitignore riêng; đây là phần chung.
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+.env
+.env.local

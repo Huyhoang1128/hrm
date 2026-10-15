@@ -1,0 +1,286 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  BriefcaseIcon,
+  EyeIcon,
+  PencilSquareIcon,
+  UsersIcon,
+  TrashIcon,
+  ExclamationCircleIcon,
+} from '@heroicons/react/24/outline';
+import { positionsAPI, departmentsAPI, Position, Department } from '../utils/api';
+import { SelectBox } from '../components/LandingLayout/SelectBox';
+import ConfirmDialog from '../components/ConfirmDialog';
+
+const PositionList: React.FC = () => {
+  const navigate = useNavigate();
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState<string>('all');
+  const [isManagementFilter, setIsManagementFilter] = useState<string>('all');
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [positionToDelete, setPositionToDelete] = useState<Position | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const fetchPositions = async (search = '', department = 'all', isManagement = 'all') => {
+    try {
+      setLoading(true);
+      const params: any = {};
+      if (search) params.search = search;
+      if (department !== 'all') params.department = department;
+      if (isManagement !== 'all') params.is_management = isManagement === 'true';
+      const response = await positionsAPI.list(params);
+      setPositions(response.results || []);
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || 'Không thể tải danh sách vị trí');
+      console.error('Error fetching positions:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDepartments = async () => {
+    try {
+      const response = await departmentsAPI.list();
+      setDepartments(response.results || []);
+    } catch (err) {
+      console.error('Error fetching departments:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchPositions();
+    fetchDepartments();
+  }, []);
+
+  useEffect(() => {
+    if (searchTimeout) clearTimeout(searchTimeout);
+    const timeout = setTimeout(() => fetchPositions(searchTerm, departmentFilter, isManagementFilter), 300);
+    setSearchTimeout(timeout);
+    return () => { if (searchTimeout) clearTimeout(searchTimeout); };
+  }, [searchTerm, departmentFilter, isManagementFilter]);
+
+  const handleDeleteConfirm = async () => {
+    if (!positionToDelete) return;
+    try {
+      setDeleting(true);
+      await positionsAPI.delete(positionToDelete.id);
+      setPositionToDelete(null);
+      fetchPositions(searchTerm, departmentFilter, isManagementFilter);
+    } catch (err: any) {
+      alert('Xóa thất bại: ' + (err.message || 'Lỗi không xác định'));
+      setPositionToDelete(null);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const getDepartmentName = (depts?: Array<{ id: number; name: string; code: string }>) => {
+    if (!depts || depts.length === 0) return 'Không có';
+    return depts.map((d) => d.name).join(', ');
+  };
+
+  const getManagementBadge = (isManagement: boolean) =>
+    isManagement ? (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-700">
+        Quản lý
+      </span>
+    ) : (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
+        Nhân viên
+      </span>
+    );
+
+  const tableHeaders = ['Mã vị trí', 'Chức danh', 'Phòng ban', 'Cấp bậc', 'Loại', 'Thao tác'];
+
+  return (
+    <div className="space-y-6">
+      {/* Page header */}
+      <div className="flex items-center">
+        <div>
+          <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Quản lý vị trí công việc</h1>
+          <p className="text-sm text-gray-900 mt-0.5">Quản lý thông tin vị trí công việc, chức danh và cấp bậc trong tổ chức.</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        {/* Filter */}
+        <div className="mb-5 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-sm font-bold text-gray-900">Tìm kiếm vị trí</h3>
+            {loading && (
+              <div className="flex items-center text-xs text-gray-400 gap-1.5">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
+                Đang tìm kiếm...
+              </div>
+            )}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">
+                Tìm kiếm theo tên, mã vị trí
+              </label>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="input-field"
+                placeholder="Nhập tên hoặc mã vị trí..."
+              />
+            </div>
+            <div>
+              <SelectBox<string>
+                label="Phòng ban"
+                value={departmentFilter}
+                options={[
+                  { value: 'all', label: 'Tất cả phòng ban' },
+                  ...departments.map((dept) => ({
+                    value: String(dept.id),
+                    label: dept.name,
+                  })),
+                ]}
+                onChange={setDepartmentFilter}
+                searchable
+              />
+            </div>
+            <div>
+              <SelectBox<string>
+                label="Loại vị trí"
+                value={isManagementFilter}
+                options={[
+                  { value: 'all', label: 'Tất cả loại' },
+                  { value: 'true', label: 'Vị trí quản lý' },
+                  { value: 'false', label: 'Vị trí nhân viên' },
+                ]}
+                onChange={setIsManagementFilter}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* List header */}
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h2 className="text-sm font-bold text-gray-900">Danh sách vị trí</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Tổng số: {positions.length} vị trí</p>
+          </div>
+          <button
+            className="btn-primary"
+            onClick={() => navigate('/dashboard/positions/create')}
+          >
+            + Thêm vị trí
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+            <p className="mt-4 text-sm text-gray-500">Đang tải dữ liệu...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <div className="h-12 w-12 bg-red-100 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <ExclamationCircleIcon className="h-6 w-6" />
+            </div>
+            <p className="text-sm font-bold text-gray-900">Đã xảy ra lỗi</p>
+            <p className="text-xs text-gray-400 mt-1">{error}</p>
+            <button onClick={() => fetchPositions()} className="btn-primary mt-4">
+              Thử lại
+            </button>
+          </div>
+        ) : (
+          <div className="border border-gray-100 rounded-2xl overflow-x-auto">
+            <table className="w-full min-w-[1200px] divide-y divide-gray-100">
+              <thead className="bg-gray-50">
+                <tr>
+                  {tableHeaders.map((h) => (
+                    <th key={h} className="table-header">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-100">
+                {positions.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="h-12 w-12 bg-primary-100 text-primary-400 rounded-2xl flex items-center justify-center">
+                          <BriefcaseIcon className="h-6 w-6" />
+                        </div>
+                        <p className="text-sm font-bold text-gray-900">Chưa có vị trí nào</p>
+                        <p className="text-xs text-gray-400">Bắt đầu bằng cách thêm vị trí mới</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  positions.map((position) => (
+                    <tr key={position.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="table-cell font-medium">{position.code}</td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-medium text-gray-900">{position.title}</div>
+                        <div className="text-xs text-gray-400 max-w-xs truncate">
+                          {position.description || 'Không có mô tả'}
+                        </div>
+                      </td>
+                      <td className="table-cell">{getDepartmentName(position.department)}</td>
+                      <td className="table-cell">Cấp {position.level}</td>
+                      <td className="table-cell">{getManagementBadge(position.is_management)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => navigate(`/dashboard/positions/${position.id}`)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-primary-600 bg-white border border-primary-200 rounded-lg hover:bg-primary-50 transition-colors"
+                          >
+                            <EyeIcon className="w-3.5 h-3.5" />
+                            Xem
+                          </button>
+                          <button
+                            onClick={() => navigate(`/dashboard/positions/${position.id}/edit`)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-primary-600 bg-white border border-primary-200 rounded-lg hover:bg-primary-50 transition-colors"
+                          >
+                            <PencilSquareIcon className="w-3.5 h-3.5" />
+                            Sửa
+                          </button>
+                          <button
+                            onClick={() => navigate(`/dashboard/positions/${position.id}/employees`)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-emerald-600 bg-white border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors"
+                          >
+                            <UsersIcon className="w-3.5 h-3.5" />
+                            Nhân viên
+                          </button>
+                          <button
+                            onClick={() => setPositionToDelete(position)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                          >
+                            <TrashIcon className="w-3.5 h-3.5" />
+                            Xóa
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <ConfirmDialog
+        open={positionToDelete !== null}
+        variant="danger"
+        title="Xóa vị trí"
+        message={positionToDelete ? `Bạn có chắc chắn muốn xóa vị trí "${positionToDelete.title}" (${positionToDelete.code})?` : ''}
+        confirmLabel="Xóa"
+        loading={deleting}
+        onConfirm={handleDeleteConfirm}
+        onClose={() => setPositionToDelete(null)}
+      />
+    </div>
+  );
+};
+
+export default PositionList;

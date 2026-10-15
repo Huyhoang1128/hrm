@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>In nhiều phiếu giải trình chấm công</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm;
+        }
+        
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 12pt;
+            line-height: 1.5;
+            color: #000;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .container {
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 0;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+        }
+        
+        .company-name {
+            font-size: 16pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        
+        .document-title {
+            font-size: 14pt;
+            font-weight: bold;
+            margin: 15px 0;
+            text-transform: uppercase;
+        }
+        
+        .info-section {
+            margin-bottom: 20px;
+        }
+        
+        .info-row {
+            display: flex;
+            margin-bottom: 5px;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            min-width: 150px;
+        }
+        
+        .info-value {
+            flex: 1;
+        }
+        
+        .table-container {
+            margin: 20px 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        
+        th, td {
+            border: 1px solid #000;
+            padding: 8px;
+            text-align: left;
+            vertical-align: top;
+        }
+        
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .text-center {
+            text-align: center;
+        }
+        
+        .text-right {
+            text-align: right;
+        }
+        
+        .signature-section {
+            margin-top: 40px;
+        }
+        
+        .signature-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 60px;
+        }
+        
+        .signature-box {
+            text-align: center;
+            width: 200px;
+        }
+        
+        .signature-line {
+            border-top: 1px solid #000;
+            margin: 40px 0 5px 0;
+            width: 100%;
+        }
+        
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 10pt;
+            color: #666;
+        }
+        
+        .page-break {
+            page-break-before: always;
+        }
+        
+        .no-print {
+            display: none;
+        }
+        
+        @media print {
+            .no-print {
+                display: none;
+            }
+            
+            body {
+                font-size: 11pt;
+            }
+            
+            .container {
+                max-width: 100%;
+            }
+        }
+        
+        .explanation-count {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 13pt;
+        }
+        
+        .record-number {
+            font-weight: bold;
+            background-color: #f0f0f0;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="company-name">{{ company_name }}</div>
+            <div>---o0o---</div>
+            <div class="document-title">DANH SÁCH PHIẾU GIẢI TRÌNH CHẤM CÔNG</div>
+        </div>
+        
+        <!-- Print info -->
+        <div class="info-section">
+            <div class="info-row">
+                <div class="info-label">Ngày in:</div>
+                <div class="info-value">{{ print_date }}</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Tổng số phiếu:</div>
+                <div class="info-value">{{ total_count }} phiếu</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Người in:</div>
+                <div class="info-value">{{ user.get_full_name|default:user.username }}</div>
+            </div>
+        </div>
+        
+        <!-- Table for multiple explanations -->
+        <div class="table-container">
+            <div class="explanation-count">Danh sách {{ total_count }} phiếu giải trình:</div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 40px">STT</th>
+                        <th style="width: 120px">Mã giải trình</th>
+                        <th style="width: 150px">Nhân viên</th>
+                        <th style="width: 100px">Mã NV</th>
+                        <th style="width: 100px">Ngày chấm công</th>
+                        <th style="width: 100px">Trạng thái cũ</th>
+                        <th style="width: 100px">Trạng thái mới</th>
+                        <th>Lý do</th>
+                        <th style="width: 100px">Trạng thái</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for explanation in explanations %}
+                    <tr>
+                        <td class="text-center">{{ forloop.counter }}</td>
+                        <td>{{ explanation.explanation_code|default:"-" }}</td>
+                        <td>{{ explanation.employee.full_name|default:"-" }}</td>
+                        <td>{{ explanation.employee.employee_id|default:"-" }}</td>
+                        <td>{{ explanation.attendance_date|date:"d/m/Y" }}</td>
+                        <td>{{ explanation.get_original_status_display|default:"-" }}</td>
+                        <td>{{ explanation.get_expected_status_display|default:"-" }}</td>
+                        <td>{{ explanation.reason|truncatechars:50|default:"-" }}</td>
+                        <td>{{ explanation.get_status_display|default:"-" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Detailed information for each explanation -->
+        {% for explanation in explanations %}
+        <div class="page-break">
+            <div class="header">
+                <div class="company-name">{{ company_name }}</div>
+                <div>---o0o---</div>
+                <div class="document-title">PHIẾU GIẢI TRÌNH CHẤM CÔNG</div>
+            </div>
+            
+            <!-- Explanation info -->
+            <div class="info-section">
+                <div class="info-row">
+                    <div class="info-label">Mã giải trình:</div>
+                    <div class="info-value">{{ explanation.explanation_code|default:"-" }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Ngày tạo:</div>
+                    <div class="info-value">{{ explanation.created_at|date:"d/m/Y H:i" }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Nhân viên:</div>
+                    <div class="info-value">{{ explanation.employee.full_name|default:"-" }} ({{ explanation.employee.employee_id|default:"-" }})</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Phòng ban:</div>
+                    <div class="info-value">{{ explanation.employee.department.name|default:"-" }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Vị trí:</div>
+                    <div class="info-value">{{ explanation.employee.position.title|default:"-" }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Ngày chấm công:</div>
+                    <div class="info-value">{{ explanation.attendance_date|date:"d/m/Y" }}</div>
+                </div>
+            </div>
+            
+            <!-- Status information -->
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Trạng thái cũ</th>
+                            <th>Trạng thái đề xuất</th>
+                            <th>Trạng thái hiện tại</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="text-center">{{ explanation.get_original_status_display|default:"-" }}</td>
+                            <td class="text-center">{{ explanation.get_expected_status_display|default:"-" }}</td>
+                            <td class="text-center">{{ explanation.get_status_display|default:"-" }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Reason and notes -->
+            <div class="info-section">
+                <div class="info-row">
+                    <div class="info-label">Lý do giải trình:</div>
+                </div>
+                <div style="border: 1px solid #000; padding: 10px; min-height: 80px; margin-bottom: 20px;">
+                    {{ explanation.reason|default:"-"|linebreaks }}
+                </div>
+                
+                {% if explanation.approval_note %}
+                <div class="info-row">
+                    <div class="info-label">Ghi chú phê duyệt:</div>
+                </div>
+                <div style="border: 1px solid #000; padding: 10px; min-height: 60px; margin-bottom: 20px;">
+                    {{ explanation.approval_note|default:"-"|linebreaks }}
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Approval information -->
+            {% if explanation.direct_manager_approved or explanation.hr_approved %}
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Cấp phê duyệt</th>
+                            <th>Người phê duyệt</th>
+                            <th>Thời gian</th>
+                            <th>Trạng thái</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if explanation.direct_manager_approved %}
+                        <tr>
+                            <td>Quản lý trực tiếp</td>
+                            <td>{{ explanation.direct_manager_approved_by.full_name|default:"-" }}</td>
+                            <td>{{ explanation.direct_manager_approved_at|date:"d/m/Y H:i"|default:"-" }}</td>
+                            <td>Đã duyệt</td>
+                        </tr>
+                        {% endif %}
+                        
+                        {% if explanation.hr_approved %}
+                        <tr>
+                            <td>Phòng Nhân sự</td>
+                            <td>{{ explanation.hr_approved_by.full_name|default:"-" }}</td>
+                            <td>{{ explanation.hr_approved_at|date:"d/m/Y H:i"|default:"-" }}</td>
+                            <td>Đã duyệt</td>
+                        </tr>
+                        {% endif %}
+                        
+                        {% if explanation.approved_by %}
+                        <tr>
+                            <td>Phê duyệt cuối</td>
+                            <td>{{ explanation.approved_by.full_name|default:"-" }}</td>
+                            <td>{{ explanation.approved_at|date:"d/m/Y H:i"|default:"-" }}</td>
+                            <td>{{ explanation.get_approval_decision_display|default:"-" }}</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+            
+            <!-- Signatures -->
+            <div class="signature-section">
+                <div class="signature-row">
+                    <div class="signature-box">
+                        <div>NGƯỜI GIẢI TRÌNH</div>
+                        <div class="signature-line"></div>
+                        <div>{{ explanation.employee.full_name|default:"-" }}</div>
+                    </div>
+                    
+                    {% if explanation.direct_manager_approved_by %}
+                    <div class="signature-box">
+                        <div>QUẢN LÝ TRỰC TIẾP</div>
+                        <div class="signature-line"></div>
+                        <div>{{ explanation.direct_manager_approved_by.full_name|default:"-" }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if explanation.hr_approved_by %}
+                    <div class="signature-box">
+                        <div>PHÒNG NHÂN SỰ</div>
+                        <div class="signature-line"></div>
+                        <div>{{ explanation.hr_approved_by.full_name|default:"-" }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div class="footer">
+                <div>Phiếu giải trình số {{ forloop.counter }}/{{ total_count }} - In ngày {{ print_date }}</div>
+            </div>
+        </div>
+        {% endfor %}
+        
+        <!-- Print button (only visible on screen) -->
+        <div class="no-print" style="text-align: center; margin-top: 30px;">
+            <button onclick="window.print()" style="padding: 10px 20px; font-size: 14pt; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                In tài liệu
+            </button>
+            <button onclick="window.close()" style="padding: 10px 20px; font-size: 14pt; background-color: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; margin-left: 10px;">
+                Đóng
+            </button>
+        </div>
+    </div>
+    
+    <script>
+        // Auto-print when page loads (optional)
+        // window.onload = function() {
+        //     window.print();
+        // };
+        
+        // After printing, close the window (optional)
+        window.onafterprint = function() {
+            // window.close();
+        };
+    </script>
+</body>
+</html>

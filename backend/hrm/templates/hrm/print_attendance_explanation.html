@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phiếu Giải Trình Chấm Công - {{ explanation.explanation_code }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            color: #333;
+        }
+
+        /* ===== HEADER MỚI ===== */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .header-left {
+            width: 45%;
+            font-size: 18pt;
+            font-weight: bold;
+            text-align: left;
+        }
+
+        .header-right {
+            width: 55%;
+            text-align: right;
+        }
+
+        .document-title {
+            font-size: 16pt;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            font-size: 14pt;
+            margin-bottom: 4px;
+            margin-right: 10px;
+            font-style: italic;
+        }
+
+        /* ===== PHẦN CÒN LẠI GIỮ NGUYÊN ===== */
+        .info-section {
+            margin-bottom: 20px;
+        }
+        .info-row {
+            display: flex;
+            margin-bottom: 8px;
+        }
+        .info-label {
+            width: 150px;
+            font-weight: bold;
+        }
+        .info-value {
+            flex: 1;
+        }
+        .explanation-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .explanation-table th, .explanation-table td {
+            border: 1px solid #000;
+            padding: 8px;
+            text-align: left;
+            vertical-align: top;
+        }
+        .signature-section {
+            margin-top: 40px;
+        }
+        .signature-row {
+            display: flex;
+            justify-content: space-between;
+        }
+        .signature-box {
+            width: 30%;
+            text-align: center;
+        }
+        .signature-name {
+            margin-top: 80px;
+            font-weight: bold;
+        }
+        @media print {
+            .no-print {
+                display: none;
+            }
+        }
+        .print-button {
+            padding: 10px 20px;
+            font-size: 14pt;
+            margin: 5px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+        }
+        .info-row-2col {
+            display: flex;
+            margin-bottom: 8px;
+        }
+
+        .info-col {
+            display: flex;
+            align-items: center;
+        }
+
+        .info-col.left {
+            width: 50%;
+        }
+
+        .info-col.right {
+            width: 50%;
+        }
+
+        .info-col .info-label {
+            min-width: 150px;
+            font-weight: bold;
+            white-space: nowrap;
+            margin-right: 15px;
+        }
+
+        .info-col .info-value {
+            white-space: nowrap;
+        }
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 25px;
+        }
+
+        .header-left,
+        .header-right {
+            width: 48%;
+        }
+
+        /* CÔNG TY – căn giữa trong cột trái */
+        .header-left {
+            text-align: center;
+        }
+
+        .company-name {
+            font-size: 16pt;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        /* PHẦN PHẢI */
+        .header-right {
+            text-align: center;
+        }
+
+        .document-title {
+            font-size: 15pt;
+            font-weight: bold;
+            margin-bottom: 6px;
+        }
+
+        .recipient {
+            font-size: 13pt;
+            margin-bottom: 6px;
+        }
+
+        .date-text {
+            font-size: 12pt;
+            font-style: italic;
+        }
+
+    </style>
+
+</head>
+<body>
+    <div class="no-print" style="text-align: center; margin-bottom: 20px;">
+        <button class="print-button" onclick="window.print()">🖨️ In Phiếu</button>
+        <button class="print-button" onclick="window.close()" style="background-color: #6c757d;">✕ Đóng</button>
+    </div>
+    
+    <div class="header-row">
+        <!-- CỘT TRÁI -->
+        <div class="header-left">
+            <div class="company-name">
+                {{ company_name }}
+            </div>
+        </div>
+
+        <!-- CỘT PHẢI -->
+        <div class="header-right">
+            <div class="document-title">
+                GIẢI TRÌNH CHẤM CÔNG
+            </div>
+            <div class="recipient">
+                <i>Kính gửi:</i> <b>Phòng Hành chính nhân sự</b>
+            </div>
+            <div class="date-text">
+                Hà Nội, ngày {{ today|date:"d" }} tháng {{ today|date:"m" }} năm {{ today|date:"Y" }}
+            </div>
+        </div>
+    </div>
+
+    
+    <div class="info-section">
+        <div class="info-row">
+            <div class="info-label">Họ và tên:</div>
+            <div class="info-value">{{ explanation.employee.full_name }}</div>
+        </div>
+        <div class="info-row-2col">
+            <div class="info-col left">
+                <div class="info-label">Mã nhân viên:</div>
+                <div class="info-value">
+                    {{ explanation.employee.employee_id }}
+                </div>
+            </div>
+
+            <div class="info-col right">
+                <div class="info-label">Phòng/Ban/Bộ phận:</div>
+                <div class="info-value">
+                    {{ explanation.employee.department.name|default:"Không có" }}
+                </div>
+            </div>
+        </div>
+</div>
+
+    </div>
+</div>
+
+    </div>
+    
+    <div class="table-container">
+        <table class="explanation-table">
+            <thead>
+                <tr>
+                    <th style="width: 18%;">Ngày</th>
+                    <th style="width: 22%;">Lỗi</th>
+                    <th style="width: 40%;">Giải trình</th>
+                    <th style="width: 20%;">Xác nhận của quản lý trực tiếp</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>{{ explanation.attendance_date|date:"d/m/Y" }}</td>
+                    <td>{{ explanation.get_original_status_display }}</td>
+                    <td>{{ explanation.reason|linebreaks }}</td>
+                    <td>
+                        {% if explanation.direct_manager_approved %}
+                            {{ explanation.direct_manager_approved_by.full_name|default:"" }}
+                            {% if explanation.direct_manager_approved_at %}<br><span style="font-size:10pt;">{{ explanation.direct_manager_approved_at|date:"d/m/Y H:i" }}</span>{% endif %}
+                        {% else %}
+                            <span style="color:#888;"></span>
+                        {% endif %}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    {% if explanation.direct_manager_approved or explanation.hr_approved %}
+    <div class="info-section">
+        <h3>Thông tin phê duyệt</h3>
+        
+        {% if explanation.direct_manager_approved %}
+        <div class="info-row">
+            <div class="info-label">Quản lý trực tiếp:</div>
+            <div class="info-value">
+                {{ explanation.direct_manager_approved_by.full_name|default:"Không có" }}
+                {% if explanation.direct_manager_approved_at %}
+                - {{ explanation.direct_manager_approved_at|date:"d/m/Y H:i" }}
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if explanation.hr_approved %}
+        <div class="info-row">
+            <div class="info-label">Phòng Nhân sự:</div>
+            <div class="info-value">
+                {{ explanation.hr_approved_by.full_name|default:"Không có" }}
+                {% if explanation.hr_approved_at %}
+                - {{ explanation.hr_approved_at|date:"d/m/Y H:i" }}
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if explanation.approved_by %}
+        <div class="info-row">
+            <div class="info-label">Người duyệt cuối:</div>
+            <div class="info-value">
+                {{ explanation.approved_by.full_name }}
+                {% if explanation.approved_at %}
+                - {{ explanation.approved_at|date:"d/m/Y H:i" }}
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if explanation.approval_note %}
+        <div class="info-row">
+            <div class="info-label">Ghi chú phê duyệt:</div>
+            <div class="info-value">{{ explanation.approval_note|linebreaks }}</div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <div class="signature-section">
+        <div class="signature-row">
+            <div class="signature-box">
+                <div class="signature-name">Xác nhận P.HCNS</div>
+            </div>
+            
+            <div class="signature-box">
+                <div class="signature-name">Trưởng Bộ phận</div>
+            </div>
+            
+            <div class="signature-box">
+                <div class="signature-name">Người lập</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Tự động in khi trang tải xong (chỉ trên máy in)
+        window.addEventListener('load', function() {
+            // Kiểm tra xem có tham số ?print=true trong URL không
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('print') === 'true') {
+                setTimeout(function() {
+                    window.print();
+                }, 500);
+            }
+        });
+        
+        // Thêm nút quay lại
+        document.addEventListener('DOMContentLoaded', function() {
+            const backButton = document.createElement('button');
+            backButton.className = 'print-button no-print';
+            backButton.textContent = '← Quay lại';
+            backButton.style.backgroundColor = '#6c757d';
+            backButton.style.marginRight = '10px';
+            backButton.onclick = function() {
+                window.history.back();
+            };
+            
+            const buttonContainer = document.querySelector('.no-print');
+            if (buttonContainer) {
+                buttonContainer.insertBefore(backButton, buttonContainer.firstChild);
+            }
+        });
+    </script>
+</body>
+</html>
