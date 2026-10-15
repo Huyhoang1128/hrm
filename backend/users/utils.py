@@ -8,6 +8,24 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def get_user_display_name(user):
+    """Họ tên hiển thị của 1 User.
+
+    User Django lưu tên Việt Nam tách đôi: first_name = tên (từ cuối),
+    last_name = họ + đệm, nên user.get_full_name() ("first last") ra tên bị
+    đảo. Ưu tiên họ tên của hồ sơ nhân viên, thiếu thì ghép đúng thứ tự họ
+    trước tên, cuối cùng mới tới username.
+    """
+    if not user:
+        return ''
+    # Không có hồ sơ: truy cập related OneToOne ném RelatedObjectDoesNotExist
+    # (lớp con của AttributeError) -> getattr trả None.
+    employee = getattr(user, 'employee', None)
+    if employee is not None and getattr(employee, 'full_name', ''):
+        return employee.full_name
+    return ' '.join(p for p in (user.last_name, user.first_name) if p) or user.username
+
+
 def get_user_role(user):
     """
     Determine the role of a user based on their profile associations

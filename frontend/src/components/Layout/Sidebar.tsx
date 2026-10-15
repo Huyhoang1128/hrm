@@ -39,6 +39,7 @@ import {
   DevicePhoneMobileIcon,
   ChatBubbleBottomCenterTextIcon,
   ExclamationTriangleIcon,
+  BanknotesIcon,
 } from '@heroicons/react/24/outline';
 import { BRAND } from '@/config/brand';
 
@@ -387,6 +388,12 @@ const navigationItems: NavigationItem[] = [
         href: '/dashboard/leave-violations',
         icon: ExclamationTriangleIcon,
         roles: ['ADMIN', 'HR', 'USER', 'STAFF', 'CUSTOMER'],
+      },
+      {
+        name: 'Thanh toán & mua hàng',
+        href: '/dashboard/payment-documents',
+        icon: BanknotesIcon,
+        roles: ['ADMIN', 'HR'],
       },
       {
         name: 'Template đơn từ',

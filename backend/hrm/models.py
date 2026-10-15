@@ -5731,3 +5731,5 @@ class MeetingRoomBookingLog(models.Model):
 # model, hoặc thấy không ổn định tuỳ thứ tự import.
 # ─────────────────────────────────────────────────────────────────────────────
 from .violation_models import BlockedRequestAttempt, ViolationPenaltyOverride  # noqa: E402,F401
+
+from .payment_document_models import PaymentDocument, PaymentDocumentAttachment  # noqa: E402,F401
