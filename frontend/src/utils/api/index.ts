@@ -35,6 +35,8 @@ export type {
   Asset,
   AssetAssignmentHistory,
   AssetMaintenance,
+  AssetInventoryCheck,
+  AssetInventoryCheckResult,
   AssetStats,
   CompanyConfig,
   ShiftConfig,
@@ -79,6 +81,7 @@ export {
   assetsAPI,
   assetAssignmentsAPI,
   assetMaintenanceAPI,
+  assetInventoryChecksAPI,
 } from './assets.api';
 export { companyConfigAPI, hrmAPI, attendanceRuleAPI } from './company-config.api';
 
@@ -108,6 +111,7 @@ import {
   assetsAPI,
   assetAssignmentsAPI,
   assetMaintenanceAPI,
+  assetInventoryChecksAPI,
 } from './assets.api';
 import { companyConfigAPI, hrmAPI, attendanceRuleAPI } from './company-config.api';
 
@@ -131,6 +135,7 @@ export default {
   assets: assetsAPI,
   assetAssignments: assetAssignmentsAPI,
   assetMaintenance: assetMaintenanceAPI,
+  assetInventoryChecks: assetInventoryChecksAPI,
   hrm: hrmAPI,
   attendanceRule: attendanceRuleAPI,
   birthdayWishes: birthdayWishesAPI,

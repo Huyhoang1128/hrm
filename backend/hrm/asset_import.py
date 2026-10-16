@@ -25,7 +25,10 @@ from django.utils import timezone
 from openpyxl import load_workbook
 
 from employee.models import CompanyUnit, Department, Employee, Position
-from .models import Asset, AssetAssignmentHistory
+from .models import (
+    ASSET_TYPE_MAX_LENGTH, STANDARD_ASSET_TYPES, Asset, AssetAssignmentHistory,
+    normalize_asset_type,
+)
 
 
 SHEET_NAME = "Tài sản"
@@ -86,27 +89,10 @@ REGION_LOOKUP = {
     "miền nam": "MIEN_NAM",
 }
 
-ASSET_TYPE_LOOKUP = {
-    # Chỉ giữ nhãn tiếng Việt — English code đã match qua .upper() + VALID_ASSET_TYPES
-    "máy tính xách tay": "LAPTOP",
-    "máy tính để bàn": "DESKTOP",
-    "màn hình": "MONITOR",
-    "điện thoại": "PHONE",
-    "máy tính bảng": "TABLET",
-    "máy in": "PRINTER",
-    "máy scan": "SCANNER",
-    "thiết bị mạng": "NETWORK",
-    "máy chủ": "SERVER",
-    "nội thất": "FURNITURE",
-    "phương tiện": "VEHICLE",
-    "khác": "OTHER",
+DEPRECIATION_METHOD_LOOKUP = {
+    "đường thẳng": "STRAIGHT_LINE",
 }
-
-VALID_ASSET_TYPES = {
-    "LAPTOP", "DESKTOP", "MONITOR", "SIM", "PHONE", "TABLET",
-    "PRINTER", "SCANNER", "NETWORK", "SERVER", "FURNITURE", "VEHICLE", "OTHER",
-}
-
+VALID_DEPRECIATION_METHODS = {"STRAIGHT_LINE"}
 
 # ======== Helpers ========
 
@@ -180,6 +166,19 @@ def resolve_department(value):
     return None, f"Không tìm thấy phòng ban: {raw}"
 
 
+def resolve_department_by_code(value):
+    """Chỉ khớp theo MÃ phòng ban (không fallback qua tên) — dùng cho cột
+    "Mã phòng ban" (Phòng ban sử dụng), theo yêu cầu HCNS 2026-09-18: liên
+    kết bằng mã để tránh sai sót do trùng/gõ nhầm tên phòng ban."""
+    raw = norm(value)
+    if not raw:
+        return None, ""
+    dept = Department.objects.filter(code__iexact=raw).first()
+    if dept:
+        return dept, ""
+    return None, f"Không tìm thấy phòng ban theo mã: {raw}"
+
+
 def resolve_employee(value):
     raw = norm(value)
     if not raw:
@@ -237,6 +236,34 @@ def parse_recipients(raw_value) -> list[tuple[str, int | None]]:
         else:
             results.append((part.strip(), None))
     return results
+
+
+def _pick_recipient_and_initiator(pick_any, headers: dict[str, int]) -> tuple:
+    """Tách cột 'người sử dụng' (assigned_to — người đang giữ/dùng tài sản)
+    khỏi cột 'người bàn giao' (assigned_by — người THỰC HIỆN việc bàn giao).
+
+    Format MỚI (từ 2026-09-22, sau khi phát hiện 2 cột "Mã/Tên người bàn giao"
+    trong Excel đang lưu NHẦM data của người sử dụng): file có thêm cột riêng
+    "Mã/Tên người sử dụng" — khi đó "Mã/Tên người bàn giao" mới đúng là người
+    thực hiện bàn giao (assigned_by, xem AssetDetailModal.tsx nhãn "Người bàn
+    giao:").
+
+    Format CŨ (file export trước đó): chỉ có "Mã/Tên người bàn giao", thực
+    chất mang nghĩa người sử dụng/người ĐƯỢC bàn giao — giữ tương thích
+    ngược, coi là recipient, không có initiator riêng từ Excel (import vẫn
+    tự fallback initiator = asset.managed_by như cũ).
+    """
+    has_new_user_columns = "mã người sử dụng" in headers or "tên người sử dụng" in headers
+    if has_new_user_columns:
+        recipient_raw = pick_any("Mã người sử dụng", "Tên người sử dụng")
+        initiator_raw = pick_any("Mã người bàn giao", "Tên người bàn giao")
+    else:
+        recipient_raw = pick_any(
+            "Mã người bàn giao", "Tên người bàn giao",
+            "Người được bàn giao", "Người nhận", "Bàn giao cho",
+        )
+        initiator_raw = None
+    return recipient_raw, initiator_raw
 
 
 def parse_date(value):
@@ -299,32 +326,26 @@ def parse_row(row_cells: list, headers: dict[str, int]) -> tuple[dict | None, li
 
     name = norm(pick_any("Mã thiết bị", "Tên tài sản"))
     asset_type_raw = norm(pick("Phân loại"))
-    asset_type = ""
-    if asset_type_raw:
-        upper = asset_type_raw.upper()
-        if upper in VALID_ASSET_TYPES:
-            asset_type = upper
-        else:
-            asset_type = ASSET_TYPE_LOOKUP.get(asset_type_raw.lower(), "")
+    # "Phân loại" là text tự do: gõ gì lưu nấy, không
+    # còn quy giá trị lạ về "Khác". Chỉ gom về mã chuẩn khi trùng y hệt nhãn/mã
+    # loại chuẩn (vd "Laptop", "Sim") — xem normalize_asset_type.
+    asset_type = normalize_asset_type(asset_type_raw)
     if not name:
         errors.append("Thiếu Mã thiết bị")
         return None, errors
+    if len(asset_type) > ASSET_TYPE_MAX_LENGTH:
+        errors.append(f"Phân loại dài quá {ASSET_TYPE_MAX_LENGTH} ký tự: {asset_type_raw[:40]}…")
+        return None, errors
 
-    # Continuation row: có Mã thiết bị nhưng thiếu Phân loại → chỉ parse handover
-    if not asset_type:
-        # Ưu tiên "Mã người bàn giao" (khớp employee_id, tránh nhầm do trùng
-        # tên — xem resolve_employee) trước khi fallback "Tên người bàn
-        # giao"; 3 alias cuối giữ cho file cũ trước khi export tách cột
-        # Mã/Tên (ff2f9aa) — file export hiện tại KHÔNG có cột "Người được
-        # bàn giao" gộp nữa, chỉ có "Mã/Tên người bàn giao" tách riêng, nên
-        # thiếu 2 alias này khiến import không đọc được recipient nào cả dù
-        # cột trong file có dữ liệu (bug thực tế, HCNS báo 2026-09-23).
-        recipient_raw = pick_any(
-            "Mã người bàn giao", "Tên người bàn giao",
-            "Người được bàn giao", "Người nhận", "Bàn giao cho",
-        )
+    # Continuation row: có Mã thiết bị nhưng cột Phân loại BỎ TRỐNG → chỉ parse
+    # handover (Phân loại có gõ bất kỳ chữ gì thì là dòng tài sản bình thường).
+    if not asset_type_raw:
+        recipient_raw, initiator_raw = _pick_recipient_and_initiator(pick_any, headers)
         if not norm(recipient_raw):
-            errors.append(f"Loại không hợp lệ: {asset_type_raw or '(trống)'}")
+            errors.append(
+                "Thiếu Phân loại (nếu đây là dòng bổ sung người bàn giao/sử dụng "
+                "cho tài sản ở trên thì cần điền cột Mã/Tên người sử dụng)"
+            )
             return None, errors
         parsed_recipients = parse_recipients(recipient_raw)
         handover_date = parse_date(pick_any("Ngày bàn giao", "Ngày bàn giao cho NV"))
@@ -344,11 +365,17 @@ def parse_row(row_cells: list, headers: dict[str, int]) -> tuple[dict | None, li
                     "quantity": rec_qty if rec_qty is not None else handover_quantity_default,
                     "notes": handover_notes,
                 })
+        initiator_emp = None
+        if initiator_raw:
+            initiator_emp, initiator_err = resolve_employee(initiator_raw)
+            if initiator_err:
+                warnings.append(initiator_err)
         return {
             "name": name,
             "_continuation": True,
             "_handover_recipients": recipients_list,
             "_handover_date": handover_date,
+            "_handover_initiator": initiator_emp,
         }, warnings
 
     # Tách 2 cột riêng biệt:
@@ -449,6 +476,12 @@ def parse_row(row_cells: list, headers: dict[str, int]) -> tuple[dict | None, li
     elif asset_type == "OTHER":
         qty = parse_int(pick("Số lượng"), default=0) or 0
         specs = {"type_name": norm(pick("Tên loại chi tiết")), "quantity": qty}
+    elif Asset.is_multi_holder_type(asset_type):
+        # Phân loại gõ tự do: có Số lượng + bàn giao nhiều người như "Khác".
+        specs = {"quantity": parse_int(pick("Số lượng"), default=0) or 0}
+        type_name = norm(pick("Tên loại chi tiết"))
+        if type_name:
+            specs["type_name"] = type_name
 
     dept, dept_err = resolve_department(
         pick_any("Phòng ban quản lý", "Phòng ban", "Phòng ban ID")
@@ -464,14 +497,20 @@ def parse_row(row_cells: list, headers: dict[str, int]) -> tuple[dict | None, li
     if emp_err:
         warnings.append(emp_err)
 
-    # Parse recipients — hỗ trợ cả format đơn "Tên" lẫn gộp "Tên (qty), Tên (qty)".
-    # Ưu tiên cột "Mã người bàn giao" (khớp employee_id, tránh nhầm do trùng
-    # tên — xem resolve_employee) trước khi fallback "Tên người bàn giao";
-    # 3 alias cuối giữ cho file cũ trước khi export tách cột Mã/Tên (ff2f9aa).
-    recipient_raw = pick_any(
-        "Mã người bàn giao", "Tên người bàn giao",
-        "Người được bàn giao", "Người nhận", "Bàn giao cho",
+    # Phòng ban SỬ DỤNG (khác phòng ban quản lý ở trên) — liên kết bằng MÃ
+    # phòng ban, không dùng tên, để tránh nhầm lẫn khi trùng/gõ sai tên.
+    usage_dept, usage_dept_err = resolve_department_by_code(
+        pick_any("Mã phòng ban", "Mã phòng ban sử dụng")
     )
+    if usage_dept_err:
+        warnings.append(usage_dept_err)
+
+    # Parse recipients — hỗ trợ cả format đơn "Tên" lẫn gộp "Tên (qty), Tên (qty)".
+    # Ưu tiên cột "Mã người sử dụng"/"Mã người bàn giao" (khớp employee_id,
+    # tránh nhầm do trùng tên — xem resolve_employee) trước khi fallback
+    # cột "Tên...". Xem _pick_recipient_and_initiator() để biết cách phân
+    # biệt "người sử dụng" (assigned_to) và "người bàn giao" (assigned_by).
+    recipient_raw, initiator_raw = _pick_recipient_and_initiator(pick_any, headers)
     parsed_recipients = parse_recipients(recipient_raw)
 
     handover_date = parse_date(pick_any("Ngày bàn giao", "Ngày bàn giao cho NV"))
@@ -494,6 +533,12 @@ def parse_row(row_cells: list, headers: dict[str, int]) -> tuple[dict | None, li
                 "notes": handover_notes,
             })
 
+    initiator_emp = None
+    if initiator_raw:
+        initiator_emp, initiator_err = resolve_employee(initiator_raw)
+        if initiator_err:
+            warnings.append(initiator_err)
+
     if not condition:
         condition = "EXCELLENT"
 
@@ -510,13 +555,23 @@ def parse_row(row_cells: list, headers: dict[str, int]) -> tuple[dict | None, li
         "purchase_date": parse_date(pick("Ngày mua")),
         "purchase_price": parse_decimal(pick("Giá mua"), Decimal("0")),
         "warranty_period": parse_int(pick("Bảo hành (tháng)"), default=0) or 0,
+        "depreciation_period_months": parse_int(pick("Thời gian khấu hao (tháng)")),
+        "depreciation_method": (
+            lookup_enum(pick("Phương pháp khấu hao"), DEPRECIATION_METHOD_LOOKUP, VALID_DEPRECIATION_METHODS)
+            or "STRAIGHT_LINE"
+        ),
         "supplier": norm(pick("Nhà cung cấp")),
         "description": norm(pick_any("Mô tả / Ghi chú", "Mô tả")),
         "department": dept,
         "managed_by": emp,
+        "dimensions": norm(pick("Kích thước")),
+        "usage_area": norm(pick("Khu vực sử dụng")),
+        "usage_department": usage_dept,
+        "facility_code": norm(pick_any("Mã cơ sở", "Mã cơ sở sử dụng")),
         "specifications": specs,
         "_handover_recipients": recipients_list,
         "_handover_date": handover_date,
+        "_handover_initiator": initiator_emp,
     }
     return payload, warnings
 
@@ -566,6 +621,7 @@ def import_workbook(workbook) -> dict:
         is_continuation = payload.pop("_continuation", False)
         recipients = payload.pop("_handover_recipients", [])
         handover_date = payload.pop("_handover_date", None)
+        handover_initiator_explicit = payload.pop("_handover_initiator", None)
 
         try:
             with transaction.atomic():
@@ -594,6 +650,14 @@ def import_workbook(workbook) -> dict:
                     existing = Asset.objects.filter(
                         name=asset_name, asset_type=asset_type, is_deleted=False
                     ).first()
+                    if existing is None and asset_type not in STANDARD_ASSET_TYPES:
+                        # Trước 2026-10-12 "Phân loại" lạ bị lưu thành "Khác" +
+                        # Tên loại chi tiết = chữ đã gõ. Import lại thì cập nhật
+                        # (chuyển sang đúng loại đã gõ) thay vì tạo bản trùng.
+                        existing = Asset.objects.filter(
+                            name=asset_name, asset_type="OTHER", is_deleted=False,
+                            specifications__type_name__iexact=asset_type,
+                        ).first()
                     if existing:
                         for field, value in payload.items():
                             setattr(existing, field, value)
@@ -614,7 +678,7 @@ def import_workbook(workbook) -> dict:
                     handover_notes = rec["notes"]
 
                     # Validate quantity theo scope multi-holder
-                    if asset.asset_type not in Asset.MULTI_HOLDER_TYPES and handover_quantity != 1:
+                    if not Asset.is_multi_holder_type(asset.asset_type) and handover_quantity != 1:
                         failed.append({
                             "row": r,
                             "messages": [
@@ -649,7 +713,7 @@ def import_workbook(workbook) -> dict:
                     assigned_date = handover_date or timezone.now().date()
 
                     # Non-multi-holder: auto-return holder cũ nếu khác người (single-holder).
-                    if asset.asset_type not in Asset.MULTI_HOLDER_TYPES:
+                    if not Asset.is_multi_holder_type(asset.asset_type):
                         if asset.assigned_to and asset.assigned_to_id != recipient.id:
                             AssetAssignmentHistory.objects.filter(
                                 asset=asset,
@@ -668,7 +732,10 @@ def import_workbook(workbook) -> dict:
                         asset.status = "IN_USE"
                     asset.save()
 
-                    handover_initiator = asset.managed_by
+                    # Ưu tiên "Mã/Tên người bàn giao" người dùng điền trong Excel
+                    # (chỉ có ở format MỚI — xem _pick_recipient_and_initiator);
+                    # nếu không có, fallback về Người quản lý (Kho) như cũ.
+                    handover_initiator = handover_initiator_explicit or asset.managed_by
                     hist = AssetAssignmentHistory.objects.filter(
                         asset=asset, assigned_to=recipient, status="CONFIRMED",
                     ).first()
@@ -676,7 +743,13 @@ def import_workbook(workbook) -> dict:
                         hist.assigned_date = assigned_date
                         hist.assignment_notes = handover_notes or hist.assignment_notes or "Bàn giao qua import Excel"
                         hist.assigned_quantity = handover_quantity
-                        if handover_initiator and not hist.assigned_by:
+                        # Initiator điền tường minh trong Excel → luôn ghi đè (user
+                        # chủ động khai báo). Initiator suy ra từ managed_by (fallback)
+                        # → chỉ điền khi hist chưa có, tránh mỗi lần re-import lại ghi
+                        # đè người bàn giao thật đã lưu trước đó bằng phỏng đoán chung.
+                        if handover_initiator_explicit:
+                            hist.assigned_by = handover_initiator_explicit
+                        elif handover_initiator and not hist.assigned_by:
                             hist.assigned_by = handover_initiator
                         hist.save()
                     else:

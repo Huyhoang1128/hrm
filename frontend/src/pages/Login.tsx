@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,9 +16,19 @@ const fadeUp = {
   }),
 };
 
+// Chỉ chấp nhận redirect nội bộ dạng "/path" — chặn "//evil.com" hay
+// "https://..." (protocol-relative / absolute URL) để tránh open-redirect.
+const sanitizeRedirect = (raw: string | null): string | null => {
+  if (!raw) return null;
+  if (!raw.startsWith('/') || raw.startsWith('//')) return null;
+  return raw;
+};
+
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { isAuthenticated, loading, login } = useAuth();
+  const redirectTo = sanitizeRedirect(searchParams.get('redirect')) || '/home';
 
   const [formData, setFormData] = useState({ username: '', password: '' });
   const [fieldErrors, setFieldErrors] = useState({ username: '', password: '' });
@@ -40,7 +50,7 @@ export default function Login() {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/home" replace />;
+    return <Navigate to={redirectTo} replace />;
   }
 
   const validate = () => {
@@ -101,7 +111,7 @@ export default function Login() {
     setServerError('');
     try {
       await login(formData.username, formData.password);
-      navigate('/home');
+      navigate(redirectTo);
     } catch (err: any) {
       setServerError(err.response?.data?.message || 'Tên đăng nhập hoặc mật khẩu không đúng');
     } finally {

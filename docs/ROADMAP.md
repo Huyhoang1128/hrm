@@ -9,7 +9,7 @@ Các tính năng dự kiến bổ sung, chia theo giai đoạn.
 2. **Migration sinh bằng `makemigrations`** trên repo này, không viết tay số thứ tự.
 3. Mỗi tính năng là một nhánh/PR riêng, kèm test backend và FE build qua (`npm run build`).
 
-Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 tuần.
+Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 tuần. ✅ = đã xong.
 
 ---
 
@@ -17,11 +17,11 @@ Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 
 
 | # | Tính năng | Cỡ | Ghi chú |
 | --- | --- | --- | --- |
-| 1.1 | **Người phụ thuộc** (giảm trừ gia cảnh) trên hồ sơ NV | S | Model riêng thay cho trường "số người phụ thuộc"; sau đó nối vào bảng lương. |
-| 1.2 | **Chứng từ thanh toán / đề xuất mua hàng / đề nghị tạm ứng**: đính kèm file, trạng thái, đánh dấu đã soát, xuất Excel | M | Một tab trong "Đơn từ", chỉ HR/Admin thấy. |
-| 1.3 | **Kiểm kê tài sản** + giao diện ghi bảo trì | S | API bảo trì đã có, chỉ thiếu UI. |
-| 1.4 | **Ảnh tài sản + khấu hao đường thẳng** | S–M | Các field đã có trong model. |
-| 1.5 | **Mã QR tài sản** + đăng nhập chuyển hướng `/login?redirect=` | S | Cần thư viện `qrcode`. |
+| 1.1 | ✅ **Người phụ thuộc** (giảm trừ gia cảnh) trên hồ sơ NV | S | Model riêng thay cho trường "số người phụ thuộc"; sau đó nối vào bảng lương. |
+| 1.2 | ✅ **Chứng từ thanh toán / đề xuất mua hàng / đề nghị tạm ứng**: đính kèm file, trạng thái, đánh dấu đã soát, xuất Excel | M | Một tab trong "Đơn từ", chỉ HR/Admin thấy. |
+| 1.3 | ✅ **Kiểm kê tài sản** + giao diện ghi bảo trì | S | API bảo trì đã có, chỉ thiếu UI. |
+| 1.4 | ✅ **Ảnh tài sản + khấu hao đường thẳng** | S–M | Các field đã có trong model. |
+| 1.5 | ✅ **Mã QR tài sản** + đăng nhập chuyển hướng `/login?redirect=` | S | Cần thư viện `qrcode`. |
 | 1.6 | **Import phòng ban / vị trí từ Excel** | S | Chỉ HR/Admin. |
 | 1.7 | **Từ chối hàng loạt** trên trang Phê duyệt | S | Đặt cạnh `bulk_approve`. |
 | 1.8 | **Khoá dòng chốt công đã sửa tay** + trang "Data chốt công" | S | Để "Chốt công tất cả" không ghi đè số đã sửa tay. |
@@ -46,8 +46,8 @@ Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 
 | 2.5 | **Lịch sử trạng thái NV** + trạng thái Nghỉ thai sản | M | |
 | 2.6 | **Thêm loại hợp đồng**: 6 tháng, 3 năm, thử việc 1–2 tháng | S–M | Mọi chỗ kiểm tra "thử việc / chưa chính thức" phải nhận mã mới. |
 | 2.7 | **Quản lý BHXH theo kỳ** (nhiều bản ghi mỗi NV, tỷ lệ NLĐ/DN) | M | Cần quyết định: giữ trường trên hồ sơ làm "hiện tại" và thêm bảng lịch sử, hay thay hẳn. |
-| 2.8 | **Thông tin sử dụng tài sản** + file mẫu import; tách người sử dụng / người bàn giao | M | |
-| 2.9 | **Phân loại tài sản nhập tự do** | M | |
+| 2.8 | ✅ **Thông tin sử dụng tài sản** + file mẫu import; tách người sử dụng / người bàn giao | M | |
+| 2.9 | ✅ **Phân loại tài sản nhập tự do** | M | |
 | 2.10 | **Hạn mức ngày online theo NV / vị trí / phòng ban** | M | Mặc định lấy `CompanyConfig.max_online_work_count_per_month`. |
 | 2.11 | **Số công cố định của ca** (`ShiftConfig.fixed_workday`) | S–M | Để trống thì không có tác dụng. |
 | 2.12 | **Chế độ con nhỏ**: đi muộn / về sớm tối đa N phút | M | N cấu hình được. |

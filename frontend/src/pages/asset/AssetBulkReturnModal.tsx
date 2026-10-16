@@ -1,4 +1,5 @@
 import { useState, useEffect, Fragment } from 'react';
+import { assetTypeOptionsFrom, isMultiHolderType } from './assetTypes';
 import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import { XMarkIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { Asset, assetsAPI } from '../../utils/api';
@@ -21,27 +22,8 @@ const ASSET_CONDITIONS = [
   { value: 'BROKEN', label: 'Hỏng (Không hoạt động)' },
 ];
 
-const MULTI_HOLDER_TYPES = ['MONITOR', 'OTHER'];
-
-const ASSET_TYPE_OPTIONS: SelectOption<string>[] = [
-  { value: 'all', label: 'Tất cả loại' },
-  { value: 'LAPTOP', label: 'Laptop' },
-  { value: 'DESKTOP', label: 'Máy tính bàn' },
-  { value: 'MONITOR', label: 'Màn hình' },
-  { value: 'PHONE', label: 'Điện thoại' },
-  { value: 'TABLET', label: 'Máy tính bảng' },
-  { value: 'PRINTER', label: 'Máy in' },
-  { value: 'SCANNER', label: 'Máy quét' },
-  { value: 'NETWORK', label: 'Thiết bị mạng' },
-  { value: 'SERVER', label: 'Máy chủ' },
-  { value: 'SIM', label: 'SIM / USB 4G' },
-  { value: 'FURNITURE', label: 'Nội thất' },
-  { value: 'VEHICLE', label: 'Phương tiện' },
-  { value: 'OTHER', label: 'Khác' },
-];
-
 const isMultiType = (a: Asset) =>
-  MULTI_HOLDER_TYPES.includes(a.asset_type) && (a.total_quantity ?? 1) > 1;
+  isMultiHolderType(a.asset_type) && (a.total_quantity ?? 1) > 1;
 
 const uniqueHolderCount = (a: Asset): number =>
   new Set((a.holders ?? []).map((h) => h.employee_id)).size;
@@ -172,7 +154,7 @@ export default function AssetBulkReturnModal({ isOpen, onClose, onSuccess, asset
                             <SelectBox
                               label=""
                               value={filterType}
-                              options={ASSET_TYPE_OPTIONS}
+                              options={[{ value: 'all', label: 'Tất cả loại' }, ...assetTypeOptionsFrom(assets)]}
                               onChange={setFilterType}
                               placeholder="Phân loại"
                             />

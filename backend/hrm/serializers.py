@@ -924,7 +924,7 @@ class EmployeeBirthdaySerializer(serializers.ModelSerializer):
 # ASSET MANAGEMENT SERIALIZERS
 # ======================
 
-from .models import Asset, AssetAssignmentHistory, AssetMaintenance
+from .models import Asset, AssetAssignmentHistory, AssetMaintenance, AssetInventoryCheck, normalize_asset_type, ASSET_TYPE_MAX_LENGTH
 
 
 # Nhãn riêng cho SIM — cùng enum ASSET_STATUS nhưng ngữ cảnh khác.
@@ -952,7 +952,7 @@ def _build_holders_payload(asset) -> list:
     Non-multi-holder types trả về ``[]`` (FE đọc ``assigned_to_name`` như cũ).
     """
     from .models import Asset
-    if asset.asset_type not in Asset.MULTI_HOLDER_TYPES:
+    if not Asset.is_multi_holder_type(asset.asset_type):
         return []
     rows = (
         asset.assignment_history
@@ -980,6 +980,8 @@ def _build_holders_payload(asset) -> list:
 class AssetSerializer(serializers.ModelSerializer):
     """Serializer cho tài sản"""
     department_name = serializers.CharField(source='department.name', read_only=True)
+    usage_department_name = serializers.CharField(source='usage_department.name', read_only=True)
+    usage_department_code = serializers.CharField(source='usage_department.code', read_only=True)
     assigned_to_name = serializers.CharField(source='assigned_to.full_name', read_only=True)
     assigned_to_department_name = serializers.CharField(source='assigned_to.department.name', read_only=True)
     managed_by_name = serializers.CharField(source='managed_by.full_name', read_only=True)
@@ -995,9 +997,29 @@ class AssetSerializer(serializers.ModelSerializer):
     assigned_quantity_total = serializers.IntegerField(read_only=True)
     holders = serializers.SerializerMethodField()
     pending_assignment = serializers.SerializerMethodField()
+    # Khấu hao — tính động từ property trên model (xem Asset.current_value)
+    depreciation_method_display = serializers.CharField(source='get_depreciation_method_display', read_only=True)
+    monthly_depreciation = serializers.ReadOnlyField()
+    accumulated_depreciation = serializers.ReadOnlyField()
+    current_value = serializers.ReadOnlyField()
+    # Hình ảnh — trả presigned URL, field gốc (S3 key) không expose ra ngoài
+    current_image_url = serializers.SerializerMethodField()
+    purchase_image_url = serializers.SerializerMethodField()
 
     def get_status_display(self, obj):
         return _resolve_status_display(obj)
+
+    def get_current_image_url(self, obj):
+        if not obj.current_image:
+            return None
+        from .utils import get_cloudfly_presigned_url
+        return get_cloudfly_presigned_url(str(obj.current_image))
+
+    def get_purchase_image_url(self, obj):
+        if not obj.purchase_image:
+            return None
+        from .utils import get_cloudfly_presigned_url
+        return get_cloudfly_presigned_url(str(obj.purchase_image))
 
     def get_managed_by_employee_id(self, obj):
         return obj.managed_by.employee_id if obj.managed_by else ""
@@ -1025,10 +1047,27 @@ class AssetSerializer(serializers.ModelSerializer):
 
     # Writeable fields for foreign key IDs
     department_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    usage_department_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     assigned_to_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     managed_by_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     created_by_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
-    
+
+    # "Phân loại" và "Tình trạng vật lý" không còn dropdown cố định ở form
+    # web (đồng bộ với Excel import/export) — override
+    # ChoiceField mặc định (sinh tự động từ Asset.asset_type/condition có
+    # choices=...) thành CharField thường để nhận text tự do, không bị
+    # reject "is not a valid choice" khi FE gửi giá trị ngoài danh sách cũ.
+    asset_type = serializers.CharField(max_length=ASSET_TYPE_MAX_LENGTH)
+    condition = serializers.CharField(max_length=20, required=False, allow_blank=True)
+
+    def validate_asset_type(self, value):
+        # Cùng quy tắc với import Excel: gõ gì lưu nấy, chỉ gom về mã chuẩn khi
+        # trùng y hệt nhãn/mã loại chuẩn (xem normalize_asset_type).
+        value = normalize_asset_type(value)
+        if not value:
+            raise serializers.ValidationError("Phân loại không được để trống")
+        return value
+
     class Meta:
         model = Asset
         fields = [
@@ -1037,7 +1076,11 @@ class AssetSerializer(serializers.ModelSerializer):
             'brand', 'model', 'serial_number', 'specifications',
             'status', 'status_display', 'condition', 'condition_display',
             'warranty_period', 'warranty_expiry', 'warranty_provider',
-            'department', 'department_name', 'location',
+            'depreciation_period_months', 'depreciation_method', 'depreciation_method_display',
+            'monthly_depreciation', 'accumulated_depreciation', 'current_value',
+            'current_image_url', 'purchase_image_url',
+            'department', 'department_name', 'location', 'dimensions', 'facility_code',
+            'usage_area', 'usage_department', 'usage_department_id', 'usage_department_name', 'usage_department_code',
             'managed_by', 'managed_by_name', 'managed_by_employee_id', 'managed_by_id',
             'assigned_to', 'assigned_to_name', 'assigned_to_employee_id', 'assigned_to_department_name', 'assigned_date',
             'total_quantity', 'remaining_quantity', 'assigned_quantity_total', 'holders', 'pending_assignment',
@@ -1090,10 +1133,11 @@ class AssetSerializer(serializers.ModelSerializer):
         """
         # Extract foreign key IDs
         department_id = validated_data.pop('department_id', None)
+        usage_department_id = validated_data.pop('usage_department_id', None)
         assigned_to_id = validated_data.pop('assigned_to_id', None)
         managed_by_id = validated_data.pop('managed_by_id', None)
         created_by_id = validated_data.pop('created_by_id', None)
-        
+
         # Handle department (optional)
         if department_id:
             try:
@@ -1102,7 +1146,17 @@ class AssetSerializer(serializers.ModelSerializer):
                 validated_data['department'] = department
             except Department.DoesNotExist:
                 raise serializers.ValidationError(f"Department with ID {department_id} does not exist")
-        
+
+        # Handle usage_department (optional) — phòng ban đang thực tế sử dụng,
+        # tách biệt với department (phòng ban quản lý trong kho) ở trên.
+        if usage_department_id:
+            try:
+                from employee.models import Department
+                usage_department = Department.objects.get(id=usage_department_id)
+                validated_data['usage_department'] = usage_department
+            except Department.DoesNotExist:
+                raise serializers.ValidationError(f"Department with ID {usage_department_id} does not exist")
+
         # Handle assigned_to (optional)
         if assigned_to_id:
             try:
@@ -1153,10 +1207,11 @@ class AssetSerializer(serializers.ModelSerializer):
         """
         # Extract foreign key IDs
         department_id = validated_data.pop('department_id', None)
+        usage_department_id = validated_data.pop('usage_department_id', None)
         assigned_to_id = validated_data.pop('assigned_to_id', None)
         managed_by_id = validated_data.pop('managed_by_id', None)
         created_by_id = validated_data.pop('created_by_id', None)
-        
+
         # Handle department (optional)
         if department_id is not None:
             try:
@@ -1165,7 +1220,19 @@ class AssetSerializer(serializers.ModelSerializer):
                 instance.department = department
             except Department.DoesNotExist:
                 raise serializers.ValidationError(f"Department with ID {department_id} does not exist")
-        
+
+        # Handle usage_department (optional) — 0 xoá gán, giống pattern assigned_to/managed_by.
+        if usage_department_id is not None:
+            if usage_department_id == 0:
+                instance.usage_department = None
+            else:
+                try:
+                    from employee.models import Department
+                    usage_department = Department.objects.get(id=usage_department_id)
+                    instance.usage_department = usage_department
+                except Department.DoesNotExist:
+                    raise serializers.ValidationError(f"Department with ID {usage_department_id} does not exist")
+
         # Handle assigned_to (optional)
         if assigned_to_id is not None:
             if assigned_to_id == 0:  # Special case to clear assignment
@@ -1222,6 +1289,8 @@ class AssetListSerializer(serializers.ModelSerializer):
     Simplified serializer for listing assets with flat hardware fields
     """
     department_name = serializers.CharField(source='department.name', read_only=True)
+    usage_department_name = serializers.CharField(source='usage_department.name', read_only=True)
+    usage_department_code = serializers.CharField(source='usage_department.code', read_only=True)
     assigned_to_name = serializers.CharField(source='assigned_to.full_name', read_only=True)
     assigned_to_employee_id = serializers.SerializerMethodField()
     assigned_to_department_name = serializers.CharField(source='assigned_to.department.name', read_only=True)
@@ -1241,6 +1310,8 @@ class AssetListSerializer(serializers.ModelSerializer):
     # AssetSerializer đã có field này; giữ hai response nhất quán để các thao tác
     # từ màn danh sách (lọc, bàn giao hàng loạt) đều dùng đúng trạng thái.
     pending_assignment = serializers.SerializerMethodField()
+    depreciation_method_display = serializers.CharField(source='get_depreciation_method_display', read_only=True)
+    current_value = serializers.ReadOnlyField()
 
     def get_status_display(self, obj):
         return _resolve_status_display(obj)
@@ -1274,11 +1345,13 @@ class AssetListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'asset_code', 'name', 'asset_type', 'asset_type_display',
             'brand', 'model', 'status', 'status_display', 'condition', 'condition_display',
-            'department', 'department_name',
+            'department', 'department_name', 'dimensions', 'facility_code',
+            'usage_area', 'usage_department', 'usage_department_name', 'usage_department_code',
             'managed_by', 'managed_by_name', 'managed_by_employee_id',
             'assigned_to', 'assigned_to_name', 'assigned_to_employee_id', 'assigned_to_department_name', 'assigned_date',
             'total_quantity', 'remaining_quantity', 'assigned_quantity_total', 'holders', 'pending_assignment',
             'purchase_date', 'purchase_price', 'warranty_expiry', 'supplier', 'specifications',
+            'depreciation_period_months', 'depreciation_method_display', 'current_value',
             'created_at',
         ]
 
@@ -1367,6 +1440,37 @@ class AssetAssignmentHistorySerializer(serializers.ModelSerializer):
         # Create the assignment history
         history = AssetAssignmentHistory.objects.create(**validated_data)
         return history
+
+
+class AssetInventoryCheckSerializer(serializers.ModelSerializer):
+    """Serializer cho lịch sử kiểm kê tài sản"""
+    asset_code = serializers.CharField(source='asset.asset_code', read_only=True)
+    asset_name = serializers.CharField(source='asset.name', read_only=True)
+    checked_by_name = serializers.CharField(source='checked_by.full_name', read_only=True, default=None)
+    actual_condition_display = serializers.CharField(source='get_actual_condition_display', read_only=True)
+    result_display = serializers.CharField(source='get_result_display', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.full_name', read_only=True, default=None)
+
+    # Ghi bằng ID
+    asset_id = serializers.PrimaryKeyRelatedField(
+        source='asset', queryset=Asset.objects.all(), write_only=True)
+    checked_by_id = serializers.PrimaryKeyRelatedField(
+        source='checked_by', queryset=Employee.objects.all(), write_only=True,
+        required=False, allow_null=True)
+    created_by_id = serializers.PrimaryKeyRelatedField(
+        source='created_by', queryset=Employee.objects.all(), write_only=True,
+        required=False, allow_null=True)
+
+    class Meta:
+        model = AssetInventoryCheck
+        fields = [
+            'id', 'asset', 'asset_id', 'asset_code', 'asset_name',
+            'check_date', 'checked_by', 'checked_by_id', 'checked_by_name',
+            'actual_condition', 'actual_condition_display',
+            'result', 'result_display', 'notes',
+            'created_at', 'created_by', 'created_by_id', 'created_by_name',
+        ]
+        read_only_fields = ['asset', 'checked_by', 'created_by', 'created_at']
 
 
 class AssetMaintenanceSerializer(serializers.ModelSerializer):

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, Fragment, useCallback, useMemo } from 'react';
+import { isMultiHolderType } from './assetTypes';
 import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import { XMarkIcon, UserIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { Asset, assetsAPI, employeesAPI } from '../../utils/api';
@@ -37,8 +38,7 @@ export default function AssetAssignModal({ isOpen, onClose, onSuccess, asset, on
   } | null>(null);
   const [employees, setEmployees] = useState<SelectOption<string>[]>([]);
   const [quantityError, setQuantityError] = useState<string | null>(null);
-  const MULTI_HOLDER_TYPES = ['MONITOR', 'OTHER'];
-  const hasQuantity = MULTI_HOLDER_TYPES.includes(asset.asset_type);
+  const hasQuantity = isMultiHolderType(asset.asset_type);
   const isMultiHolder = hasQuantity && (asset.total_quantity ?? 1) > 1;
   const totalQty = asset.total_quantity ?? 1;
   const remainingQty = asset.remaining_quantity ?? totalQty;
@@ -261,9 +261,9 @@ export default function AssetAssignModal({ isOpen, onClose, onSuccess, asset, on
               leaveFrom="opacity-100 translate-y-0 sm:scale-100"
               leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
             >
-              <DialogPanel className="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+              <DialogPanel className="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl transition-all w-full sm:my-8 sm:w-full sm:max-w-lg">
                 {/* Modal Header */}
-                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                   <DialogTitle as="h3" className="text-base font-semibold leading-6 text-gray-900">
                     Bàn giao tài sản thiết bị
                   </DialogTitle>
@@ -278,7 +278,7 @@ export default function AssetAssignModal({ isOpen, onClose, onSuccess, asset, on
                 </div>
 
                 {/* Modal Body */}
-                <div className="px-6 py-4">
+                <div className="px-4 sm:px-6 py-4">
                   {/* Asset Info Block */}
                   <div className={`mb-4 p-4 rounded-xl border ${asset.assigned_to_name ? 'bg-amber-50 border-amber-200' : 'bg-primary-50 border-primary-100'}`}>
                     <div className="flex justify-between items-start">
@@ -408,7 +408,7 @@ export default function AssetAssignModal({ isOpen, onClose, onSuccess, asset, on
                 </div>
 
                 {/* Modal Footer */}
-                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex flex-row-reverse gap-3">
+                <div className="px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex flex-row-reverse gap-3">
                   <button
                     type="submit"
                     form="assign-form"
@@ -457,7 +457,7 @@ export default function AssetAssignModal({ isOpen, onClose, onSuccess, asset, on
                 leaveFrom="opacity-100 translate-y-0 sm:scale-100"
                 leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
               >
-                <DialogPanel className="relative transform overflow-hidden rounded-2xl bg-white p-6 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-md">
+                <DialogPanel className="relative transform overflow-hidden rounded-2xl bg-white p-6 text-left shadow-xl transition-all w-full sm:my-8 sm:w-full sm:max-w-md">
                   <div className="sm:flex sm:items-start">
                     <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-rose-100 sm:mx-0 sm:h-10 sm:w-10">
                       <svg className="h-6 w-6 text-rose-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
@@ -527,7 +527,7 @@ export default function AssetAssignModal({ isOpen, onClose, onSuccess, asset, on
                 leaveFrom="opacity-100 translate-y-0 sm:scale-100"
                 leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
               >
-                <DialogPanel className="relative transform overflow-hidden rounded-2xl bg-white p-6 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-md">
+                <DialogPanel className="relative transform overflow-hidden rounded-2xl bg-white p-6 text-left shadow-xl transition-all w-full sm:my-8 sm:w-full sm:max-w-md">
                   <div className="sm:flex sm:items-start">
                     <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-amber-100 sm:mx-0 sm:h-10 sm:w-10">
                       <svg className="h-6 w-6 text-amber-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
@@ -627,7 +627,7 @@ export default function AssetAssignModal({ isOpen, onClose, onSuccess, asset, on
                 leaveFrom="opacity-100 translate-y-0 sm:scale-100"
                 leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
               >
-                <DialogPanel className="relative transform overflow-hidden rounded-2xl bg-white p-6 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-md">
+                <DialogPanel className="relative transform overflow-hidden rounded-2xl bg-white p-6 text-left shadow-xl transition-all w-full sm:my-8 sm:w-full sm:max-w-md">
                   <div className="sm:flex sm:items-start">
                     <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-primary-100 sm:mx-0 sm:h-10 sm:w-10">
                       <InformationCircleIcon className="h-6 w-6 text-primary-600" />

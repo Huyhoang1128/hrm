@@ -654,6 +654,17 @@ export interface Asset {
   condition_display: string;
   department?: number;
   department_name?: string;
+  // Kích thước vật lý +
+  // nơi thực tế đang sử dụng — usage_department khác `department` ở trên
+  // (department = phòng ban QUẢN LÝ trong kho, usage_department = phòng ban
+  // đang thực tế SỬ DỤNG). "Người sử dụng" dùng chung assigned_to, không có
+  // field riêng.
+  dimensions?: string;
+  usage_area?: string;
+  facility_code?: string;
+  usage_department?: number;
+  usage_department_name?: string;
+  usage_department_code?: string;
   managed_by?: number;
   managed_by_name?: string;
   managed_by_employee_id?: string;
@@ -684,6 +695,17 @@ export interface Asset {
   };
   other_details?: string;
   warranty_period?: number;
+  // Khấu hao — monthly_depreciation/accumulated_depreciation/current_value tính động
+  // ở backend (không lưu DB), luôn khớp thời điểm hiện tại.
+  depreciation_period_months?: number | null;
+  depreciation_method?: string;
+  depreciation_method_display?: string;
+  monthly_depreciation?: number | null;
+  accumulated_depreciation?: number | null;
+  current_value?: number | null;
+  // Hình ảnh — presigned URL, field ghi là multipart file 'current_image'/'purchase_image'
+  current_image_url?: string | null;
+  purchase_image_url?: string | null;
   created_at: string;
   updated_at: string;
   is_deleted?: boolean;
@@ -764,6 +786,26 @@ export interface AssetMaintenance {
   next_maintenance_date?: string;
   created_at: string;
   updated_at: string;
+}
+
+export type AssetInventoryCheckResult = 'MATCH' | 'MISSING' | 'DAMAGED' | 'WRONG_HOLDER' | 'OTHER';
+
+export interface AssetInventoryCheck {
+  id: number;
+  asset: number;
+  asset_code: string;
+  asset_name: string;
+  check_date: string;
+  checked_by?: number | null;
+  checked_by_name?: string;
+  actual_condition?: string;
+  actual_condition_display?: string;
+  result: AssetInventoryCheckResult;
+  result_display: string;
+  notes?: string;
+  created_at: string;
+  created_by?: number | null;
+  created_by_name?: string;
 }
 
 export interface AssetStats {
