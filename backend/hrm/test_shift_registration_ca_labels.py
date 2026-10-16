@@ -2,7 +2,7 @@
 Nhãn hiển thị 2 ô ca theo từng cấu hình đăng ký ca.
 
 Ô shift_1 luôn là ca MẶC ĐỊNH, ô shift_2 luôn là ca PHẢI ĐĂNG KÝ — nhưng mỗi
-team gọi khác nhau: Điều dưỡng BS BS A mặc định "Ca 1" / đăng ký "Ca 2";
+team gọi khác nhau: Điều dưỡng BS A mặc định "Ca 1" / đăng ký "Ca 2";
 Sale BS B (thông báo 02/10/2026) ngược lại — mặc định "Ca 2" / đăng
 ký "Ca 1". API phải trả đúng nhãn của config để FE hiện đúng tên nút.
 """

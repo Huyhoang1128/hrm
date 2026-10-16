@@ -1028,7 +1028,7 @@ const EmployeeMonthAttendance: React.FC<EmployeeMonthAttendanceProps> = ({
             )}
 
             {/* Đăng ký Ca 2 hộ nhân viên — chỉ hiện với nhân viên thuộc phạm
-                vi (vd Điều dưỡng nhóm BS Ma BS A); backend tự kiểm tra
+                vi (vd Điều dưỡng nhóm BS A); backend tự kiểm tra
                 lại quyền (chính mình/quản lý trực tiếp/Admin/HR) khi bấm. */}
             {!ca2Loading && ca2Status?.in_scope && (
               <div className="px-6 pt-4">

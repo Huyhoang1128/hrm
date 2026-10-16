@@ -530,7 +530,7 @@ const Approvals: React.FC = () => {
   const showWorkFinalizationPanel = isAdmin || isHR || isManagement || visibleWorkFinalizationApprovals.length > 0;
 
   // ── Chờ duyệt Ca 2 (đăng ký ca theo ngày, cần quản lý trực tiếp duyệt
-  // trước 0h — vd Điều dưỡng BS Ma BS A) — hoàn toàn tách biệt khỏi
+  // trước 0h — vd Điều dưỡng BS A) — hoàn toàn tách biệt khỏi
   // hệ EmployeeEvent/duyet-don ở trên (dữ liệu nằm ở ShiftRegistrationDay,
   // không phải EmployeeEvent), nên fetch + hiển thị riêng tại đây thay vì
   // đi qua getAllPendingRequests()/categorizeDuyetDonList(). Chỉ hiện khi

@@ -9,12 +9,12 @@ export interface ShiftBrief {
 }
 
 /** Tên gọi 2 ô ca theo ĐÚNG cấu hình của nhân viên — mỗi team gọi khác nhau
- * (Điều dưỡng BS BS A: mặc định "Ca 1", đăng ký "Ca 2"; Sale BS B: mặc định "Ca 2", đăng ký "Ca 1"). Backend cũ không trả -> dùng
+ * (Điều dưỡng BS A: mặc định "Ca 1", đăng ký "Ca 2"; Sale BS B: mặc định "Ca 2", đăng ký "Ca 1"). Backend cũ không trả -> dùng
  * caLabels() để luôn có giá trị. */
 export interface CaLabels {
   default_ca_label?: string;
   registrable_ca_label?: string;
-  /** false => team đã ngừng ca phải đăng ký (vd Sale BS Trung từ 14/10/2026):
+  /** false => team đã ngừng ca phải đăng ký (vd Sale BS B từ 14/10/2026):
    * ẩn mọi nút đăng ký. Backend cũ không trả -> coi như vẫn cho đăng ký. */
   registration_enabled?: boolean;
 }
