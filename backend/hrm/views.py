@@ -12,7 +12,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.permissions import IsAuthenticated, BasePermission, SAFE_METHODS
-from .permissions import IsSuperUser
+from .permissions import IsSuperUser, IsAdminOrHR
 from .pagination import StandardResultsSetPagination, DepartmentResultsSetPagination, OnboardingResultsSetPagination
 from rest_framework.views import APIView
 import django_filters
@@ -749,11 +749,11 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'], url_path='export-all',
-            permission_classes=[IsAuthenticated, IsSuperUser])
+            permission_classes=[IsAuthenticated, IsAdminOrHR])
     def export_all(self, request):
         """
         Xuất toàn bộ thông tin của tất cả nhân viên trong bảng Employee.
-        Chỉ superuser mới có thể truy cập API này.
+        Chỉ Admin hoặc HCNS.
         GET /api/hrm/employees/export-all/
         """
         employees = Employee.objects.all().select_related(
