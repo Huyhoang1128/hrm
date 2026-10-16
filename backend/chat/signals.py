@@ -6,6 +6,7 @@ from django.dispatch import receiver
 from employee.models import Employee
 
 from .models import ChatUser, Conversation, ConversationMember, Organization, UsernameHistory
+from users.utils import get_user_display_name
 
 
 def add_user_to_public_channels(auth_user_id):
@@ -16,7 +17,7 @@ def add_user_to_public_channels(auth_user_id):
 
     org, _ = Organization.objects.get_or_create(name='Default Organization')
     employee = getattr(auth_user, 'employee', None)
-    display_name = (employee.full_name if employee else '') or auth_user.get_full_name() or auth_user.username
+    display_name = (employee.full_name if employee else '') or get_user_display_name(auth_user)
 
     chat_user = ChatUser.objects.filter(auth_user=auth_user).first()
     if chat_user is None:

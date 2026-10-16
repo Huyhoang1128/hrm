@@ -7,7 +7,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.exceptions import AuthenticationFailed
 
-from .utils import get_user_role, get_user_role_display, get_user_permissions
+from .utils import get_user_role, get_user_role_display, get_user_permissions, get_user_display_name
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['first_name'] = user.first_name
         token['last_name'] = user.last_name
         # Add full name and phone number for convenience
-        token['full_name'] = user.get_full_name()
+        token['full_name'] = get_user_display_name(user)
         # Prefer phone stored on profile models, fall back to username
         phone_number = user.username
         if hasattr(user, 'employee') and getattr(user.employee, 'phone_number', None):
@@ -108,7 +108,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         user_data = {
             'id': user.id,
             'username': user.username,
-            'full_name': user.get_full_name(),
+            'full_name': get_user_display_name(user),
             'email': user.email,
             'first_name': user.first_name,
             'last_name': user.last_name,
