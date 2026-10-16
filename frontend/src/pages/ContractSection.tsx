@@ -30,6 +30,7 @@ const CONTRACT_TYPE_LABELS: Record<string, string> = {
   CONFIDENTIALITY: 'Thoả thuận bảo mật',
   COMPANY_RULES: 'Cam kết đọc hiểu nội quy công ty',
   NURSING_COMMITMENT: 'Cam kết của CBNV Điều dưỡng',
+  APPENDIX: 'Phụ lục hợp đồng',
 };
 
 const CONTRACT_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
