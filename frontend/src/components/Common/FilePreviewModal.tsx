@@ -1,4 +1,5 @@
 import { XMarkIcon, ArrowDownTrayIcon, DocumentIcon } from '@heroicons/react/24/outline';
+import PdfFrame from './PdfFrame';
 
 interface Props {
   open: boolean;
@@ -60,7 +61,7 @@ export default function FilePreviewModal({ open, file_name, file_url, onClose }:
         {/* Body */}
         {type === 'pdf' && (
           <div className="flex-1 bg-gray-200 relative min-h-0">
-            <iframe
+            <PdfFrame
               src={file_url}
               title={file_name}
               className="absolute inset-0 w-full h-full border-0"

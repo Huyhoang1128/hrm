@@ -9,6 +9,7 @@ import {
 } from '@heroicons/react/24/outline';
 import onboardingService from '../services/onboarding.service';
 import { useLockBodyScroll } from '../hooks/useLockBodyScroll';
+import PdfFrame from './Common/PdfFrame';
 
 /**
  * Blocking gate: ép nhân viên đọc xong các tài liệu REGULATION bắt buộc
@@ -161,7 +162,7 @@ const RegulationGate: React.FC<RegulationGateProps> = ({ userId }) => {
 
             <div className="bg-gray-100" style={{ height: 'calc(90vh - 128px)' }}>
               {viewingDoc.file_url || viewingDoc.file ? (
-                <iframe
+                <PdfFrame
                   src={viewingDoc.file_url || viewingDoc.file}
                   className="w-full h-full border-0"
                   title={viewingDoc.document_name}
