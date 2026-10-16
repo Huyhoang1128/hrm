@@ -39,10 +39,10 @@ from salary.salary_data_models import (
     SalesCommission,
 )
 from django.utils import timezone
+from employee.models import NON_OFFICIAL_CONTRACT_TYPES
 
 
 MAX_LUNCH_ALLOWANCE_CAP = Decimal("500000")
-NON_OFFICIAL_CONTRACT_TYPES = {"PROBATION", "INTERN", "COLLABORATOR"}
 DEFAULT_PROBATION_RATE_PERCENT = Decimal("85")
 PROBATION_RATE_PERCENT_MAP = {
     "OPTION_1": Decimal("85"),
@@ -332,9 +332,13 @@ _HTLV_DISPLAY_PASSTHROUGH = {"CT", "TV", "TTS", "CTV"}
 # Raw codes from Employee.contract_type choices → display abbreviation
 _HTLV_CODE_MAP = {
     "PROBATION": "TV",
+    "PROBATION_1M": "TV",
+    "PROBATION_2M": "TV",
     "INTERN": "TTS",
     "COLLABORATOR": "CTV",
+    "SIX_MONTH": "CT",
     "ONE_YEAR": "CT",
+    "TWO_YEAR": "CT",
     "THREE_YEAR": "CT",
     "INDEFINITE": "CT",
     "SERVICE": "CT",

@@ -38,6 +38,7 @@ import deptAttendanceViolationReportService from '../services/deptAttendanceViol
 import type { DeptAttendanceViolationResponse } from '../services/deptAttendanceViolationReport.service';
 import EmployeeMonthAttendance from '../components/EmployeeMonthAttendance';
 import { SelectBox } from '../components/LandingLayout/SelectBox';
+import { isProbationContract } from '../constants/contractTypes';
 
 // --- Optimizations: Global Helpers & Memoized Sub-components ---
 
@@ -79,7 +80,7 @@ const parseDateValue = (value: unknown): Date | null => {
 const isProbationEffectiveInMonth = (emp: Employee, year: number, month: number): boolean => {
   const contractType = normalizeToken(emp.contract_type);
   const employmentStatus = normalizeToken(emp.employment_status);
-  const isProbation = contractType === 'PROBATION' || employmentStatus === 'PROBATION';
+  const isProbation = isProbationContract(contractType) || employmentStatus === 'PROBATION';
   if (!isProbation) return false;
 
   const monthStart = new Date(year, month - 1, 1);

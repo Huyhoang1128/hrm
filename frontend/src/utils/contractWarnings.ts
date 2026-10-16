@@ -1,3 +1,4 @@
+import { OFFICIAL_LABOR_CONTRACT_TYPES, PROBATION_CONTRACT_TYPES } from '../constants/contractTypes';
 // Cảnh báo mâu thuẫn ngày tháng / loại hợp đồng trên form sửa nhân viên.
 // Form có 6 trường ngày (vào làm, hết thử việc, lên chính thức, bắt đầu HĐ, kết thúc
 // HĐ, nghỉ việc) nên rất dễ lệch nhau mà không ai nhận ra. Những lệch đó không vô
@@ -5,8 +6,8 @@
 // chế độ thử việc; đã có ngày nghỉ mà trạng thái chưa đổi thì mọi báo cáo "đang làm
 // việc" đều sai. Cảnh báo chỉ để rà soát, KHÔNG chặn lưu.
 
-const PROBATION_TYPES = ['PROBATION'];
-const OFFICIAL_TYPES = ['ONE_YEAR', 'TWO_YEAR', 'INDEFINITE'];
+const PROBATION_TYPES = PROBATION_CONTRACT_TYPES;
+const OFFICIAL_TYPES = OFFICIAL_LABOR_CONTRACT_TYPES;
 const NOT_WORKING_STATUSES = ['INACTIVE', 'PAUSED', 'SUSPENDED', 'MATERNITY_LEAVE'];
 
 /** "dd/mm/yyyy" -> Date (00:00) hoặc null */

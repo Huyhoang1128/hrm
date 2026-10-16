@@ -33,6 +33,7 @@ import { attendanceService, AttendanceRankingEntry } from '../services/attendanc
 import { salaryService, type PenaltyRecord } from '../services/salary.service';
 import { recruitmentService } from '../services/recruitment.service';
 import { useNotePrompt } from '../components/NotePromptDialog';
+import { NON_OFFICIAL_CONTRACT_TYPES, OFFICIAL_LABOR_CONTRACT_TYPES } from '../constants/contractTypes';
 
 const formatBirthDate = (dateOfBirth: string): string => {
   const parts = dateOfBirth.split('-');
@@ -147,7 +148,7 @@ const Home: React.FC = () => {
   // Employee's own contract — non-dismissable alert if no active contract
   type MyContract = { id: number; status: string; contract_type: string; end_date: string | null };
   // Các loại hợp đồng lao động thực sự — cam kết/thoả thuận (CONFIDENTIALITY, COMPANY_RULES, NURSING_COMMITMENT) không tính
-  const LABOR_CONTRACT_TYPES = ['PROBATION', 'INTERN', 'COLLABORATOR', 'ONE_YEAR', 'TWO_YEAR', 'INDEFINITE', 'SERVICE'];
+  const LABOR_CONTRACT_TYPES = [...NON_OFFICIAL_CONTRACT_TYPES, ...OFFICIAL_LABOR_CONTRACT_TYPES, 'SERVICE'];
   const [myContracts, setMyContracts] = useState<MyContract[] | null>(null); // null = not yet fetched or admin
   const [contractCheckLoading, setContractCheckLoading] = useState(false);
   const [contractCheckFailed, setContractCheckFailed] = useState(false);

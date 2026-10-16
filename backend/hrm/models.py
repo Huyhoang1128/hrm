@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from employee.models import Employee, CompanyUnit
+from employee.models import CONTRACT_TYPE as EMPLOYEE_CONTRACT_TYPE, PROBATION_CONTRACT_TYPES, OFFICIAL_LABOR_CONTRACT_TYPES, probation_months_for
 
 # Create your models here.
 
@@ -3799,18 +3800,8 @@ ONBOARDING_TASK_STATUS = [
     ('SKIPPED', 'Bỏ qua'),
 ]
 
-CONTRACT_TYPE = [
-    ('PROBATION', 'Hợp đồng thử việc'),
-    ('INTERN', 'Hợp đồng thực tập sinh'),
-    ('COLLABORATOR', 'Hợp đồng cộng tác viên'),
-    ('ONE_YEAR', 'Hợp đồng lao động 12 tháng'),
-    ('TWO_YEAR', 'Hợp đồng lao động 24 tháng'),
-    ('INDEFINITE', 'Hợp đồng vô thời hạn'),
-    ('SERVICE', 'Hợp đồng dịch vụ'),
-    ('CONFIDENTIALITY', 'Thoả thuận bảo mật'),
-    ('COMPANY_RULES', 'Cam kết đọc hiểu nội quy công ty'),
-    ('NURSING_COMMITMENT', 'Cam kết của CBNV Điều dưỡng'),
-]
+# Cùng danh sách với hồ sơ nhân viên (employee.models.CONTRACT_TYPE).
+CONTRACT_TYPE = list(EMPLOYEE_CONTRACT_TYPE)
 
 # Loại của template / hợp đồng đã tạo: thêm Phụ lục hợp đồng. Không thêm vào
 # CONTRACT_TYPE vì danh sách đó còn là loại HĐ của onboarding / hồ sơ nhân viên —
@@ -4029,10 +4020,11 @@ class OnboardingProcess(models.Model):
             self.onboarding_code = f"ONB-{timestamp}-{count + 1:03d}"
         
         # Tính ngày kết thúc thử việc nếu là hợp đồng thử việc
-        if self.contract_type == 'PROBATION' and self.start_date and not self.expected_end_date:
+        if self.contract_type in PROBATION_CONTRACT_TYPES and self.start_date and not self.expected_end_date:
             from dateutil.relativedelta import relativedelta
             from datetime import timedelta
-            months_end_date = self.start_date + relativedelta(months=self.probation_period_months) - timedelta(days=1)
+            months = probation_months_for(self.contract_type, self.probation_period_months)
+            months_end_date = self.start_date + relativedelta(months=months) - timedelta(days=1)
             max_60_days_end_date = self.start_date + timedelta(days=59)
             self.expected_end_date = min(months_end_date, max_60_days_end_date)
         
@@ -5455,8 +5447,8 @@ class ContractCounter(models.Model):
     # trong EmployeeContractViewSet — đảo ngược chiều).
     GROUP_TO_CONTRACT_TYPES = {
         'INTERN': ['INTERN', 'COLLABORATOR'],
-        'PROBATION': ['PROBATION'],
-        'LABOR': ['ONE_YEAR', 'THREE_YEAR', 'INDEFINITE'],
+        'PROBATION': sorted(PROBATION_CONTRACT_TYPES),
+        'LABOR': sorted(OFFICIAL_LABOR_CONTRACT_TYPES),
         'SERVICE': ['SERVICE'],
         'COMPANY_RULES': ['COMPANY_RULES'],
     }

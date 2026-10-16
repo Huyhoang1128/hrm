@@ -101,16 +101,35 @@ TIME_OFF_TYPE = [
 # Contract types
 CONTRACT_TYPE = [
     ('PROBATION', 'Hợp đồng thử việc'),
+    ('PROBATION_1M', 'Thử việc 1 tháng'),
+    ('PROBATION_2M', 'Thử việc 2 tháng'),
     ('INTERN', 'Hợp đồng thực tập sinh'),
     ('COLLABORATOR', 'Hợp đồng cộng tác viên'),
+    ('SIX_MONTH', 'Hợp đồng lao động 6 tháng'),
     ('ONE_YEAR', 'Hợp đồng lao động 12 tháng'),
     ('TWO_YEAR', 'Hợp đồng lao động 24 tháng'),
+    ('THREE_YEAR', 'Hợp đồng lao động 36 tháng'),
     ('INDEFINITE', 'Hợp đồng vô thời hạn'),
     ('SERVICE', 'Hợp đồng dịch vụ'),
     ('CONFIDENTIALITY', 'Thoả thuận bảo mật'),
     ('COMPANY_RULES', 'Cam kết đọc hiểu nội quy công ty'),
     ('NURSING_COMMITMENT', 'Cam kết của CBNV Điều dưỡng'),
 ]
+
+# Nhóm loại hợp đồng — mọi chỗ kiểm tra "thử việc / chưa chính thức" dùng các hằng số
+# này thay vì so chuỗi 'PROBATION' (có nhiều mã thử việc).
+PROBATION_CONTRACT_TYPES = frozenset({'PROBATION', 'PROBATION_1M', 'PROBATION_2M'})
+NON_OFFICIAL_CONTRACT_TYPES = PROBATION_CONTRACT_TYPES | {'INTERN', 'COLLABORATOR'}
+FIXED_TERM_CONTRACT_MONTHS = {'SIX_MONTH': 6, 'ONE_YEAR': 12, 'TWO_YEAR': 24, 'THREE_YEAR': 36}
+OFFICIAL_LABOR_CONTRACT_TYPES = frozenset(FIXED_TERM_CONTRACT_MONTHS) | {'INDEFINITE'}
+# Mã thử việc có sẵn số tháng; 'PROBATION' dùng số tháng nhập riêng.
+PROBATION_MONTHS_BY_CONTRACT_TYPE = {'PROBATION_1M': 1, 'PROBATION_2M': 2}
+
+
+def probation_months_for(contract_type, fallback):
+    """Số tháng thử việc: theo mã hợp đồng nếu mã đã có sẵn số tháng, ngược lại dùng fallback."""
+    return PROBATION_MONTHS_BY_CONTRACT_TYPE.get(contract_type or '', fallback)
+
 
 # Employee file status
 FILE_STATUS = [
