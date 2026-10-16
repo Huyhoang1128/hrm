@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { managementApi } from '../../utils/api';
 import ContractPlaceholderModal from '../../pages/ContractPlaceholderModal';
+import PdfFrame from './PdfFrame';
 
 export interface ContractPreviewItem {
   id: number;
@@ -293,7 +294,7 @@ const MultiPdfPreviewModal: React.FC<Props> = ({ open, contracts, onClose }) => 
 
             {pdfUrl && !loading && !error && (
               <div className="relative flex-1 min-h-0">
-                <iframe
+                <PdfFrame
                   key={selectedId}
                   src={pdfUrl}
                   title={selected?.employee_name || 'PDF'}

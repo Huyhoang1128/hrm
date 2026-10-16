@@ -24,6 +24,7 @@ import {
   TrashIcon,
 } from '@heroicons/react/24/outline';
 import DependentSection from './DependentSection';
+import PdfFrame from '../components/Common/PdfFrame';
 
 // ============================================
 // CONSTANTS
@@ -780,7 +781,7 @@ const EmployeeShow: React.FC = () => {
             className="relative w-full max-w-4xl h-[90vh] bg-white rounded-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <iframe src={previewPdf} className="w-full h-full" title="PDF Preview" />
+            <PdfFrame src={previewPdf} className="w-full h-full" title="PDF Preview" />
             <button
               onClick={() => setPreviewPdf(null)}
               className="absolute top-4 right-4 p-2 rounded-full bg-white/90 hover:bg-white text-gray-800"

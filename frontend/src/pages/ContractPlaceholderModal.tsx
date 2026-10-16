@@ -9,6 +9,7 @@ import {
   PencilIcon,
 } from '@heroicons/react/24/outline';
 import { managementApi } from '../utils/api';
+import PdfFrame from '../components/Common/PdfFrame';
 
 // ============================================
 // TYPES
@@ -437,7 +438,7 @@ const ContractPlaceholderModal: React.FC<Props> = ({ contractId, onClose, onSucc
                     </div>
                   </div>
                 )}
-                <iframe src={previewUrl} className="w-full h-full border-0" title="Xem trước hợp đồng" />
+                <PdfFrame src={previewUrl} className="w-full h-full border-0" title="Xem trước hợp đồng" />
               </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 text-center px-8">
