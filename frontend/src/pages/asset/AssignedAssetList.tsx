@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { assetTypeOptionsFrom, isMultiHolderType } from './assetTypes';
 import { assetsAPI, Asset, AssetAssignmentHistory } from '../../utils/api';
 import {
   ComputerDesktopIcon,
@@ -106,23 +107,6 @@ const CONDITION_OPTIONS = [
   { value: 'FAIR', label: 'Cũ (Trầy xước / Cấn móp)' },
   { value: 'POOR', label: 'Cũ (Kém / Lỗi chức năng)' },
   { value: 'BROKEN', label: 'Hỏng (Không hoạt động)' },
-];
-
-const TYPE_OPTIONS = [
-  { value: '', label: 'Tất cả loại' },
-  { value: 'LAPTOP', label: 'Laptop' },
-  { value: 'DESKTOP', label: 'Desktop' },
-  { value: 'MONITOR', label: 'Màn hình' },
-  { value: 'PHONE', label: 'Điện thoại' },
-  { value: 'TABLET', label: 'Máy tính bảng' },
-  { value: 'PRINTER', label: 'Máy in' },
-  { value: 'SCANNER', label: 'Máy scan' },
-  { value: 'NETWORK', label: 'Thiết bị mạng' },
-  { value: 'SERVER', label: 'Máy chủ' },
-  { value: 'SIM', label: 'SIM' },
-  { value: 'FURNITURE', label: 'Nội thất' },
-  { value: 'VEHICLE', label: 'Phương tiện' },
-  { value: 'OTHER', label: 'Khác' },
 ];
 
 export default function AssignedAssetList() {
@@ -325,14 +309,17 @@ export default function AssignedAssetList() {
     <div className="space-y-6">
       {/* Header */}
       <div className="mb-6">
-        <div className="flex items-center mb-1">
+        <div className="flex items-center space-x-3 mb-1">
+          <div className="h-9 w-9 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center">
+            <ComputerDesktopIcon className="h-5 w-5" />
+          </div>
           <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Thiết bị bàn giao</h1>
         </div>
         <p className="text-sm text-gray-900">Danh sách thiết bị, tài sản công ty đã bàn giao cho bạn sử dụng.</p>
       </div>
 
       {/* Sticky wrapper: Stats + Filters — chỉ sticky từ sm trở lên, tránh chiếm hết viewport trên mobile */}
-      <div className="sm:sticky sm:top-16 z-20 -mx-6 px-6 py-4 bg-gray-50/95 backdrop-blur space-y-4">
+      <div className="sm:sticky sm:top-16 z-20 -mx-4 px-4 sm:-mx-6 sm:px-6 py-4 bg-gray-50/95 backdrop-blur space-y-4">
         {/* Stats banner */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
@@ -370,7 +357,7 @@ export default function AssignedAssetList() {
                 className="input-field w-full"
               />
             </div>
-            <div className="w-48">
+            <div className="w-full sm:w-48">
               <SelectBox
                 label="Trạng thái vận hành"
                 value={filterStatus}
@@ -378,7 +365,7 @@ export default function AssignedAssetList() {
                 onChange={setFilterStatus}
               />
             </div>
-            <div className="w-48">
+            <div className="w-full sm:w-48">
               <SelectBox
                 label="Tình trạng vật lý"
                 value={filterCondition}
@@ -386,16 +373,16 @@ export default function AssignedAssetList() {
                 onChange={setFilterCondition}
               />
             </div>
-            <div className="w-40">
+            <div className="w-full sm:w-40">
               <SelectBox
                 label="Loại tài sản"
                 value={filterType}
-                options={TYPE_OPTIONS}
+                options={[{ value: '', label: 'Tất cả loại' }, ...assetTypeOptionsFrom(assets)]}
                 onChange={setFilterType}
               />
             </div>
-            <div className="flex items-end gap-2 flex-wrap">
-              <div>
+            <div className="flex items-end gap-2 flex-wrap w-full sm:w-auto">
+              <div className="flex-1 sm:flex-initial">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Ngày nhận từ</label>
                 <input
                   type="date"
@@ -404,7 +391,7 @@ export default function AssignedAssetList() {
                   className="input-field"
                 />
               </div>
-              <div>
+              <div className="flex-1 sm:flex-initial">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Đến ngày</label>
                 <input
                   type="date"
@@ -453,7 +440,7 @@ export default function AssignedAssetList() {
         <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <ClockIcon className="h-5 w-5 text-amber-600" />
-            <h2 className="flex-1 text-base font-bold text-amber-900">
+            <h2 className="flex-1 min-w-[60%] sm:min-w-[auto] text-base font-bold text-amber-900">
               Bàn giao chờ xác nhận
               <span className="ml-2 rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-900">
                 {pendingHandovers.length}
@@ -541,7 +528,7 @@ export default function AssignedAssetList() {
                                 {h.asset_specifications.power_supply && <div><span className="text-slate-500">Nguồn:</span> <span className="font-semibold">{h.asset_specifications.power_supply}</span></div>}
                               </>
                             )}
-                            {['MONITOR', 'OTHER'].includes(h.asset_type || '') && h.assigned_quantity != null && (
+                            {isMultiHolderType(h.asset_type) && h.assigned_quantity != null && (
                               <div><span className="text-slate-500">Số lượng bàn giao:</span> <span className="font-semibold">{h.assigned_quantity}</span></div>
                             )}
                             {h.asset_type === 'SIM' && (
@@ -586,7 +573,7 @@ export default function AssignedAssetList() {
                       <button
                         onClick={() => handleConfirmHandover(h)}
                         disabled={isBusy}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:bg-emerald-300 transition-all active:scale-95"
+                        className="flex-1 sm:flex-initial whitespace-nowrap inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-2 sm:px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:bg-emerald-300 transition-all active:scale-95"
                       >
                         <CheckCircleIcon className="h-4 w-4" />
                         {isBusy ? 'Đang xử lý...' : 'Xác nhận nhận máy'}
@@ -594,7 +581,7 @@ export default function AssignedAssetList() {
                       <button
                         onClick={() => openRejectDialog(h)}
                         disabled={isBusy}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 shadow-sm hover:bg-red-100 disabled:opacity-50 transition-all active:scale-95"
+                        className="flex-1 sm:flex-initial whitespace-nowrap inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2 sm:px-3 py-2 text-xs font-bold text-red-700 shadow-sm hover:bg-red-100 disabled:opacity-50 transition-all active:scale-95"
                       >
                         <XCircleIcon className="h-4 w-4" />
                         Từ chối
@@ -613,8 +600,116 @@ export default function AssignedAssetList() {
         <div className="mb-4 p-4 bg-red-50 rounded-2xl text-sm text-red-700">{error}</div>
       )}
 
+      {/* Mobile: danh sách dạng thẻ (bảng 12 cột không đọc được trên điện thoại) */}
+      <div className="sm:hidden space-y-3">
+        {loading ? (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-12 flex flex-col items-center justify-center gap-3 text-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600" />
+            <p className="text-sm text-gray-500">Đang tải danh sách thiết bị bàn giao...</p>
+          </div>
+        ) : filteredAssets.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-12 text-center">
+            <ComputerDesktopIcon className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+            <p className="text-gray-500 font-medium">Bạn chưa được bàn giao tài sản nào.</p>
+            <p className="text-sm text-gray-400 mt-1">Liên hệ phòng IT để được hỗ trợ.</p>
+          </div>
+        ) : (
+          pagedAssets.map((asset) => {
+            const isReturned = asset.status === 'IDLE' || asset.status === 'RETIRED';
+            const isUnderMaintenance = asset.status === 'UNDER_MAINTENANCE';
+            return (
+              <div key={asset.id} className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 ${(isReturned || isUnderMaintenance) ? 'opacity-50 grayscale-[0.5]' : ''}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-primary-700 break-words">{asset.name}</p>
+                    <p className="text-sm text-gray-900 font-medium">{asset.model || '-'}</p>
+                  </div>
+                  <button
+                    onClick={() => { setSelectedAsset(asset); setIsDetailModalOpen(true); }}
+                    className="flex-shrink-0 inline-flex items-center space-x-1.5 px-3 py-2 rounded-lg text-primary-600 bg-primary-50 hover:bg-primary-100 hover:text-primary-700 transition-all font-bold text-[11px] uppercase tracking-wide shadow-sm active:scale-95"
+                  >
+                    <EyeIcon className="h-4 w-4" />
+                    <span>Chi tiết</span>
+                  </button>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${ASSET_TYPE_COLOR_MAP[asset.asset_type] ?? 'bg-gray-100 text-gray-800 border-gray-200'} uppercase tracking-tight`}>
+                    {asset.asset_type === 'OTHER' && (asset as any).other_type_name
+                      ? `Khác (${(asset as any).other_type_name})`
+                      : asset.asset_type_display}
+                  </span>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${getStatusColor(asset.status)} uppercase tracking-tight`}>
+                    {asset.status_display}
+                  </span>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${getConditionColor(asset.condition)} uppercase tracking-tight`}>
+                    {asset.condition_display}
+                  </span>
+                  {isReturned ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 uppercase tracking-tight">
+                      Đã thu hồi
+                    </span>
+                  ) : isUnderMaintenance ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary-50 text-primary-700 border border-primary-200 uppercase tracking-tight">
+                      Đang bảo hành
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase tracking-tight">
+                      Đang sử dụng
+                    </span>
+                  )}
+                </div>
+                <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                  <div>
+                    <dt className="text-xs text-gray-500">Số lượng bàn giao</dt>
+                    <dd className="font-semibold text-gray-800">{asset.my_assigned_quantity ?? 1}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-gray-500">Ngày nhận</dt>
+                    <dd className="text-gray-800">{formatDate(asset.assigned_date)}</dd>
+                  </div>
+                  <div className="col-span-2">
+                    <dt className="text-xs text-gray-500">Quản lý kho</dt>
+                    <dd className="text-gray-800">
+                      {asset.managed_by_name || asset.department_name
+                        ? [asset.managed_by_name, asset.department_name].filter(Boolean).join(' · ')
+                        : '-'}
+                    </dd>
+                  </div>
+                </dl>
+                <div className="mt-3 pt-3 border-t border-gray-100 flex flex-col gap-2">
+                  {asset.description && (
+                    <div className="flex items-start space-x-1.5 opacity-80" title="Mô tả kỹ thuật/Lưu ý vật lý">
+                      <span className="mt-0.5"><SparklesIcon className="h-3 w-3 text-slate-400" /></span>
+                      <p className="text-[10px] text-gray-500 italic leading-relaxed line-clamp-2">
+                        {asset.description}
+                      </p>
+                    </div>
+                  )}
+                  <div className="flex items-start space-x-1.5" title={isReturned ? (asset as any).return_notes : (asset as any).assignment_notes}>
+                    <span className="mt-0.5">
+                      {isReturned ? (
+                        <ArrowPathRoundedSquareIcon className="h-3 w-3 text-amber-500" />
+                      ) : (
+                        <ShieldCheckIcon className="h-3 w-3 text-emerald-500" />
+                      )}
+                    </span>
+                    <div className="text-xs min-w-0">
+                      {isReturned ? (
+                        <span className="text-amber-600 line-clamp-2 font-medium">Thu hồi: {(asset as any).return_notes || '-'}</span>
+                      ) : (
+                        <span className="text-emerald-700 line-clamp-2 font-semibold">Bàn giao: {(asset as any).assignment_notes || '-'}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="hidden sm:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-auto max-h-[calc(100vh-16rem)]">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50 sticky top-0 z-10">
@@ -789,7 +884,7 @@ export default function AssignedAssetList() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-2">
           <p className="text-sm text-gray-500">
             Hiển thị <span className="font-semibold text-gray-700">{(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredAssets.length)}</span> / <span className="font-semibold text-gray-700">{filteredAssets.length}</span> thiết bị
           </p>

@@ -54,3 +54,4 @@ google-api-python-client==2.105.0
 # AI / document parsing for recruitment CV preview
 openai>=1.30.0
 pypdf>=5.0.0
+qrcode==8.0

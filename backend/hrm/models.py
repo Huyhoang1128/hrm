@@ -1,3 +1,5 @@
+import decimal
+
 from django.db import models
 from hrm import branding
 from django.contrib.auth.models import User
@@ -1612,6 +1614,33 @@ ASSET_TYPE = [
     ('OTHER', 'Khác'),
 ]
 
+# "Phân loại" tài sản là text tự do: gõ gì lưu nấy, KHÔNG quy giá trị lạ về
+# "Khác". ASSET_TYPE ở trên chỉ còn là các loại chuẩn có hành vi riêng (SIM,
+# cấu hình máy...) và nhãn hiển thị của chúng.
+STANDARD_ASSET_TYPES = {code for code, _ in ASSET_TYPE}
+ASSET_TYPE_MAX_LENGTH = 100
+# Tên gọi khác của loại chuẩn mà file Excel cũ vẫn dùng.
+_ASSET_TYPE_ALIASES = {"máy tính xách tay": "LAPTOP"}
+
+
+def normalize_asset_type(raw) -> str:
+    """Chuẩn hoá "Phân loại" người dùng gõ (web lẫn Excel).
+
+    Chỉ gom khoảng trắng thừa. Riêng giá trị trùng Y HỆT (không phân biệt hoa
+    thường) mã hoặc nhãn của 1 loại chuẩn — vd "Laptop", "sim", "Máy tính để
+    bàn", "Khác" — thì lưu theo mã chuẩn, để dữ liệu cũ/file export cũ và các
+    hành vi theo loại (SIM, Màn hình...) giữ nguyên. Còn lại giữ đúng chữ đã gõ.
+    """
+    text = " ".join(str(raw or "").split())
+    if not text:
+        return ""
+    key = text.casefold()
+    for code, label in ASSET_TYPE:
+        if key in (code.casefold(), label.casefold()):
+            return code
+    return _ASSET_TYPE_ALIASES.get(key, text)
+
+
 ASSET_STATUS = [
     ('NEW', 'Mới'),
     ('IN_USE', 'Đang sử dụng'),
@@ -1631,11 +1660,15 @@ ASSET_CONDITION = [
     ('BROKEN', 'Hỏng'),
 ]
 
+DEPRECIATION_METHOD = [
+    ('STRAIGHT_LINE', 'Đường thẳng'),
+]
+
 class Asset(models.Model):
     """Quản lý tài sản công ty"""
     asset_code = models.CharField(max_length=64, unique=True, verbose_name="Mã tài sản")
     name = models.CharField(max_length=255, verbose_name="Tên tài sản")
-    asset_type = models.CharField(max_length=20, choices=ASSET_TYPE, verbose_name="Loại tài sản")
+    asset_type = models.CharField(max_length=ASSET_TYPE_MAX_LENGTH, choices=ASSET_TYPE, verbose_name="Loại tài sản")
     description = models.TextField(blank=True, verbose_name="Mô tả")
     
     # Thông tin mua sắm
@@ -1668,6 +1701,17 @@ class Asset(models.Model):
     assigned_to = models.ForeignKey(Employee, on_delete=models.SET_NULL, null=True, blank=True,
                                    related_name='assigned_assets', verbose_name="Người được gán")
     assigned_date = models.DateField(null=True, blank=True, verbose_name="Ngày gán")
+
+    # Kích thước vật lý + nơi thực tế đang sử dụng — TÁCH biệt với `department`
+    # (phòng ban QUẢN LÝ tài sản) vì tài sản có thể do phòng A quản lý nhưng phòng
+    # B đang dùng. "Người sử dụng" dùng chung `assigned_to`.
+    dimensions = models.CharField(max_length=100, blank=True, verbose_name="Kích thước")
+    usage_area = models.CharField(max_length=255, blank=True, verbose_name="Khu vực sử dụng")
+    usage_department = models.ForeignKey(
+        'employee.Department', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='assets_in_use', verbose_name="Phòng ban sử dụng",
+    )
+    facility_code = models.CharField(max_length=50, blank=True, verbose_name="Mã cơ sở")
     
     # Thông tin hệ thống
     created_at = models.DateTimeField(auto_now_add=True)
@@ -1679,15 +1723,20 @@ class Asset(models.Model):
     is_deleted = models.BooleanField(default=False, verbose_name="Đã xóa")
     deleted_at = models.DateTimeField(null=True, blank=True, verbose_name="Thời điểm xóa")
 
-    # Hình ảnh + khấu hao tài sản. Chưa có logic/UI dùng tới; depreciation_method
-    # có default để INSERT không thiếu giá trị.
-    current_image = models.CharField(max_length=500, null=True, blank=True, verbose_name="Hình ảnh tài sản hiện tại")
+    # Khấu hao — "Giá trị hiện tại"/"Mức khấu hao" KHÔNG lưu cột riêng mà tính
+    # động qua property (xem bên dưới) để luôn khớp thời điểm hiện tại.
+    depreciation_period_months = models.PositiveIntegerField(
+        null=True, blank=True, verbose_name="Thời gian khấu hao (tháng)")
     depreciation_method = models.CharField(
-        max_length=20, choices=[('STRAIGHT_LINE', 'Đường thẳng')], default='STRAIGHT_LINE',
-        verbose_name="Phương pháp khấu hao",
-    )
-    depreciation_period_months = models.PositiveIntegerField(null=True, blank=True, verbose_name="Thời gian khấu hao (tháng)")
-    purchase_image = models.CharField(max_length=500, null=True, blank=True, verbose_name="Hình ảnh tài sản mới mua")
+        max_length=20, choices=DEPRECIATION_METHOD, default='STRAIGHT_LINE',
+        verbose_name="Phương pháp khấu hao")
+
+    # Hình ảnh tài sản — CharField lưu S3 key (giống Employee.avatar), upload qua
+    # action upload_image(), đọc ra bằng presigned URL ở serializer.
+    current_image = models.CharField(max_length=500, blank=True, null=True,
+                                     verbose_name="Hình ảnh tài sản hiện tại")
+    purchase_image = models.CharField(max_length=500, blank=True, null=True,
+                                      verbose_name="Hình ảnh tài sản mới mua")
 
     def save(self, *args, **kwargs):
         if not self.asset_code:
@@ -1737,16 +1786,67 @@ class Asset(models.Model):
         
         super().save(*args, **kwargs)
 
+    # ======== Khấu hao (đường thẳng) — tính động, không lưu DB ========
+    @property
+    def monthly_depreciation(self):
+        """Mức khấu hao mỗi tháng = Giá mua ÷ Thời gian khấu hao (tháng)."""
+        if not self.purchase_price or not self.depreciation_period_months:
+            return None
+        try:
+            return round(self.purchase_price / self.depreciation_period_months, 2)
+        except (TypeError, ZeroDivisionError, decimal.InvalidOperation):
+            return None
+
+    @property
+    def months_since_purchase(self):
+        """Số tháng đã trôi qua kể từ ngày mua tới hôm nay (chưa tròn tháng thì không tính)."""
+        if not self.purchase_date:
+            return 0
+        today = timezone.now().date()
+        if today < self.purchase_date:
+            return 0
+        months = (today.year - self.purchase_date.year) * 12 + (today.month - self.purchase_date.month)
+        if today.day < self.purchase_date.day:
+            months -= 1
+        return max(0, months)
+
+    @property
+    def accumulated_depreciation(self):
+        """Tổng đã khấu hao tính đến hiện tại, không vượt quá giá mua."""
+        monthly = self.monthly_depreciation
+        if monthly is None:
+            return None
+        months_used = self.months_since_purchase
+        if self.depreciation_period_months:
+            months_used = min(months_used, self.depreciation_period_months)
+        return min(monthly * months_used, self.purchase_price)
+
+    @property
+    def current_value(self):
+        """Giá trị hiện tại sau khấu hao. Không cấu hình khấu hao thì bằng giá mua."""
+        if self.purchase_price is None:
+            return None
+        accumulated = self.accumulated_depreciation
+        if accumulated is None:
+            return self.purchase_price
+        return max(self.purchase_price - accumulated, 0)
+
     # ======== Multi-holder helpers ========
     # Loại tài sản cho phép nhiều đơn vị + bàn giao cho nhiều người.
     MULTI_HOLDER_TYPES = {'MONITOR', 'OTHER'}
 
+    @classmethod
+    def is_multi_holder_type(cls, asset_type) -> bool:
+        """Loại có Số lượng + bàn giao cho nhiều người: Màn hình, Khác, và mọi
+        "Phân loại" gõ tự do ngoài danh sách chuẩn (hành vi giống "Khác")."""
+        return asset_type in cls.MULTI_HOLDER_TYPES or asset_type not in STANDARD_ASSET_TYPES
+
     @property
     def total_quantity(self) -> int:
         """Tổng số đơn vị vật lý — dùng ``specifications.quantity``
-        cho các loại trong MULTI_HOLDER_TYPES. Các loại khác mặc định 1.
+        cho các loại nhiều đơn vị (is_multi_holder_type). Các loại khác mặc định 1.
         """
-        if self.asset_type in self.MULTI_HOLDER_TYPES:
+        if self.is_multi_holder_type(self.asset_type):
             try:
                 return max(1, int((self.specifications or {}).get('quantity', 1) or 1))
             except (TypeError, ValueError):
@@ -1770,7 +1870,7 @@ class Asset(models.Model):
 
     def is_multi_holder(self) -> bool:
         """True nếu asset thuộc loại cho phép chia cho nhiều người (qty>1)."""
-        return self.asset_type in self.MULTI_HOLDER_TYPES and self.total_quantity > 1
+        return self.is_multi_holder_type(self.asset_type) and self.total_quantity > 1
 
     def assign_to_employee(self, employee, assigned_date=None, notes=None,
                            assigned_by=None, override_pending=False, quantity=1):
@@ -1811,7 +1911,7 @@ class Asset(models.Model):
             err.remaining_quantity = self.remaining_quantity  # type: ignore[attr-defined]
             raise err
 
-        if self.asset_type not in self.MULTI_HOLDER_TYPES and quantity != 1:
+        if not self.is_multi_holder_type(self.asset_type) and quantity != 1:
             err = ValidationError("Loại tài sản này không hỗ trợ bàn giao nhiều đơn vị")
             err.error_code = 'NOT_MULTI_HOLDER_TYPE'  # type: ignore[attr-defined]
             raise err
@@ -2087,6 +2187,44 @@ class AssetMaintenance(models.Model):
             models.Index(fields=['asset', 'maintenance_date']),
         ]
 
+
+
+INVENTORY_CHECK_RESULT = [
+    ('MATCH', 'Khớp'),
+    ('MISSING', 'Thiếu / không tìm thấy'),
+    ('DAMAGED', 'Hư hỏng'),
+    ('WRONG_HOLDER', 'Sai vị trí / người giữ'),
+    ('OTHER', 'Khác'),
+]
+
+
+class AssetInventoryCheck(models.Model):
+    """Lịch sử kiểm kê tài sản — mỗi bản ghi là 1 lần kiểm kê thực tế cho 1 tài sản."""
+    asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='inventory_checks',
+                              verbose_name="Tài sản")
+    check_date = models.DateField(verbose_name="Ngày kiểm kê")
+    checked_by = models.ForeignKey(Employee, on_delete=models.SET_NULL, null=True, blank=True,
+                                   related_name='performed_inventory_checks', verbose_name="Người kiểm kê")
+    actual_condition = models.CharField(max_length=20, choices=ASSET_CONDITION, blank=True,
+                                        verbose_name="Tình trạng thực tế")
+    result = models.CharField(max_length=20, choices=INVENTORY_CHECK_RESULT, default='MATCH',
+                              verbose_name="Kết quả kiểm kê")
+    notes = models.TextField(blank=True, verbose_name="Ghi chú")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(Employee, on_delete=models.SET_NULL, null=True, blank=True,
+                                   related_name='created_inventory_checks', verbose_name="Người tạo bản ghi")
+
+    def __str__(self):
+        return f"Kiểm kê {self.asset.asset_code} - {self.check_date}"
+
+    class Meta:
+        verbose_name = "Kiểm kê tài sản"
+        verbose_name_plural = "Kiểm kê tài sản"
+        ordering = ['-check_date']
+        indexes = [
+            models.Index(fields=['asset', 'check_date']),
+        ]
 
 # ======================
 # COMPANY CONFIGURATION MODELS

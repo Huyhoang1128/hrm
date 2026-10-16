@@ -18,7 +18,7 @@ from .models import (
     DepartmentWorkFinalizationApproval, WorkFinalizationApprovalLog,
     WorkFinalization, WorkFinalizationEmployeeDecision, WorkFinalizationAccountingExport,
     ContractTemplate, EmployeeContract,
-    Asset, AssetAssignmentHistory, AssetMaintenance,
+    Asset, AssetAssignmentHistory, AssetMaintenance, AssetInventoryCheck,
     FinalizationLock, FinalizationLockLog, FinalizationLockEmployeeOverride,
     MeetingRoom, MeetingRoomSetting, MeetingRoomBooking, MeetingRoomBookingLog,
     AttendanceAppDownloadConfig,
@@ -3372,3 +3372,12 @@ class PaymentDocumentAdmin(admin.ModelAdmin):
     raw_id_fields = ('employee', 'department', 'reviewed_by', 'created_by', 'updated_by', 'deleted_by')
     date_hierarchy = 'doc_date'
     inlines = [PaymentDocumentAttachmentInline]
+
+
+@admin.register(AssetInventoryCheck)
+class AssetInventoryCheckAdmin(admin.ModelAdmin):
+    list_display = ('asset', 'check_date', 'result', 'actual_condition', 'checked_by')
+    list_filter = ('result', 'actual_condition')
+    search_fields = ('asset__asset_code', 'asset__name', 'notes')
+    raw_id_fields = ('asset', 'checked_by', 'created_by')
+    date_hierarchy = 'check_date'

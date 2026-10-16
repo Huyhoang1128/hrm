@@ -134,11 +134,13 @@ class SimCancellationDateExportTests(SimpleTestCase):
             'phone_number': 'p', 'network_provider': 'np', 'sim_type': 'st',
             'doctor': 'd', 'region': 'r', 'vi_tri': 'vt', 'cong_ty': 'ct', 'ngay_bao_huy': 'NBH',
             'type_name': 'tn',
-            'purchase_date': '', 'warranty_period': 0, 'supplier': '',
+            'purchase_date': '', 'warranty_period': 0, 'purchase_price': '',
+            'depreciation_period_months': '', 'depreciation_method': '', 'supplier': '',
             'department': '', 'managed_by_code': '', 'managed_by_name': '',
+            'dimensions': '', 'usage_area': '', 'usage_department_code': '', 'facility_code': '',
             'description': '',
         }
-        row = _row_from_base(fake_base, '', '', '', '', '')
+        row = _row_from_base(fake_base, '', '', '', '', '', '', '')
         cong_ty_idx = row.index('ct')
         type_name_idx = row.index('tn')
         self.assertEqual(row[cong_ty_idx + 1], 'NBH')
