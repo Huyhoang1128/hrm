@@ -3,6 +3,7 @@ from hrm import branding
 import os
 from collections import defaultdict
 import re
+from users.utils import get_user_display_name
 
 logger = logging.getLogger(__name__)
 
@@ -10905,7 +10906,7 @@ class GenericRequestViewSet(viewsets.ModelViewSet):
         if request.method == 'GET':
             return Response({
                 'is_locked': lock.is_locked,
-                'updated_by_name': lock.updated_by.get_full_name() or lock.updated_by.username if lock.updated_by else None,
+                'updated_by_name': get_user_display_name(lock.updated_by) if lock.updated_by else None,
                 'updated_at': lock.updated_at,
             })
 
@@ -10928,7 +10929,7 @@ class GenericRequestViewSet(viewsets.ModelViewSet):
         lock.save(update_fields=['is_locked', 'updated_by', 'updated_at'])
         return Response({
             'is_locked': lock.is_locked,
-            'updated_by_name': lock.updated_by.get_full_name() or lock.updated_by.username,
+            'updated_by_name': get_user_display_name(lock.updated_by),
             'updated_at': lock.updated_at,
         })
 
@@ -10953,7 +10954,7 @@ class GenericRequestViewSet(viewsets.ModelViewSet):
                 # Khung tạo đơn mặc định (00:00 ngày 1 - 15:30 ngày 3, giờ VN) theo
                 # giờ server — FE dùng giá trị này thay vì đồng hồ máy người dùng.
                 'window_open': GenericRequestSerializer.is_salary_advance_creation_window_open(),
-                'updated_by_name': lock.updated_by.get_full_name() or lock.updated_by.username if lock.updated_by else None,
+                'updated_by_name': get_user_display_name(lock.updated_by) if lock.updated_by else None,
                 'updated_at': lock.updated_at,
             })
 
@@ -10976,7 +10977,7 @@ class GenericRequestViewSet(viewsets.ModelViewSet):
         lock.save(update_fields=['is_locked', 'updated_by', 'updated_at'])
         return Response({
             'is_locked': lock.is_effectively_locked(),
-            'updated_by_name': lock.updated_by.get_full_name() or lock.updated_by.username,
+            'updated_by_name': get_user_display_name(lock.updated_by),
             'updated_at': lock.updated_at,
         })
 

@@ -16,6 +16,7 @@ from rest_framework import status
 from django.utils import timezone
 
 from .models import FinalizationLock
+from users.utils import get_user_display_name
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +118,7 @@ def check_finalization_lock(year, month, day=None, period=None, employee=None):
     locked_by_name = ""
     locked_by_role = ""
     if lock.locked_by:
-        locked_by_name = lock.locked_by.get_full_name() or lock.locked_by.username
+        locked_by_name = get_user_display_name(lock.locked_by)
         if lock.locked_by.is_superuser or lock.locked_by.is_staff:
             locked_by_role = "ADMIN"
         else:

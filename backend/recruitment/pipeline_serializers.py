@@ -9,6 +9,8 @@ from .pipeline_models import (
 )
 from .candidate_serializers import CandidateListSerializer, resolve_candidate_cv_url
 from .serializers import JobListSerializer
+from users.utils import get_user_display_name
+from users.fields import UserDisplayNameField
 
 
 # ---------------------------------------------------------------------------
@@ -17,9 +19,7 @@ from .serializers import JobListSerializer
 
 class ApplicationStageHistorySerializer(serializers.ModelSerializer):
     stage_display = serializers.CharField(source='get_stage_display', read_only=True)
-    changed_by_name = serializers.CharField(
-        source='changed_by.get_full_name', read_only=True
-    )
+    changed_by_name = UserDisplayNameField(source='changed_by')
 
     class Meta:
         model = ApplicationStageHistory
@@ -46,9 +46,7 @@ class ApplicationListSerializer(serializers.ModelSerializer):
         source='get_current_stage_display', read_only=True
     )
     status_display = serializers.CharField(source='get_status_display', read_only=True)
-    assignee_name = serializers.CharField(
-        source='assignee.get_full_name', read_only=True
-    )
+    assignee_name = UserDisplayNameField(source='assignee')
     cv_process_status_display = serializers.CharField(
         source='get_cv_process_status_display', read_only=True
     )
@@ -97,7 +95,7 @@ class ApplicationListSerializer(serializers.ModelSerializer):
         employee = getattr(user, 'employee', None)
         if employee and getattr(employee, 'full_name', None):
             return employee.full_name
-        return user.get_full_name() or user.username
+        return get_user_display_name(user)
 
 
 class ApplicationSerializer(serializers.ModelSerializer):
@@ -107,9 +105,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
         source='get_current_stage_display', read_only=True
     )
     status_display = serializers.CharField(source='get_status_display', read_only=True)
-    assignee_name = serializers.CharField(
-        source='assignee.get_full_name', read_only=True
-    )
+    assignee_name = UserDisplayNameField(source='assignee')
     cv_process_status_display = serializers.CharField(
         source='get_cv_process_status_display', read_only=True
     )
@@ -191,7 +187,7 @@ class InterviewListSerializer(serializers.ModelSerializer):
     interviewer_full_name = serializers.SerializerMethodField()
 
     def get_interviewer_names(self, obj):
-        return [u.get_full_name() or u.username for u in obj.interviewers.all()]
+        return [get_user_display_name(u) for u in obj.interviewers.all()]
 
     def get_interviewer_user_ids(self, obj):
         return list(obj.interviewers.values_list('id', flat=True))
@@ -220,7 +216,7 @@ class InterviewListSerializer(serializers.ModelSerializer):
         if emp:
             return emp.full_name
         for u in obj.interviewers.all():
-            return u.get_full_name() or u.username
+            return get_user_display_name(u)
         return None
 
     def _candidate(self, obj):
@@ -266,7 +262,7 @@ class InterviewListSerializer(serializers.ModelSerializer):
                 return emp.full_name
         except Exception:
             pass
-        return user.get_full_name() or user.username
+        return get_user_display_name(user)
 
     def _need_interviewer(self, obj):
         try:
@@ -292,7 +288,7 @@ class InterviewListSerializer(serializers.ModelSerializer):
                 return emp.full_name
         except Exception:
             pass
-        return user.get_full_name() or user.username
+        return get_user_display_name(user)
 
     class Meta:
         model = Interview
@@ -326,7 +322,7 @@ class InterviewSerializer(serializers.ModelSerializer):
     )
 
     def get_interviewer_names(self, obj):
-        return [u.get_full_name() or u.username for u in obj.interviewers.all()]
+        return [get_user_display_name(u) for u in obj.interviewers.all()]
 
     class Meta:
         model = Interview
@@ -354,9 +350,7 @@ class InterviewSerializer(serializers.ModelSerializer):
 # ---------------------------------------------------------------------------
 
 class InterviewEvaluationSerializer(serializers.ModelSerializer):
-    evaluator_name = serializers.CharField(
-        source='evaluator.get_full_name', read_only=True
-    )
+    evaluator_name = UserDisplayNameField(source='evaluator')
 
     class Meta:
         model = InterviewEvaluation
@@ -384,9 +378,7 @@ class OfferSerializer(serializers.ModelSerializer):
     job_title = serializers.CharField(
         source='application.job.title', read_only=True
     )
-    created_by_name = serializers.CharField(
-        source='created_by.get_full_name', read_only=True
-    )
+    created_by_name = UserDisplayNameField(source='created_by')
 
     class Meta:
         model = Offer

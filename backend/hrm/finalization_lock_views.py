@@ -21,6 +21,7 @@ from rest_framework import status
 from django.utils import timezone
 
 from .models import FinalizationLock, FinalizationLockLog, FinalizationLockEmployeeOverride
+from users.utils import get_user_display_name
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +115,7 @@ def _get_user_display(user):
     except Exception:
         pass
     if not full_name:
-        full_name = user.get_full_name() or user.username
+        full_name = get_user_display_name(user)
     if not employee_code:
         employee_code = user.username
     display = f"{employee_code} - {full_name}"
@@ -325,7 +326,7 @@ class FinalizationLockToggleView(APIView):
 
         return Response({
             "message": f"{action_text} chốt công tháng {month}/{year} — {lock.get_period_display()}.",
-            "performed_by": user.get_full_name() or user.username,
+            "performed_by": get_user_display_name(user),
             "performed_by_role": role,
             **_serialize_lock(lock),
         })
@@ -400,7 +401,7 @@ class FinalizationLockCheckView(APIView):
             if lock.is_locked:
                 locked_by_name = ""
                 if lock.locked_by:
-                    locked_by_name = lock.locked_by.get_full_name() or lock.locked_by.username
+                    locked_by_name = get_user_display_name(lock.locked_by)
                 message = (
                     f"Tháng {month}/{year} — {lock.get_period_display()} đã đóng chốt công. "
                     f"Không thể tạo đơn hoặc phê duyệt cho khoảng ngày này."
@@ -458,7 +459,7 @@ class FinalizationLockLogView(APIView):
                 "action": log.action,
                 "action_display": log.get_action_display(),
                 "performed_by": (
-                    log.performed_by.get_full_name() or log.performed_by.username
+                    get_user_display_name(log.performed_by)
                 ) if log.performed_by else None,
                 "performed_by_role": log.performed_by_role,
                 "note": log.note,
