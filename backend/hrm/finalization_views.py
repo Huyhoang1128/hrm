@@ -1730,6 +1730,27 @@ def get_salary_rows(year: int, month: int, department_id=None, legal_entity: str
     }
 
 
+def split_rows_by_employment(rows: list, year: int, month: int) -> tuple:
+    """
+    Tách các dòng bảng lương thành (đang làm việc, đã nghỉ) tính đến cuối kỳ lương.
+
+    Mốc là ngày cuối tháng lương nhưng không vượt quá hôm nay — xem bảng lương tháng
+    đang diễn ra thì không đoán trước ai sẽ nghỉ trong phần còn lại của tháng.
+    """
+    days_in_month = cal_module.monthrange(year, month)[1]
+    ref_date = min(_dt.date(year, month, days_in_month), timezone.localdate())
+    end_dates = dict(
+        Employee.objects
+        .filter(id__in=[r.get('employee_id') for r in rows if r.get('employee_id')])
+        .values_list('id', 'end_date')
+    )
+    working, left = [], []
+    for row in rows:
+        end_date = end_dates.get(row.get('employee_id'))
+        (left if (end_date and end_date <= ref_date) else working).append(row)
+    return working, left
+
+
 class SalaryDepartmentView(APIView):
     """
     GET /hrm/salary/department/
@@ -1739,6 +1760,7 @@ class SalaryDepartmentView(APIView):
       - department_id (optional)
       - legal_entity (optional)
       - employee_code (optional)
+      - employment_filter (optional) — working | left, mặc định trả tất cả
     """
 
     permission_classes = [IsAuthenticated]
@@ -1759,13 +1781,41 @@ class SalaryDepartmentView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        return Response(get_salary_rows(
+        # working = đang làm việc | left = đã nghỉ | mặc định: tất cả
+        employment_filter = (request.query_params.get("employment_filter") or "").strip().lower()
+        if employment_filter not in ("", "all", "working", "left"):
+            return Response(
+                {"error": "employment_filter chỉ nhận working | left"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        data = get_salary_rows(
             year,
             month,
             department_id=request.query_params.get("department_id"),
             legal_entity=request.query_params.get("legal_entity") or "",
             employee_code=request.query_params.get("employee_code"),
-        ))
+        )
+        working_rows, left_rows = split_rows_by_employment(data["results"], year, month)
+        if employment_filter == "working":
+            data["results"] = working_rows
+        elif employment_filter == "left":
+            data["results"] = left_rows
+        # Người đã nghỉ vẫn có thể còn lương phải trả của những ngày đã làm trong tháng.
+        # Trả kèm con số này để giao diện cảnh báo khi HR lọc "đang làm việc", tránh
+        # ẩn mất khoản phải thanh toán.
+        left_payable = [r for r in left_rows if (r.get("con_phai_thanh_toan") or 0) != 0]
+        data.update({
+            "employment_filter": employment_filter if employment_filter in ("working", "left") else "all",
+            "working_count": len(working_rows),
+            "left_count": len(left_rows),
+            "left_payable_count": len(left_payable),
+            "left_payable_amount": sum(r.get("con_phai_thanh_toan") or 0 for r in left_payable),
+            "total": len(data["results"]),
+        })
+        if not data["results"]:
+            data["department_name"] = None
+        return Response(data)
 
 
 # ---------------------------------------------------------------------------
