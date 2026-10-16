@@ -312,6 +312,19 @@ export const departmentsAPI = {
     }> = await managementApi.get(`/api-hrm/departments/${id}/employees/`, { params });
     return response.data;
   },
+
+  importFile: async (file: File): Promise<{
+    success: boolean;
+    summary: { total: number; created: number; updated: number; failed: number };
+    errors: Array<{ row: number; code?: string; warnings?: string[]; errors?: string[] }>;
+  }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await managementApi.post('/api-hrm/departments/import/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
 };
 
 // Sections API (Bộ phận - dùng chung model Department, BE auto set is_section=true)
@@ -414,6 +427,19 @@ export const positionsAPI = {
       previous: string | null;
       results: Employee[];
     }> = await managementApi.get(`/api-hrm/positions/${id}/employees/`, { params });
+    return response.data;
+  },
+
+  importFile: async (file: File): Promise<{
+    success: boolean;
+    summary: { total: number; created: number; updated: number; failed: number };
+    errors: Array<{ row: number; code?: string; warnings?: string[]; errors?: string[] }>;
+  }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await managementApi.post('/api-hrm/positions/import/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return response.data;
   },
 };

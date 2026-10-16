@@ -78,7 +78,7 @@ from .finalization_lock_views import (
     FinalizationLockEmployeeOverrideDetailView,
 )
 from employee.birthday_views import BirthdayWishListCreateView, BirthdayWishDetailView, BirthdayWishLikeView
-from employee.import_views import EmployeeImportView, EmployeeSocialInsuranceImportView
+from employee.import_views import EmployeeImportView, EmployeeSocialInsuranceImportView, DepartmentImportView, PositionImportView
 from employee.dependent_views import EmployeeDependentViewSet
 from .payment_document_views import PaymentDocumentViewSet
 from .views import BulkSalaryConfigImportView
@@ -141,6 +141,8 @@ urlpatterns = [
     
     path('employees/send-account-emails/', send_account_emails, name='send-account-emails'),
     path('employees/import/', EmployeeImportView.as_view(), name='employee-import'),
+    path('departments/import/', DepartmentImportView.as_view(), name='department-import'),
+    path('positions/import/', PositionImportView.as_view(), name='position-import'),
     path('employees/social-insurance/import/', EmployeeSocialInsuranceImportView.as_view(), name='employee-social-insurance-import'),
     path('employees/bulk-salary-config/', BulkSalaryConfigImportView.as_view(), name='employee-bulk-salary-config'),
     path('email-batch/<str:batch_id>/status/', check_email_batch_status, name='email-batch-status'),
