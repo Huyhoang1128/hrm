@@ -103,6 +103,7 @@ import FeedbackManagement from './pages/FeedbackManagement';
 import InternalChat from './pages/InternalChat';
 import SalaryPayroll from './pages/SalaryPayroll';
 import SalaryBonusPrediction from './pages/SalaryBonusPrediction';
+import SalaryComparisonReport from './pages/SalaryComparisonReport';
 import SalaryEmployeeConfig from './pages/SalaryEmployeeConfig';
 import SalaryData from './pages/SalaryData';
 import OvertimeRateConfigPage from './pages/OvertimeRateConfig';
@@ -1268,6 +1269,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <WorkFinalizationApprovals />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/salary-management/comparison"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <Layout>
+                  <SalaryComparisonReport />
                 </Layout>
               </ProtectedRoute>
             }

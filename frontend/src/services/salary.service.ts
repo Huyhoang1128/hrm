@@ -998,6 +998,79 @@ class SalaryService {
     const response = await managementApi.post('/api/v1/salary/records/bonus-prediction/', params);
     return response.data;
   }
+
+  async salaryComparison(params: SalaryComparisonParams): Promise<SalaryComparisonReport> {
+    const query = Object.fromEntries(
+      Object.entries(params).filter(([, v]) => v !== '' && v !== undefined && v !== null),
+    );
+    const response = await managementApi.get('/api/v1/salary/records/comparison-report/', { params: query });
+    return response.data;
+  }
+}
+
+// ── Báo cáo biến động lương ────────────────────────────────────────────────────────
+
+export type SalaryMetricKey = 'tong_thu_nhap' | 'luong_thuc_linh' | 'con_phai_thanh_toan';
+export type SalaryMetricValues = Record<SalaryMetricKey, number>;
+
+export interface SalaryComparisonRow {
+  employee_id: number | null;
+  employee_code: string;
+  full_name: string;
+  department: string;
+  position: string;
+  legal_entity: string;
+  legal_entity_name: string;
+  department_a: string;
+  /** Pháp nhân tháng A. */
+  legal_entity_a: string;
+  legal_entity_a_name: string;
+  in_month_a: boolean;
+  in_month_b: boolean;
+  month_a: SalaryMetricValues | null;
+  month_b: SalaryMetricValues | null;
+  diff: SalaryMetricValues;
+  /** null khi tháng trước không có lương (không chia được). */
+  diff_percent: Record<SalaryMetricKey, number | null>;
+}
+
+export interface SalaryComparisonReport {
+  month_a: { year: number; month: number; label: string };
+  month_b: { year: number; month: number; label: string };
+  metrics: Array<{ key: SalaryMetricKey; label: string }>;
+  rows: SalaryComparisonRow[];
+  totals: {
+    month_a: SalaryMetricValues;
+    month_b: SalaryMetricValues;
+    diff: SalaryMetricValues;
+    employee_count: number;
+  };
+}
+
+export interface SalaryComparisonParams {
+  month_a: string; // YYYY-MM
+  month_b: string; // YYYY-MM
+  department?: number | '';
+  legal_entity?: string;
+  /** Mã hoặc tên nhân viên. */
+  employee?: string;
+}
+
+/** Gom lỗi DRF ({field: [msg]} / {detail} / {non_field_errors}) thành một câu đọc được. */
+export function apiErrorMessage(err: unknown, fallback = 'Đã có lỗi xảy ra. Vui lòng thử lại.'): string {
+  const data = (err as { response?: { data?: unknown } })?.response?.data;
+  if (!data) return fallback;
+  if (typeof data === 'string') return data;
+  if (typeof data === 'object') {
+    const parts: string[] = [];
+    for (const value of Object.values(data as Record<string, unknown>)) {
+      if (Array.isArray(value)) parts.push(...value.map(String));
+      else if (value && typeof value === 'object') parts.push(...Object.values(value).map(String));
+      else if (value) parts.push(String(value));
+    }
+    if (parts.length) return parts.join(' ');
+  }
+  return fallback;
 }
 
 export const salaryService = new SalaryService();
