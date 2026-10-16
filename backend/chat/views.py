@@ -43,6 +43,7 @@ from .serializers import (
 	ReactionTypeSerializer,
 )
 from hrm.utils import upload_file_to_cloudfly
+from users.utils import get_user_display_name
 
 
 CHAT_IMAGE_MAX_SIZE = 500 * 1024
@@ -52,7 +53,7 @@ CHAT_IMAGE_TYPES = {'image/jpeg', 'image/png', 'image/gif', 'image/webp'}
 def _ensure_chat_user(auth_user):
 	org, _ = Organization.objects.get_or_create(name='Default Organization')
 	employee = getattr(auth_user, 'employee', None)
-	display_name = (employee.full_name if employee else '') or auth_user.get_full_name() or auth_user.username
+	display_name = (employee.full_name if employee else '') or get_user_display_name(auth_user)
 	chat_user, created = ChatUser.objects.get_or_create(
 		auth_user=auth_user,
 		defaults={

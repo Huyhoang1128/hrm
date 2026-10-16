@@ -25,6 +25,7 @@ from .pipeline_serializers import (
     OfferSerializer,
 )
 from hrm import branding
+from users.utils import get_user_display_name
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +165,7 @@ def queue_interview_scheduled_email(interview, actor):
 
     candidate = interview.application.candidate
     interviewer_names = ' & '.join([
-        interviewer.get_full_name() or interviewer.username
+        get_user_display_name(interviewer)
         for interviewer in interview.interviewers.all()
     ])
 
@@ -330,7 +331,7 @@ class ApplicationViewSet(viewsets.ModelViewSet):
             'application_id': application.id,
             'candidate_name': application.candidate.full_name,
             'interviewer_id': interviewer.id if interviewer else None,
-            'interviewer_name': (interviewer.get_full_name() or interviewer.username) if interviewer else 'Chưa gán',
+            'interviewer_name': get_user_display_name(interviewer) if interviewer else 'Chưa gán',
             'duration_minutes': duration_minutes,
             'suggested_slots': suggested_slots,
             'available_rooms': available_rooms,
@@ -373,7 +374,7 @@ class ApplicationViewSet(viewsets.ModelViewSet):
 
         recruitment_need = getattr(application.job, 'recruitment_need', None)
         interviewer = getattr(recruitment_need, 'interviewer', None)
-        interviewer_names = (interviewer.get_full_name() or interviewer.username) if interviewer else 'Đang xác định'
+        interviewer_names = get_user_display_name(interviewer) if interviewer else 'Đang xác định'
 
         location = request.data.get('location', '')
         if not location and selected_room:
@@ -447,7 +448,7 @@ class ApplicationViewSet(viewsets.ModelViewSet):
                 booked_by=employee,
                 booked_by_user=user,
                 booking_source='USER',
-                contact_name=(employee.full_name if employee else (user.get_full_name() or user.username)),
+                contact_name=(employee.full_name if employee else get_user_display_name(user)),
                 contact_phone=(getattr(employee, 'phone_number', '') if employee else ''),
                 start_time=scheduled_at,
                 end_time=interview_end,
@@ -973,7 +974,7 @@ class InterviewViewSet(viewsets.ModelViewSet):
         # Format datetime for display
         scheduled_at_formatted = scheduled_at.strftime('%d/%m/%Y lúc %H:%M')
         interviewer_names = ' & '.join([
-            interviewer.get_full_name() or interviewer.username 
+            get_user_display_name(interviewer) 
             for interviewer in interview.interviewers.all()
         ])
         

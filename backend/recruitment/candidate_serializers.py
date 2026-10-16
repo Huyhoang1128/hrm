@@ -4,6 +4,8 @@ recruitment/candidate_serializers.py – Serializers cho Candidate.
 from rest_framework import serializers
 
 from .candidate_models import Candidate
+from users.utils import get_user_display_name
+from users.fields import UserDisplayNameField
 
 
 class FlexibleFileOrKeyField(serializers.FileField):
@@ -35,15 +37,7 @@ def resolve_uploader_display_name(user):
     if not user:
         return None
 
-    employee = getattr(user, 'employee', None)
-    if employee and getattr(employee, 'full_name', None):
-        return employee.full_name
-
-    full_name = user.get_full_name()
-    if full_name:
-        return full_name
-
-    return user.username
+    return get_user_display_name(user)
 
 
 def _recruiter_info(user):
@@ -64,7 +58,7 @@ class CandidateListSerializer(serializers.ModelSerializer):
         source='applications.count', read_only=True
     )
     latest_job_title = serializers.SerializerMethodField(read_only=True)
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    created_by_name = UserDisplayNameField(source='created_by')
     recruiter_employee_id = serializers.SerializerMethodField(read_only=True)
     recruiter_full_name = serializers.SerializerMethodField(read_only=True)
     need_interviewer_employee_id = serializers.SerializerMethodField(read_only=True)
@@ -150,7 +144,7 @@ class CandidateListSerializer(serializers.ModelSerializer):
         employee = getattr(user, 'employee', None)
         if employee and getattr(employee, 'full_name', None):
             return employee.full_name
-        return user.get_full_name() or user.username
+        return get_user_display_name(user)
 
     def get_source_display(self, obj):
         return obj.get_source_display()
@@ -160,9 +154,7 @@ class CandidateSerializer(serializers.ModelSerializer):
     source_display = serializers.SerializerMethodField(read_only=True)
     gender_display = serializers.CharField(source='get_gender_display', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
-    created_by_name = serializers.CharField(
-        source='created_by.get_full_name', read_only=True
-    )
+    created_by_name = UserDisplayNameField(source='created_by')
     recruiter_employee_id = serializers.SerializerMethodField(read_only=True)
     recruiter_full_name = serializers.SerializerMethodField(read_only=True)
     latest_job_title = serializers.SerializerMethodField(read_only=True)
