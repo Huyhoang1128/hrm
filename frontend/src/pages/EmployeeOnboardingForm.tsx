@@ -44,7 +44,15 @@ interface OnboardingData {
   position_name: string;
   department_name: string;
   token_expires_at: string;
+  /** Link cho NV đang làm tự cập nhật hồ sơ: không hiện / không gửi các trường HCNS quản lý */
+  is_self_update?: boolean;
 }
+
+/** Trường HCNS quản lý — link tự cập nhật hồ sơ không hiện và không gửi lên. */
+const SELF_UPDATE_HIDDEN_FIELDS = new Set([
+  'company_unit', 'region', 'block', 'sub_department', 'section', 'position', 'job_rank', 'doctor_team',
+  'work_form', 'work_type', 'work_location', 'salary', 'allowance', 'probation_period_months', 'probation_rate',
+]);
 
 interface FormValues {
   candidate_name: string;
@@ -220,6 +228,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
+  const isSelfUpdate = !!onboardingData?.is_self_update;
   const [pageError, setPageError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error' | 'warning'; msg: string } | null>(null);
@@ -465,7 +474,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
       if (!values.facebook_link.trim()) { showToast('error', 'Vui lòng nhập link Facebook'); return false; }
       if (!/^https?:\/\//i.test(values.facebook_link.trim())) { showToast('error', 'Link Facebook phải bắt đầu bằng http:// hoặc https://'); return false; }
     }
-    if (step === 2) {
+    if (step === 2 && !isSelfUpdate) {
       if (!values.company_unit) { showToast('error', 'Vui lòng chọn đơn vị làm việc'); return false; }
       if (!values.region) { showToast('error', 'Vui lòng chọn vùng/miền'); return false; }
       if (!values.block) { showToast('error', 'Vui lòng chọn khối'); return false; }
@@ -519,9 +528,11 @@ export const EmployeeOnboardingForm: React.FC = () => {
       if (!values.emergency_contact_address.trim()) { showToast('error', 'Vui lòng nhập địa chỉ người liên hệ'); return false; }
     }
     if (step === 6) {
-      if (!values.salary.trim()) { showToast('error', 'Vui lòng nhập mức lương cơ bản'); return false; }
-      if (isNaN(Number(values.salary)) || Number(values.salary) <= 0) { showToast('error', 'Mức lương cơ bản phải là số dương'); return false; }
-      if (values.allowance.trim() !== '' && (isNaN(Number(values.allowance)) || Number(values.allowance) < 0)) { showToast('error', 'Phụ cấp không hợp lệ'); return false; }
+      if (!isSelfUpdate) {
+        if (!values.salary.trim()) { showToast('error', 'Vui lòng nhập mức lương cơ bản'); return false; }
+        if (isNaN(Number(values.salary)) || Number(values.salary) <= 0) { showToast('error', 'Mức lương cơ bản phải là số dương'); return false; }
+        if (values.allowance.trim() !== '' && (isNaN(Number(values.allowance)) || Number(values.allowance) < 0)) { showToast('error', 'Phụ cấp không hợp lệ'); return false; }
+      }
       if (!values.bank_account.trim()) { showToast('error', 'Vui lòng nhập số tài khoản ngân hàng'); return false; }
       if (!values.bank_name.trim()) { showToast('error', 'Vui lòng nhập tên ngân hàng'); return false; }
       if (!values.bank_account_holder.trim()) { showToast('error', 'Vui lòng nhập tên chủ tài khoản'); return false; }
@@ -541,6 +552,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
         values.facebook_link.trim() && !getFieldError('facebook_link', values.facebook_link));
     }
     if (step === 1) {
+      if (isSelfUpdate) return true;
       return !!(values.company_unit && values.region && values.block && values.sub_department &&
         values.position && values.job_rank && values.work_form && values.work_location);
     }
@@ -559,7 +571,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
         values.emergency_contact_address.trim());
     }
     if (step === 5) {
-      return !!(values.salary.trim() && !isNaN(Number(values.salary)) && Number(values.salary) > 0 &&
+      return !!((isSelfUpdate || (values.salary.trim() && !isNaN(Number(values.salary)) && Number(values.salary) > 0)) &&
         values.bank_account.trim() && values.bank_name.trim() && values.bank_account_holder.trim());
     }
     return true;
@@ -606,12 +618,13 @@ export const EmployeeOnboardingForm: React.FC = () => {
     for (let step = 1; step <= 6; step++) {
       if (!validateStep(step)) return;
     }
-    if (!citizenIdFile) { showToast('error', 'Vui lòng upload file CCCD (PDF)'); return; }
-    if (!vneidScreenshotFile) { showToast('error', 'Vui lòng upload ảnh chụp màn hình thông tin VNeID'); return; }
+    if (!citizenIdFile && !hasCitizenIdFile) { showToast('error', 'Vui lòng upload file CCCD (PDF)'); return; }
+    if (!vneidScreenshotFile && !hasVneidScreenshot) { showToast('error', 'Vui lòng upload ảnh chụp màn hình thông tin VNeID'); return; }
     setSubmitting(true);
     try {
       const payload = new FormData();
       const ap = (key: string, val: string | File | null | undefined) => {
+        if (isSelfUpdate && SELF_UPDATE_HIDDEN_FIELDS.has(key)) return;
         if (val !== undefined && val !== null && val !== '') payload.append(key, val);
       };
       ap('candidate_name', values.candidate_name);
@@ -762,7 +775,21 @@ export const EmployeeOnboardingForm: React.FC = () => {
       );
 
       // ── BƯỚC 2: Thông tin công việc ──
-      case 1: return (
+      case 1: return isSelfUpdate ? (
+        <div className="flex-1 flex flex-col gap-5 justify-center">
+          <h3 className="text-3xl font-bold text-gray-900 text-center">Thông tin công việc</h3>
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-5 text-base text-blue-900 space-y-2">
+            <p>
+              Vị trí: <strong>{onboardingData?.position_name || '—'}</strong> — Phòng ban:{' '}
+              <strong>{onboardingData?.department_name || '—'}</strong>
+            </p>
+            <p className="text-sm text-blue-800">
+              Thông tin công việc (đơn vị, phòng ban, vị trí, cấp bậc, hình thức và địa điểm làm việc) và thông tin lương
+              do HCNS quản lý, không sửa được ở đây. Nếu chưa đúng, vui lòng liên hệ HCNS.
+            </p>
+          </div>
+        </div>
+      ) : (
         <div className="flex-1 flex flex-col gap-5 justify-evenly">
           <h3 className="text-3xl font-bold text-gray-900 text-center">Thông tin công việc chi tiết</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
@@ -905,25 +932,29 @@ export const EmployeeOnboardingForm: React.FC = () => {
       // ── BƯỚC 6: Thông tin lương ──
       case 5: return (
         <div className="flex-1 flex flex-col gap-5 justify-evenly">
-          <h3 className="text-3xl font-bold text-gray-900 text-center">Thông tin lương</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <TF label="Mức lương cơ bản (VNĐ)" value={values.salary} onChange={handleNumericChange('salary')} type="text" inputMode="numeric" placeholder="10000000" required />
-            <TF label="Phụ cấp (VNĐ)" value={values.allowance} onChange={handleNumericChange('allowance')} type="text" inputMode="numeric" placeholder="0" />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <SF label="Số tháng thử việc" value={values.probation_period_months} onChange={handleSelect('probation_period_months')} options={[
-              { value: '0', label: 'Không thử việc' },
-              { value: '1', label: '1 tháng' },
-              { value: '2', label: '2 tháng' },
-              { value: '3', label: '3 tháng' },
-              { value: '6', label: '6 tháng' },
-            ]} />
-            <SF label="Tỉ lệ thử việc" value={values.probation_rate} onChange={handleSelect('probation_rate')} options={[
-              { value: 'OPTION_1', label: 'Tháng đầu 85%, tháng sau 85%' },
-              { value: 'OPTION_2', label: 'Tháng đầu 85%, tháng sau 100%' },
-              { value: 'OPTION_3', label: 'Tháng đầu 100%, tháng sau 100%' },
-            ]} />
-          </div>
+          <h3 className="text-3xl font-bold text-gray-900 text-center">{isSelfUpdate ? 'Thông tin ngân hàng' : 'Thông tin lương'}</h3>
+          {!isSelfUpdate && (
+            <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <TF label="Mức lương cơ bản (VNĐ)" value={values.salary} onChange={handleNumericChange('salary')} type="text" inputMode="numeric" placeholder="10000000" required />
+              <TF label="Phụ cấp (VNĐ)" value={values.allowance} onChange={handleNumericChange('allowance')} type="text" inputMode="numeric" placeholder="0" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <SF label="Số tháng thử việc" value={values.probation_period_months} onChange={handleSelect('probation_period_months')} options={[
+                { value: '0', label: 'Không thử việc' },
+                { value: '1', label: '1 tháng' },
+                { value: '2', label: '2 tháng' },
+                { value: '3', label: '3 tháng' },
+                { value: '6', label: '6 tháng' },
+              ]} />
+              <SF label="Tỉ lệ thử việc" value={values.probation_rate} onChange={handleSelect('probation_rate')} options={[
+                { value: 'OPTION_1', label: 'Tháng đầu 85%, tháng sau 85%' },
+                { value: 'OPTION_2', label: 'Tháng đầu 85%, tháng sau 100%' },
+                { value: 'OPTION_3', label: 'Tháng đầu 100%, tháng sau 100%' },
+              ]} />
+            </div>
+            </>
+          )}
 
           <div className="border border-gray-200 rounded-xl p-4 space-y-4">
             <p className="text-base font-semibold text-gray-700">Thông tin ngân hàng</p>
@@ -964,7 +995,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
             ['Quốc tịch', values.nationality],
             ['Link Facebook', values.facebook_link],
           ]},
-          { title: 'Công việc', color: 'indigo', fields: [
+          ...(isSelfUpdate ? [] : [{ title: 'Công việc', color: 'indigo', fields: [
             ['Đơn vị', companyUnits.find(cu => cu.code === values.company_unit)?.name || values.company_unit || null],
             ['Vùng/Miền', values.region],
             ['Khối', values.block],
@@ -975,7 +1006,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
             ['Team Bác sĩ', values.doctor_team],
             ['Hình thức', WORK_FORM_OPTIONS.find(o => o.value === values.work_form)?.label || values.work_form || null],
             ['Địa điểm', WORK_LOCATION_OPTIONS.find(o => o.value === values.work_location)?.label || values.work_location || null],
-          ]},
+          ]}]),
           { title: 'CCCD', color: 'amber', fields: [
             ['Số CCCD', values.citizen_id],
             ['Ngày cấp', values.citizen_id_issue_date ? new Date(values.citizen_id_issue_date).toLocaleDateString('vi-VN') : null],
@@ -999,11 +1030,13 @@ export const EmployeeOnboardingForm: React.FC = () => {
             ['Nghề nghiệp', values.emergency_contact_occupation],
             ['Địa chỉ', values.emergency_contact_address],
           ]},
-          { title: 'Lương & Ngân hàng', color: 'purple', fields: [
-            ['Mức lương', values.salary ? `${parseInt(values.salary).toLocaleString()} VNĐ` : null],
-            ['Phụ cấp', values.allowance ? `${parseInt(values.allowance).toLocaleString()} VNĐ` : null],
-            ['Thời gian thử việc', values.probation_period_months ? `${values.probation_period_months} tháng` : null],
-            ['Tỉ lệ thử việc', ({ OPTION_1: '85% → 85%', OPTION_2: '85% → 100%', OPTION_3: '100% → 100%' } as Record<string, string>)[values.probation_rate] || null],
+          { title: isSelfUpdate ? 'Ngân hàng' : 'Lương & Ngân hàng', color: 'purple', fields: [
+            ...(isSelfUpdate ? [] : [
+              ['Mức lương', values.salary ? `${parseInt(values.salary).toLocaleString()} VNĐ` : null],
+              ['Phụ cấp', values.allowance ? `${parseInt(values.allowance).toLocaleString()} VNĐ` : null],
+              ['Thời gian thử việc', values.probation_period_months ? `${values.probation_period_months} tháng` : null],
+              ['Tỉ lệ thử việc', ({ OPTION_1: '85% → 85%', OPTION_2: '85% → 100%', OPTION_3: '100% → 100%' } as Record<string, string>)[values.probation_rate] || null],
+            ]),
             ['Ngân hàng', values.bank_name],
             ['Số tài khoản', values.bank_account],
             ['Tên chủ tài khoản', values.bank_account_holder],
@@ -1073,7 +1106,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
         <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Thông tin Onboarding</h1>
+              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">{isSelfUpdate ? 'Cập nhật hồ sơ' : 'Thông tin Onboarding'}</h1>
               <p className="mt-2 text-lg text-blue-100">
                 Xin chào, <strong className="text-white text-xl">{onboardingData?.candidate_name}</strong>!
               </p>

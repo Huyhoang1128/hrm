@@ -10,6 +10,7 @@ import {
   ExclamationTriangleIcon,
   PencilIcon,
   XMarkIcon,
+  LinkIcon,
   ArrowTopRightOnSquareIcon,
   UserIcon,
   BriefcaseIcon,
@@ -175,6 +176,10 @@ const EmployeeShow: React.FC = () => {
   const isAdmin = isSuperUser || user?.role?.toUpperCase() === 'ADMIN';
   const isHR = user?.is_staff === true || user?.role?.toUpperCase() === 'HR';
   const canManageEmployee = isAdmin || isHR;
+  const [selfUpdateLink, setSelfUpdateLink] = useState<{ url: string; expiresAt: string } | null>(null);
+  const [selfUpdateLinkError, setSelfUpdateLinkError] = useState<string | null>(null);
+  const [generatingSelfUpdateLink, setGeneratingSelfUpdateLink] = useState(false);
+  const [selfUpdateLinkCopied, setSelfUpdateLinkCopied] = useState(false);
 
   useEffect(() => {
     if (id) loadEmployee(Number(id));
@@ -245,6 +250,31 @@ const EmployeeShow: React.FC = () => {
   // LOADING / ERROR
   // ============================================
 
+
+  const handleGenerateSelfUpdateLink = async () => {
+    if (!employee) return;
+    setGeneratingSelfUpdateLink(true);
+    setSelfUpdateLinkError(null);
+    setSelfUpdateLinkCopied(false);
+    try {
+      const data = await employeesAPI.generateSelfUpdateLink(employee.id);
+      setSelfUpdateLink({ url: data.employee_form_url, expiresAt: data.expires_at });
+    } catch (err: any) {
+      setSelfUpdateLinkError(err?.response?.data?.message || err?.response?.data?.detail || 'Không tạo được link. Vui lòng thử lại.');
+    } finally {
+      setGeneratingSelfUpdateLink(false);
+    }
+  };
+
+  const handleCopySelfUpdateLink = async () => {
+    if (!selfUpdateLink) return;
+    try {
+      await navigator.clipboard.writeText(selfUpdateLink.url);
+      setSelfUpdateLinkCopied(true);
+    } catch {
+      window.prompt('Copy link này và gửi cho nhân viên:', selfUpdateLink.url);
+    }
+  };
   if (loading) return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="text-center">
@@ -305,6 +335,17 @@ const EmployeeShow: React.FC = () => {
           </div>
           <div className="flex items-center gap-3">
             {getStatusBadge(employee.employment_status)}
+            {canManageEmployee && (
+              <button
+                onClick={handleGenerateSelfUpdateLink}
+                disabled={generatingSelfUpdateLink}
+                title="Tạo link để nhân viên tự kiểm tra và cập nhật thông tin cá nhân"
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors disabled:opacity-60"
+              >
+                {generatingSelfUpdateLink ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <LinkIcon className="w-4 h-4" />}
+                Link tự cập nhật hồ sơ
+              </button>
+            )}
             {canManageEmployee && (
               <button
                 onClick={() => navigate(`/dashboard/employees/${employee.id}/edit`)}
@@ -770,6 +811,55 @@ const EmployeeShow: React.FC = () => {
         </div>
 
       </div>
+
+      {(selfUpdateLink || selfUpdateLinkError) && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => { setSelfUpdateLink(null); setSelfUpdateLinkError(null); }}
+        >
+          <div className="w-full max-w-lg rounded-xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+              <h3 className="text-base font-semibold text-gray-900">Link tự cập nhật hồ sơ</h3>
+              <button
+                onClick={() => { setSelfUpdateLink(null); setSelfUpdateLinkError(null); }}
+                className="p-1 text-gray-400 hover:text-gray-600"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-3 px-5 py-4 text-sm text-gray-700">
+              {selfUpdateLinkError ? (
+                <p className="text-red-600">{selfUpdateLinkError}</p>
+              ) : selfUpdateLink && (
+                <>
+                  <p>
+                    Gửi link này cho <strong>{employee.full_name}</strong>. Nhân viên mở link để kiểm tra và cập nhật
+                    thông tin cá nhân (CCCD, địa chỉ, liên hệ khẩn cấp, tài khoản ngân hàng...). Lương, phòng ban, vị trí
+                    và các thông tin công việc khác không đổi được qua link này.
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      readOnly
+                      value={selfUpdateLink.url}
+                      onFocus={(e) => e.target.select()}
+                      className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-xs"
+                    />
+                    <button
+                      onClick={handleCopySelfUpdateLink}
+                      className="px-3 py-2 text-xs font-semibold text-white bg-primary-600 rounded-md hover:bg-primary-700"
+                    >
+                      {selfUpdateLinkCopied ? 'Đã copy' : 'Copy'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Hết hạn: {new Date(selfUpdateLink.expiresAt).toLocaleString('vi-VN')}. Tạo link mới sẽ làm link cũ hết hiệu lực.
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* PDF preview dialog */}
       {previewPdf && (

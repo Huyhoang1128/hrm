@@ -3820,6 +3820,28 @@ CONTRACT_DOCUMENT_TYPE = CONTRACT_TYPE + [
 ]
 
 
+# Mã của quy trình chỉ tạo ra để NV đang làm (chưa từng onboarding trên hệ thống)
+# tự cập nhật hồ sơ — ẩn khỏi danh sách / thống kê onboarding.
+SELF_UPDATE_CODE_PREFIX = 'SELF-'
+
+# Trường HCNS quản lý: link tự cập nhật hồ sơ không được nhận / ghi đè.
+SELF_UPDATE_BLOCKED_FORM_FIELDS = (
+    'salary', 'allowance', 'allowance_notes', 'probation_period_months', 'probation_rate',
+    'company_unit', 'region', 'block', 'sub_department', 'section', 'team', 'position',
+    'position_title', 'job_rank', 'rank', 'doctor_team', 'work_form', 'work_type', 'work_location',
+    'employee_id', 'candidate_email',
+)
+SELF_UPDATE_KEPT_EMPLOYEE_FIELDS = (
+    'position', 'department', 'region', 'block', 'section', 'rank', 'work_form', 'work_location',
+    'doctor_team', 'basic_salary', 'allowance', 'allowance_notes', 'probation_months',
+    'probation_end_date', 'official_start_date', 'probation_rate', 'extra_info',
+)
+SELF_UPDATE_KEPT_ONBOARDING_FIELDS = (
+    'position', 'department', 'company_unit', 'rank', 'section', 'doctor_team', 'region', 'block',
+    'work_form',
+)
+
+
 class OnboardingProcess(models.Model):
     """Quy trình onboarding cho nhân viên mới"""
     onboarding_code = models.CharField(max_length=64, unique=True, verbose_name="Mã onboarding")
@@ -3943,6 +3965,12 @@ class OnboardingProcess(models.Model):
         blank=True,
         verbose_name="Thời hạn token"
     )
+    is_self_update = models.BooleanField(
+        default=False,
+        verbose_name="Link tự cập nhật hồ sơ",
+        help_text="Token hiện tại là link cho NV đang làm tự cập nhật hồ sơ: "
+                  "form không được đổi các trường HCNS quản lý (lương, phòng ban, vị trí...).",
+    )
     employee_info_completed = models.BooleanField(
         default=False,
         verbose_name="Nhân viên đã điền thông tin"
@@ -4010,7 +4038,9 @@ class OnboardingProcess(models.Model):
         
         super().save(*args, **kwargs)
     
-        if is_new:
+        # Quy trình chỉ để NV đang làm tự cập nhật hồ sơ không phải onboarding thật:
+        # không tạo task / tài liệu onboarding.
+        if is_new and not self.is_self_update:
             self.create_default_tasks()
             self.apply_document_templates()
     def apply_document_templates(self):
