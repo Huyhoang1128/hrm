@@ -43,7 +43,7 @@ Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 
 | 2.2 | ✅ **Báo cáo biến động lương** giữa 2 tháng | M | Cần 2.1. |
 | 2.3 | ✅ **Xuất bảng lương nhiều tháng** + lọc Đang làm / Đã nghỉ | S–M | |
 | 2.4 | ✅ **Link tự cập nhật hồ sơ** cho NV đang làm (dùng lại form onboarding) | S–M | |
-| 2.5 | **Lịch sử trạng thái NV** + trạng thái Nghỉ thai sản | M | |
+| 2.5 | ✅ **Lịch sử trạng thái NV** + trạng thái Nghỉ thai sản | M | |
 | 2.6 | **Thêm loại hợp đồng**: 6 tháng, 3 năm, thử việc 1–2 tháng | S–M | Mọi chỗ kiểm tra "thử việc / chưa chính thức" phải nhận mã mới. |
 | 2.7 | **Quản lý BHXH theo kỳ** (nhiều bản ghi mỗi NV, tỷ lệ NLĐ/DN) | M | Cần quyết định: giữ trường trên hồ sơ làm "hiện tại" và thêm bảng lịch sử, hay thay hẳn. |
 | 2.8 | ✅ **Thông tin sử dụng tài sản** + file mẫu import; tách người sử dụng / người bàn giao | M | |

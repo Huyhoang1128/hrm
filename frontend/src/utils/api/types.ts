@@ -350,7 +350,7 @@ export interface Employee {
 
   // Trạng thái
   is_active?: boolean;
-  employment_status: 'ACTIVE' | 'PAUSED' | 'INACTIVE' | 'PROBATION';
+  employment_status: 'ACTIVE' | 'SUSPENDED' | 'PAUSED' | 'MATERNITY_LEAVE' | 'INACTIVE' | 'PROBATION';
   employment_status_notes?: string;
   start_date?: string;
   end_date?: string;
@@ -587,7 +587,7 @@ export interface EmployeeCreateData {
   personal_email?: string;
   bank_name?: string;
   bank_account?: string;
-  employment_status?: 'ACTIVE' | 'SUSPENDED' | 'INACTIVE' | 'PROBATION';
+  employment_status?: 'ACTIVE' | 'SUSPENDED' | 'PAUSED' | 'MATERNITY_LEAVE' | 'INACTIVE' | 'PROBATION';
   start_date?: string;
   end_date?: string;
   username: string;
@@ -621,7 +621,7 @@ export interface EmployeeUpdateData {
   social_insurance_participation_status?: 'PARTICIPATING' | 'NOT_PARTICIPATING' | 'SUSPENDED' | null;
   social_insurance_start_date?: string | null;
   social_insurance_end_date?: string | null;
-  employment_status?: 'ACTIVE' | 'SUSPENDED' | 'INACTIVE' | 'PROBATION';
+  employment_status?: 'ACTIVE' | 'SUSPENDED' | 'PAUSED' | 'MATERNITY_LEAVE' | 'INACTIVE' | 'PROBATION';
   start_date?: string;
   end_date?: string;
   user_id?: number;

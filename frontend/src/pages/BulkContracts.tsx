@@ -55,7 +55,7 @@ type Employee = {
   department_name: string | null;
   department: { id: number; name: string; code: string } | null;
   is_active: boolean;
-  employment_status?: 'ACTIVE' | 'SUSPENDED' | 'PAUSED' | 'INACTIVE';
+  employment_status?: 'ACTIVE' | 'SUSPENDED' | 'PAUSED' | 'MATERNITY_LEAVE' | 'INACTIVE';
 };
 
 /** Nhân viên đã nghỉ việc — không cần cảnh báo hết hạn hợp đồng. */

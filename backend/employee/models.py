@@ -26,8 +26,12 @@ EMPLOYMENT_STATUS = [
     ('ACTIVE', 'Đang làm việc'),
     ('SUSPENDED', 'Tạm nghỉ'),
     ('PAUSED', 'Tạm dừng'),
+    ('MATERNITY_LEAVE', 'Nghỉ thai sản'),
     ('INACTIVE', 'Đã nghỉ'),
 ]
+
+# Tạm thời không đi làm (vẫn còn là nhân viên): không tính vào "đang làm việc".
+TEMPORARILY_OFF_STATUSES = ('SUSPENDED', 'PAUSED', 'MATERNITY_LEAVE')
 
 SOCIAL_INSURANCE_PARTICIPATION_STATUS = [
     ('PARTICIPATING', 'Đang tham gia'),
@@ -43,12 +47,15 @@ def compute_effective_employment_status(stored_status, end_date):
     - end_date: ngày nghỉ việc trên employee
 
     Rules:
-    - SUSPENDED/PAUSED (manual override, vd: thai sản, tạm nghỉ) → SUSPENDED
+    - SUSPENDED/PAUSED (manual override, vd: tạm nghỉ) → SUSPENDED
+    - MATERNITY_LEAVE → MATERNITY_LEAVE (giữ riêng để hiển thị "Nghỉ thai sản")
     - INACTIVE (admin set thủ công) → INACTIVE
     - end_date tồn tại và <= hôm nay → INACTIVE
     - còn lại → ACTIVE
     """
     from datetime import date
+    if stored_status == 'MATERNITY_LEAVE':
+        return 'MATERNITY_LEAVE'
     if stored_status in ('PAUSED', 'SUSPENDED'):
         return 'SUSPENDED'
     if stored_status == 'INACTIVE':
@@ -728,9 +735,22 @@ class Employee(models.Model):
         return f"{prefix_value}{next_number:0{width}d}"
 
     def save(self, *args, **kwargs):
-        """Tự động cập nhật đường dẫn báo cáo khi lưu"""
+        """Tự động cập nhật đường dẫn báo cáo khi lưu; ghi nhật ký khi đổi trạng thái."""
         self.update_reporting_path()
+        is_new = self.pk is None
+        old_status = None
+        if not is_new:
+            old_status = Employee.objects.filter(pk=self.pk).values_list('employment_status', flat=True).first()
         super().save(*args, **kwargs)
+        if is_new or (old_status is not None and old_status != self.employment_status):
+            # Người thao tác do view gắn tạm vào instance (`_changed_by`), nếu có.
+            EmployeeStatusHistory.objects.create(
+                employee=self,
+                from_status=None if is_new else old_status,
+                to_status=self.employment_status,
+                changed_at=timezone.localdate(),
+                changed_by=getattr(self, '_changed_by', None),
+            )
 
     def update_reporting_path(self):
         """Cập nhật đường dẫn báo cáo dựa trên cấu trúc quản lý"""
@@ -914,6 +934,35 @@ DEPENDENT_RELATIONSHIP = [
     ('GRANDPARENT', 'Ông/Bà'),
     ('OTHER', 'Khác'),
 ]
+
+
+class EmployeeStatusHistory(models.Model):
+    """Nhật ký thay đổi trạng thái làm việc (employment_status) của nhân viên.
+
+    Ghi tự động trong Employee.save() — bản ghi đầu tiên khi tạo hồ sơ có
+    from_status rỗng. Dùng để thống kê nhân sự theo từng tháng trong quá khứ.
+    """
+    employee = models.ForeignKey(
+        Employee, on_delete=models.CASCADE, related_name='status_history', verbose_name="Nhân viên",
+    )
+    from_status = models.CharField(max_length=20, null=True, blank=True, verbose_name="Trạng thái trước")
+    to_status = models.CharField(max_length=20, verbose_name="Trạng thái sau")
+    changed_at = models.DateField(verbose_name="Ngày thay đổi")
+    changed_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Người thay đổi",
+    )
+    note = models.TextField(blank=True, verbose_name="Ghi chú")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Nhật ký trạng thái nhân viên"
+        verbose_name_plural = "Nhật ký trạng thái nhân viên"
+        # Cùng ngày có thể đổi nhiều lần → luôn phá hoà bằng id để lấy bản mới nhất.
+        ordering = ['-changed_at', '-id']
+        indexes = [models.Index(fields=['employee', 'changed_at'])]
+
+    def __str__(self):
+        return f"{self.employee.employee_id}: {self.from_status} → {self.to_status} ({self.changed_at})"
 
 
 class EmployeeDependent(models.Model):

@@ -18,7 +18,7 @@ from .models import (
     Department,
     DepartmentScheduleChange,
     Employee,
-    EmployeeAssignmentHistory,
+    EmployeeAssignmentHistory, EmployeeStatusHistory,
     EmployeeDependent,
     Position,
     SOCIAL_INSURANCE_PARTICIPATION_STATUS,
@@ -405,6 +405,16 @@ class EmployeeAssignmentHistoryInline(admin.TabularInline):
                 if name in formset.form.base_fields:
                     formset.form.base_fields[name].initial = value
         return formset
+
+
+@admin.register(EmployeeStatusHistory)
+class EmployeeStatusHistoryAdmin(admin.ModelAdmin):
+    list_display = ('employee', 'from_status', 'to_status', 'changed_at', 'changed_by')
+    list_filter = ('to_status', 'from_status')
+    search_fields = ('employee__employee_id', 'employee__full_name')
+    raw_id_fields = ('employee', 'changed_by')
+    date_hierarchy = 'changed_at'
+    ordering = ('-changed_at', '-id')
 
 
 @admin.register(EmployeeAssignmentHistory)
