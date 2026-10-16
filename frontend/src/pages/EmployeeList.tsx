@@ -108,6 +108,93 @@ const toExcelDate = (value?: string | null): Date | string => {
 };
 
 
+// Cột xuất Excel danh sách nhân viên — dùng chung cho "Xuất toàn bộ" (mọi cột) và
+// "Xuất tùy chọn" (HCNS tự chọn cột). Thêm/bớt cột chỉ cần sửa ở đây.
+type ExportColumn = { header: string; key: string; width: number; group: string };
+
+const EXPORT_COLUMNS: ExportColumn[] = [
+  { header: 'Mã NV', key: 'employee_id', width: 12, group: 'Thông tin cơ bản' },
+  { header: 'Họ tên', key: 'full_name', width: 25, group: 'Thông tin cơ bản' },
+  { header: 'Giới tính', key: 'gender', width: 10, group: 'Thông tin cơ bản' },
+  { header: 'Ngày sinh', key: 'date_of_birth', width: 14, group: 'Thông tin cơ bản' },
+  { header: 'Số điện thoại', key: 'phone_number', width: 15, group: 'Thông tin cơ bản' },
+  { header: 'Email', key: 'personal_email', width: 28, group: 'Thông tin cơ bản' },
+  { header: 'Facebook', key: 'facebook_link', width: 28, group: 'Thông tin cơ bản' },
+  { header: 'Số CCCD', key: 'cccd_number', width: 16, group: 'CCCD / VNEID' },
+  { header: 'Số CMND cũ', key: 'old_id_number', width: 14, group: 'CCCD / VNEID' },
+  { header: 'Ngày cấp CCCD', key: 'cccd_issue_date', width: 16, group: 'CCCD / VNEID' },
+  { header: 'Nơi cấp CCCD', key: 'cccd_issue_place', width: 20, group: 'CCCD / VNEID' },
+  { header: 'Link CCCD/CMT', key: 'link_cccd', width: 28, group: 'CCCD / VNEID' },
+  { header: 'Quê quán', key: 'birth_place', width: 20, group: 'CCCD / VNEID' },
+  { header: 'Hộ khẩu thường trú', key: 'permanent_residence', width: 30, group: 'CCCD / VNEID' },
+  { header: 'Địa chỉ hiện tại', key: 'current_address', width: 30, group: 'CCCD / VNEID' },
+  { header: 'Tình trạng hôn nhân', key: 'marital_status', width: 20, group: 'CCCD / VNEID' },
+  { header: 'Dân tộc', key: 'ethnicity', width: 14, group: 'CCCD / VNEID' },
+  { header: 'Quốc tịch', key: 'nationality', width: 14, group: 'CCCD / VNEID' },
+  { header: 'Phòng ban', key: 'department', width: 20, group: 'Tổ chức' },
+  { header: 'Chức vụ', key: 'position', width: 20, group: 'Tổ chức' },
+  { header: 'Vùng/Miền', key: 'region', width: 14, group: 'Tổ chức' },
+  { header: 'Khối', key: 'block', width: 14, group: 'Tổ chức' },
+  { header: 'Bộ phận', key: 'section', width: 16, group: 'Tổ chức' },
+  { header: 'Cấp bậc', key: 'rank', width: 14, group: 'Tổ chức' },
+  { header: 'Địa điểm làm việc', key: 'work_location', width: 20, group: 'Tổ chức' },
+  { header: 'Team Bác sĩ', key: 'doctor_team', width: 16, group: 'Tổ chức' },
+  { header: 'Hình thức làm việc', key: 'work_form', width: 20, group: 'Tổ chức' },
+  { header: 'Loại hình làm việc', key: 'work_type', width: 18, group: 'Tổ chức' },
+  { header: 'Trình độ học vấn', key: 'education_level', width: 18, group: 'Tổ chức' },
+  { header: 'Quản lý trực tiếp', key: 'manager', width: 22, group: 'Quản lý' },
+  { header: 'Quản lý cấp 2', key: 'manager_level_2', width: 22, group: 'Quản lý' },
+  { header: 'Quản lý cấp 3', key: 'manager_level_3', width: 22, group: 'Quản lý' },
+  { header: 'Trạng thái', key: 'employment_status', width: 16, group: 'Hợp đồng & trạng thái' },
+  { header: 'Ghi chú trạng thái', key: 'employment_status_notes', width: 24, group: 'Hợp đồng & trạng thái' },
+  { header: 'Loại hợp đồng', key: 'contract_type', width: 18, group: 'Hợp đồng & trạng thái' },
+  { header: 'Tỉ lệ thử việc', key: 'probation_rate', width: 16, group: 'Hợp đồng & trạng thái' },
+  { header: 'Số tháng thử việc', key: 'probation_months', width: 18, group: 'Hợp đồng & trạng thái' },
+  { header: 'Ngày vào làm', key: 'start_date', width: 14, group: 'Hợp đồng & trạng thái' },
+  { header: 'Ngày nghỉ việc', key: 'end_date', width: 14, group: 'Hợp đồng & trạng thái' },
+  { header: 'Ngày kết thúc thử việc', key: 'probation_end_date', width: 22, group: 'Hợp đồng & trạng thái' },
+  { header: 'Ngày lên chính thức', key: 'official_start_date', width: 20, group: 'Hợp đồng & trạng thái' },
+  { header: 'Lý do nghỉ việc', key: 'termination_reason', width: 24, group: 'Hợp đồng & trạng thái' },
+  { header: 'Tổng TG làm việc (tháng)', key: 'total_work_months', width: 24, group: 'Hợp đồng & trạng thái' },
+  { header: 'Trạng thái hồ sơ', key: 'file_status', width: 18, group: 'Hồ sơ' },
+  { header: 'Hạn nộp hồ sơ', key: 'file_submission_deadline', width: 16, group: 'Hồ sơ' },
+  { header: 'Ngày nộp hồ sơ', key: 'file_submission_date', width: 16, group: 'Hồ sơ' },
+  { header: 'Sơ yếu lý lịch', key: 'doc_resume', width: 16, group: 'Hồ sơ' },
+  { header: 'Căn cước công dân', key: 'doc_cccd', width: 18, group: 'Hồ sơ' },
+  { header: 'Bằng cấp', key: 'doc_degree', width: 12, group: 'Hồ sơ' },
+  { header: 'Giấy khám sức khỏe', key: 'doc_health', width: 20, group: 'Hồ sơ' },
+  { header: 'Lương cơ bản', key: 'basic_salary', width: 16, group: 'Lương & ngân hàng' },
+  { header: 'Phụ cấp', key: 'allowance', width: 14, group: 'Lương & ngân hàng' },
+  { header: 'Tỉ lệ % doanh số hưởng', key: 'revenue_percentage', width: 20, group: 'Lương & ngân hàng' },
+  { header: 'Tỉ lệ % lợi nhuận hưởng', key: 'profit_percentage', width: 20, group: 'Lương & ngân hàng' },
+  { header: 'Ghi chú lương', key: 'salary_notes', width: 24, group: 'Lương & ngân hàng' },
+  { header: 'Ghi chú phụ cấp', key: 'allowance_notes', width: 24, group: 'Lương & ngân hàng' },
+  { header: 'Ngân hàng', key: 'bank_name', width: 18, group: 'Lương & ngân hàng' },
+  { header: 'Chi nhánh NH', key: 'bank_branch', width: 20, group: 'Lương & ngân hàng' },
+  { header: 'Số tài khoản', key: 'bank_account', width: 20, group: 'Lương & ngân hàng' },
+  { header: 'Mã số BHXH', key: 'social_insurance_number', width: 16, group: 'BHXH & thuế' },
+  { header: 'Mã số thuế TNCN', key: 'tax_code', width: 16, group: 'BHXH & thuế' },
+  { header: 'Mã hộ gia đình', key: 'household_code', width: 16, group: 'BHXH & thuế' },
+  { header: 'Đóng BHXH tại', key: 'insurance_participation', width: 24, group: 'BHXH & thuế' },
+  { header: 'Thời điểm báo tăng', key: 'insurance_increase_time', width: 20, group: 'BHXH & thuế' },
+  { header: 'Số ngày phép còn lại', key: 'annual_leave_balance', width: 20, group: 'Nghỉ phép' },
+  { header: 'Năm số dư phép', key: 'annual_leave_balance_year', width: 16, group: 'Nghỉ phép' },
+  { header: 'Người LH khẩn cấp', key: 'emergency_contact_name', width: 22, group: 'Người liên hệ khẩn cấp' },
+  { header: 'Mối quan hệ', key: 'emergency_contact_relationship', width: 16, group: 'Người liên hệ khẩn cấp' },
+  { header: 'SĐT người thân', key: 'emergency_contact_phone', width: 16, group: 'Người liên hệ khẩn cấp' },
+  { header: 'Ngày sinh người thân', key: 'emergency_contact_dob', width: 20, group: 'Người liên hệ khẩn cấp' },
+  { header: 'Nghề nghiệp người thân', key: 'emergency_contact_occupation', width: 22, group: 'Người liên hệ khẩn cấp' },
+  { header: 'Địa chỉ người LH', key: 'emergency_contact_address', width: 28, group: 'Người liên hệ khẩn cấp' },
+  { header: 'Ghi chú', key: 'notes', width: 28, group: 'Khác' },
+  { header: 'Ngày tạo', key: 'created_at', width: 14, group: 'Khác' },
+];
+
+const EXPORT_GROUPS = Array.from(new Set(EXPORT_COLUMNS.map((c) => c.group)));
+
+const DEFAULT_CUSTOM_EXPORT_KEYS = [
+  'employee_id', 'full_name', 'gender', 'date_of_birth', 'phone_number', 'department', 'position', 'start_date',
+];
+
 const EmployeeList: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -138,6 +225,11 @@ const EmployeeList: React.FC = () => {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [totalCount, setTotalCount] = useState(0);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showCustomExportDialog, setShowCustomExportDialog] = useState(false);
+  const [customExportSelectedKeys, setCustomExportSelectedKeys] = useState<Set<string>>(
+    () => new Set(DEFAULT_CUSTOM_EXPORT_KEYS)
+  );
+  const [isExportingCustom, setIsExportingCustom] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<{
@@ -294,6 +386,7 @@ const EmployeeList: React.FC = () => {
 
   // Chặn scroll khi mở dialog import
   useLockBodyScroll(showImportDialog);
+  useLockBodyScroll(showCustomExportDialog);
   useLockBodyScroll(showChangeManagerDialog);
 
   // Khởi tạo cooldown từ localStorage và đếm ngược
@@ -489,7 +582,7 @@ const EmployeeList: React.FC = () => {
     }
   };
 
-  const handleExportAll = async () => {
+  const runEmployeeExport = async (selectedKeys: Set<string> | null, filePrefix: string, sheetTitle: string) => {
     try {
       const response = await employeesAPI.exportAll();
       const allEmployees = response.results;
@@ -505,7 +598,7 @@ const EmployeeList: React.FC = () => {
 
       const ExcelJS = (await import('exceljs')).default;
       const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet('Toàn bộ nhân viên');
+      const sheet = workbook.addWorksheet(sheetTitle);
 
       const HEADER_FILL = {
         type: 'pattern' as const,
@@ -513,94 +606,9 @@ const EmployeeList: React.FC = () => {
         fgColor: { argb: 'FF1E3A5F' },
       };
 
-      sheet.columns = [
-        // Thông tin cơ bản
-        { header: 'Mã NV', key: 'employee_id', width: 12 },
-        { header: 'Họ tên', key: 'full_name', width: 25 },
-        { header: 'Giới tính', key: 'gender', width: 10 },
-        { header: 'Ngày sinh', key: 'date_of_birth', width: 14 },
-        { header: 'Số điện thoại', key: 'phone_number', width: 15 },
-        { header: 'Email', key: 'personal_email', width: 28 },
-        { header: 'Facebook', key: 'facebook_link', width: 28 },
-        // CCCD / VNEID
-        { header: 'Số CCCD', key: 'cccd_number', width: 16 },
-        { header: 'Số CMND cũ', key: 'old_id_number', width: 14 },
-        { header: 'Ngày cấp CCCD', key: 'cccd_issue_date', width: 16 },
-        { header: 'Nơi cấp CCCD', key: 'cccd_issue_place', width: 20 },
-        { header: 'Link CCCD/CMT', key: 'link_cccd', width: 28 },
-        { header: 'Quê quán', key: 'birth_place', width: 20 },
-        { header: 'Hộ khẩu thường trú', key: 'permanent_residence', width: 30 },
-        { header: 'Địa chỉ hiện tại', key: 'current_address', width: 30 },
-        { header: 'Tình trạng hôn nhân', key: 'marital_status', width: 20 },
-        { header: 'Dân tộc', key: 'ethnicity', width: 14 },
-        { header: 'Quốc tịch', key: 'nationality', width: 14 },
-        // Tổ chức
-        { header: 'Phòng ban', key: 'department', width: 20 },
-        { header: 'Chức vụ', key: 'position', width: 20 },
-        { header: 'Vùng/Miền', key: 'region', width: 14 },
-        { header: 'Khối', key: 'block', width: 14 },
-        { header: 'Bộ phận', key: 'section', width: 16 },
-        { header: 'Cấp bậc', key: 'rank', width: 14 },
-        { header: 'Địa điểm làm việc', key: 'work_location', width: 20 },
-        { header: 'Team Bác sĩ', key: 'doctor_team', width: 16 },
-        { header: 'Hình thức làm việc', key: 'work_form', width: 20 },
-        { header: 'Loại hình làm việc', key: 'work_type', width: 18 },
-        { header: 'Trình độ học vấn', key: 'education_level', width: 18 },
-        // Quản lý
-        { header: 'Quản lý trực tiếp', key: 'manager', width: 22 },
-        { header: 'Quản lý cấp 2', key: 'manager_level_2', width: 22 },
-        { header: 'Quản lý cấp 3', key: 'manager_level_3', width: 22 },
-        // Hợp đồng & trạng thái
-        { header: 'Trạng thái', key: 'employment_status', width: 16 },
-        { header: 'Ghi chú trạng thái', key: 'employment_status_notes', width: 24 },
-        { header: 'Loại hợp đồng', key: 'contract_type', width: 18 },
-        { header: 'Tỉ lệ thử việc', key: 'probation_rate', width: 16 },
-        { header: 'Số tháng thử việc', key: 'probation_months', width: 18 },
-        { header: 'Ngày vào làm', key: 'start_date', width: 14 },
-        { header: 'Ngày nghỉ việc', key: 'end_date', width: 14 },
-        { header: 'Ngày kết thúc thử việc', key: 'probation_end_date', width: 22 },
-        { header: 'Ngày lên chính thức', key: 'official_start_date', width: 20 },
-        { header: 'Lý do nghỉ việc', key: 'termination_reason', width: 24 },
-        { header: 'Tổng TG làm việc (tháng)', key: 'total_work_months', width: 24 },
-        // Hồ sơ
-        { header: 'Trạng thái hồ sơ', key: 'file_status', width: 18 },
-        { header: 'Hạn nộp hồ sơ', key: 'file_submission_deadline', width: 16 },
-        { header: 'Ngày nộp hồ sơ', key: 'file_submission_date', width: 16 },
-        { header: 'Sơ yếu lý lịch', key: 'doc_resume', width: 16 },
-        { header: 'Căn cước công dân', key: 'doc_cccd', width: 18 },
-        { header: 'Bằng cấp', key: 'doc_degree', width: 12 },
-        { header: 'Giấy khám sức khỏe', key: 'doc_health', width: 20 },
-        // Lương & ngân hàng
-        { header: 'Lương cơ bản', key: 'basic_salary', width: 16 },
-        { header: 'Phụ cấp', key: 'allowance', width: 14 },
-        { header: 'Tỉ lệ % doanh số hưởng', key: 'revenue_percentage', width: 20 },
-        { header: 'Tỉ lệ % lợi nhuận hưởng', key: 'profit_percentage', width: 20 },
-        { header: 'Ghi chú lương', key: 'salary_notes', width: 24 },
-        { header: 'Ghi chú phụ cấp', key: 'allowance_notes', width: 24 },
-        { header: 'Ngân hàng', key: 'bank_name', width: 18 },
-        { header: 'Chi nhánh NH', key: 'bank_branch', width: 20 },
-        { header: 'Số tài khoản', key: 'bank_account', width: 20 },
-        // BHXH & thuế
-        { header: 'Mã số BHXH', key: 'social_insurance_number', width: 16 },
-        { header: 'Mã số thuế TNCN', key: 'tax_code', width: 16 },
-        { header: 'Mã hộ gia đình', key: 'household_code', width: 16 },
-        { header: 'Đóng BHXH tại', key: 'insurance_participation', width: 24 },
-        { header: 'Thời điểm báo tăng', key: 'insurance_increase_time', width: 20 },
-        // Nghỉ phép
-        { header: 'Số ngày phép còn lại', key: 'annual_leave_balance', width: 20 },
-        { header: 'Năm số dư phép', key: 'annual_leave_balance_year', width: 16 },
-        // Người liên hệ khẩn cấp
-        { header: 'Người LH khẩn cấp', key: 'emergency_contact_name', width: 22 },
-        { header: 'Mối quan hệ', key: 'emergency_contact_relationship', width: 16 },
-        { header: 'SĐT người thân', key: 'emergency_contact_phone', width: 16 },
-        { header: 'Ngày sinh người thân', key: 'emergency_contact_dob', width: 20 },
-        { header: 'Nghề nghiệp người thân', key: 'emergency_contact_occupation', width: 22 },
-        { header: 'Địa chỉ người LH', key: 'emergency_contact_address', width: 28 },
-        // Ghi chú
-        { header: 'Ghi chú', key: 'notes', width: 28 },
-        // Ngày tạo
-        { header: 'Ngày tạo', key: 'created_at', width: 14 },
-      ];
+      sheet.columns = EXPORT_COLUMNS
+        .filter((c) => !selectedKeys || selectedKeys.has(c.key))
+        .map(({ header, key, width }) => ({ header, key, width }));
       [
         'date_of_birth',
         'cccd_issue_date',
@@ -612,7 +620,7 @@ const EmployeeList: React.FC = () => {
         'file_submission_date',
         'emergency_contact_dob',
         'created_at',
-      ].forEach((key) => {
+      ].filter((key) => !selectedKeys || selectedKeys.has(key)).forEach((key) => {
         sheet.getColumn(key).numFmt = 'dd/mm/yyyy';
       });
 
@@ -716,11 +724,24 @@ const EmployeeList: React.FC = () => {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `xuat-toan-bo-nhan-vien-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      link.download = `${filePrefix}-${new Date().toISOString().slice(0, 10)}.xlsx`;
       link.click();
       URL.revokeObjectURL(url);
     } catch (err: any) {
-      alert('Xuất toàn bộ thất bại: ' + (err.message || 'Lỗi không xác định'));
+      alert('Xuất Excel thất bại: ' + (err.message || 'Lỗi không xác định'));
+    }
+  };
+
+  const handleExportAll = () => runEmployeeExport(null, 'xuat-toan-bo-nhan-vien', 'Toàn bộ nhân viên');
+
+  const handleExportCustom = async () => {
+    if (customExportSelectedKeys.size === 0) return;
+    setIsExportingCustom(true);
+    try {
+      await runEmployeeExport(customExportSelectedKeys, 'xuat-tuy-chon-nhan-vien', 'Nhân viên');
+      setShowCustomExportDialog(false);
+    } finally {
+      setIsExportingCustom(false);
     }
   };
 
@@ -1575,7 +1596,18 @@ const EmployeeList: React.FC = () => {
                 </svg>
                 Xuất danh sách
               </button>
-              {(isAdmin || isSuperUser) && (
+              {(isAdmin || isSuperUser || isHR) && (
+                <button
+                  className="bg-white text-primary-700 border border-primary-200 px-4 py-2 rounded-xl hover:bg-primary-50 transition-colors flex items-center"
+                  onClick={() => setShowCustomExportDialog(true)}
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18M6 8h12M9 12h6M11 16h2" />
+                  </svg>
+                  Xuất tùy chọn
+                </button>
+              )}
+              {(isAdmin || isSuperUser || isHR) && (
                 <button
                   className="bg-primary-700 text-white px-4 py-2 rounded-xl hover:bg-primary-800 transition-colors flex items-center"
                   onClick={handleExportAll}
@@ -1777,6 +1809,132 @@ const EmployeeList: React.FC = () => {
     </div>
 
     {/* Import Dialog */}
+    {showCustomExportDialog && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Xuất danh sách theo tiêu chí tự chọn</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Chọn các cột thông tin muốn xuất ra file Excel</p>
+            </div>
+            <button
+              onClick={() => setShowCustomExportDialog(false)}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Toolbar chọn nhanh */}
+          <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100 bg-gray-50">
+            <span className="text-sm text-gray-600">
+              Đã chọn <strong className="text-gray-900">{customExportSelectedKeys.size}</strong>/{EXPORT_COLUMNS.length} cột
+            </span>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setCustomExportSelectedKeys(new Set(EXPORT_COLUMNS.map((f) => f.key)))}
+                className="text-sm text-primary-600 hover:text-primary-800 font-medium"
+              >
+                Chọn tất cả
+              </button>
+              <button
+                onClick={() => setCustomExportSelectedKeys(new Set())}
+                className="text-sm text-gray-500 hover:text-gray-700 font-medium"
+              >
+                Bỏ chọn tất cả
+              </button>
+            </div>
+          </div>
+
+          {/* Danh sách cột theo nhóm */}
+          <div className="overflow-y-auto flex-1 px-6 py-4 space-y-5">
+            {EXPORT_GROUPS.map((group) => {
+              const fieldsInGroup = EXPORT_COLUMNS.filter((f) => f.group === group);
+              const selectedInGroup = fieldsInGroup.filter((f) => customExportSelectedKeys.has(f.key)).length;
+              const allSelected = selectedInGroup === fieldsInGroup.length;
+              return (
+                <div key={group}>
+                  <label className="flex items-center gap-2 mb-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={(el) => { if (el) el.indeterminate = selectedInGroup > 0 && !allSelected; }}
+                      onChange={() => {
+                        setCustomExportSelectedKeys((prev) => {
+                          const next = new Set(prev);
+                          fieldsInGroup.forEach((f) => {
+                            if (allSelected) next.delete(f.key);
+                            else next.add(f.key);
+                          });
+                          return next;
+                        });
+                      }}
+                      className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="text-sm font-semibold text-gray-800">{group}</span>
+                    <span className="text-xs text-gray-400">({selectedInGroup}/{fieldsInGroup.length})</span>
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 pl-6">
+                    {fieldsInGroup.map((f) => (
+                      <label key={f.key} className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={customExportSelectedKeys.has(f.key)}
+                          onChange={() => {
+                            setCustomExportSelectedKeys((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(f.key)) next.delete(f.key);
+                              else next.add(f.key);
+                              return next;
+                            });
+                          }}
+                          className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span className="text-sm text-gray-700">{f.header}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t">
+            <button
+              onClick={() => setShowCustomExportDialog(false)}
+              className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+            >
+              Đóng
+            </button>
+            <button
+              onClick={handleExportCustom}
+              disabled={customExportSelectedKeys.size === 0 || isExportingCustom}
+              className={`inline-flex items-center px-4 py-2 text-sm font-medium text-white rounded-xl transition-colors ${
+                customExportSelectedKeys.size === 0 || isExportingCustom
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-purple-600 hover:bg-purple-700'
+              }`}
+            >
+              {isExportingCustom ? (
+                <>
+                  <svg className="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                  </svg>
+                  Đang xuất...
+                </>
+              ) : (
+                `Xuất file (${customExportSelectedKeys.size} cột)`
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     {showImportDialog && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
