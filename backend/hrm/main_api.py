@@ -680,14 +680,14 @@ class EmployeeState:
             self._night_duty_shift_dates.add(event_date_str)
 
         detected_rule_type = _AUTO_SHIFT_TYPE_TO_RULE_TYPE.get(detected.shift_type, 'SHIFT_RULE_MORNING')
-        detected_hours = float(detected.working_hours or 0)
+        from .shift_config_utils import shift_workday
         override_rule = {
             'rule_name': f'Tự động nhận diện ca: {detected.name}',
             'rule_type': detected_rule_type,
             'conditions': {
                 'start_time': str(detected.start_time)[:8],
                 'end_time': str(detected.end_time)[:8],
-                'workday': 1.0 if detected_hours > 5.5 else 0.5,
+                'workday': shift_workday(detected),
             },
             'priority': 999,
         }

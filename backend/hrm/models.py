@@ -2431,6 +2431,15 @@ class ShiftConfig(models.Model):
     # Tính toán
     total_hours = models.DecimalField(max_digits=4, decimal_places=2, default=8.0, verbose_name="Tổng số giờ")
     working_hours = models.DecimalField(max_digits=4, decimal_places=2, default=7.0, verbose_name="Số giờ làm việc")
+    # Số công (0.5 / 1.0 ...) mặc định được TỰ TÍNH từ working_hours (xem
+    # shift_config_utils.shift_workday): > 5.5h → 1 công, ngược lại → 0.5 công. Ca ngắn
+    # giờ chấm công nhưng vẫn tính đủ công (vd phần còn lại làm online không chấm công)
+    # thì đặt số công ở đây; để trống giữ nguyên cách tự tính.
+    fixed_workday = models.DecimalField(
+        max_digits=3, decimal_places=2, null=True, blank=True,
+        verbose_name="Số công cố định",
+        help_text="Để trống thì tự tính theo số giờ làm việc (> 5,5 giờ = 1 công, còn lại = 0,5 công).",
+    )
     
     # Loại ca
     shift_type = models.CharField(max_length=20, choices=[
