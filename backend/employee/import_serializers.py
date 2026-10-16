@@ -3,6 +3,7 @@ Serializer và logic xử lý import nhân viên từ file CSV/Excel.
 """
 import io
 import os
+import re
 import logging
 import traceback
 import unicodedata
@@ -23,6 +24,20 @@ from hrm.models import EmployeeContract
 logger = logging.getLogger(__name__)
 
 DEFAULT_PASSWORD = os.environ.get("EMPLOYEE_IMPORT_DEFAULT_PASSWORD", "ChangeMe@2024")
+
+
+def _normalize_header(s):
+    """Chuẩn hoá text trước khi so khớp với các *_COLUMN_MAP.
+
+    File Excel gửi tay có thể lưu tiếng Việt ở dạng Unicode NFD (dấu tổ hợp rời)
+    thay vì NFC — hiển thị giống hệt nhưng so chuỗi thô sẽ không khớp. Đồng thời
+    gộp mọi loại khoảng trắng (kể cả non-breaking space) thành 1 dấu cách.
+    """
+    if s is None:
+        return ''
+    s = unicodedata.normalize('NFC', str(s))
+    s = re.sub(r'\s+', ' ', s)
+    return s.strip().lower()
 
 
 def _normalize_col(s: str) -> str:

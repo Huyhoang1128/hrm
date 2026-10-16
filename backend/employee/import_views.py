@@ -12,11 +12,14 @@ from rest_framework import permissions
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 from rest_framework.views import APIView
 
 from users.utils import get_user_role
 from .models import Employee
 from .import_serializers import EmployeeImportSerializer
+from .org_import_serializers import DepartmentImportSerializer, PositionImportSerializer
+from hrm.permissions import IsAdminOrHR
 
 logger = logging.getLogger(__name__)
 
@@ -306,3 +309,60 @@ class EmployeeSocialInsuranceImportView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+def _flatten_error_detail(detail):
+    """Làm phẳng ValidationError.detail (str | list | dict lồng nhau) thành list chuỗi."""
+    if isinstance(detail, dict):
+        out = []
+        for v in detail.values():
+            out.extend(_flatten_error_detail(v))
+        return out
+    if isinstance(detail, list):
+        out = []
+        for v in detail:
+            out.extend(_flatten_error_detail(v))
+        return out
+    return [str(detail)]
+
+
+class _OrgImportView(APIView):
+    """Upload CSV/Excel để tạo/cập nhật hàng loạt (natural key: mã). Chỉ Admin/HCNS."""
+
+    permission_classes = [IsAuthenticated, IsAdminOrHR]
+    serializer_class = None
+    label = ''
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        if not serializer.is_valid():
+            return Response({"success": False, "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            result = serializer.save()
+        except ValidationError as exc:
+            message = "; ".join(_flatten_error_detail(exc.detail))
+            return Response({"success": False, "message": message}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            logger.error("%s import failed", self.label, exc_info=True)
+            return Response(
+                {"success": False, "message": "Import thất bại. Vui lòng kiểm tra lại file và thử lại."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        http_status = status.HTTP_200_OK if result["failed"] == 0 else status.HTTP_207_MULTI_STATUS
+        return Response({
+            "success": True,
+            "summary": {k: result[k] for k in ("total", "created", "updated", "failed")},
+            "errors": result["errors"],
+        }, status=http_status)
+
+
+class DepartmentImportView(_OrgImportView):
+    """POST /api-hrm/departments/import/"""
+    serializer_class = DepartmentImportSerializer
+    label = 'Department'
+
+
+class PositionImportView(_OrgImportView):
+    """POST /api-hrm/positions/import/"""
+    serializer_class = PositionImportSerializer
+    label = 'Position'
