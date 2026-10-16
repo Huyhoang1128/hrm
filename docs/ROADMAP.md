@@ -48,7 +48,7 @@ Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 
 | 2.7 | **Quản lý BHXH theo kỳ** (nhiều bản ghi mỗi NV, tỷ lệ NLĐ/DN) | M | Cần quyết định: giữ trường trên hồ sơ làm "hiện tại" và thêm bảng lịch sử, hay thay hẳn. |
 | 2.8 | ✅ **Thông tin sử dụng tài sản** + file mẫu import; tách người sử dụng / người bàn giao | M | |
 | 2.9 | ✅ **Phân loại tài sản nhập tự do** | M | |
-| 2.10 | **Hạn mức ngày online theo NV / vị trí / phòng ban** | M | Mặc định lấy `CompanyConfig.max_online_work_count_per_month`. |
+| 2.10 | ✅ **Hạn mức ngày online theo NV / vị trí / phòng ban** | M | Mặc định lấy `CompanyConfig.max_online_work_count_per_month`. |
 | 2.11 | **Số công cố định của ca** (`ShiftConfig.fixed_workday`) | S–M | Để trống thì không có tác dụng. |
 | 2.12 | **Chế độ con nhỏ**: đi muộn / về sớm tối đa N phút | M | N cấu hình được. |
 | 2.13 | **Phạt thiếu công** theo danh sách NV được chọn | S–M | Danh sách rỗng thì không có tác dụng. |

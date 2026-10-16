@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from employee.models import Employee, CompanyUnit
 from employee.models import CONTRACT_TYPE as EMPLOYEE_CONTRACT_TYPE, PROBATION_CONTRACT_TYPES, OFFICIAL_LABOR_CONTRACT_TYPES, probation_months_for
+from django.core.validators import MaxValueValidator, MinValueValidator
 
 # Create your models here.
 
@@ -2230,6 +2231,55 @@ class AssetInventoryCheck(models.Model):
 # ======================
 # COMPANY CONFIGURATION MODELS
 # ======================
+
+class OnlineWorkQuotaOverride(models.Model):
+    """Ghi đè hạn mức số ngày làm việc online tối đa/tháng cho ĐÚNG 1 phạm vi: một nhân
+    viên, một vị trí hoặc một phòng ban (mỗi phạm vi tối đa 1 bản ghi).
+
+    Thứ tự ưu tiên khi tra cứu (xem stats_utils.get_max_online_work_quota): nhân viên >
+    vị trí > phòng ban > CompanyConfig.max_online_work_count_per_month.
+    """
+    employee = models.OneToOneField(
+        'employee.Employee', on_delete=models.CASCADE, null=True, blank=True,
+        related_name='online_work_quota_override', verbose_name="Nhân viên",
+    )
+    position = models.OneToOneField(
+        'employee.Position', on_delete=models.CASCADE, null=True, blank=True,
+        related_name='online_work_quota_override', verbose_name="Vị trí",
+    )
+    department = models.OneToOneField(
+        'employee.Department', on_delete=models.CASCADE, null=True, blank=True,
+        related_name='online_work_quota_override', verbose_name="Phòng ban",
+    )
+    max_online_days = models.DecimalField(
+        max_digits=4, decimal_places=1,
+        validators=[MinValueValidator(0), MaxValueValidator(31)],
+        verbose_name="Số ngày online tối đa/tháng",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Hạn mức ngày làm online"
+        verbose_name_plural = "Hạn mức ngày làm online"
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(employee__isnull=False, position__isnull=True, department__isnull=True)
+                    | models.Q(employee__isnull=True, position__isnull=False, department__isnull=True)
+                    | models.Q(employee__isnull=True, position__isnull=True, department__isnull=False)
+                ),
+                name='online_work_quota_override_exactly_one_scope',
+            ),
+        ]
+
+    def __str__(self):
+        scope = self.employee or self.position or self.department
+        return f"{scope}: tối đa {self.max_online_days} ngày online/tháng"
+
+    def clean(self):
+        if sum(1 for v in (self.employee_id, self.position_id, self.department_id) if v) != 1:
+            raise ValidationError("Phải chọn đúng 1 trong 3: nhân viên, vị trí hoặc phòng ban.")
+
 
 class CompanyConfig(models.Model):
     """Cấu hình chung của công ty"""

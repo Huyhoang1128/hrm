@@ -2075,9 +2075,8 @@ class OnlineWorkRequestViewSet(BulkRejectMixin, FinalizationLockMixin, viewsets.
 
         # Check quota cho mọi người có quyền duyệt, kể cả Quản lý trực tiếp bước 1
         if is_direct_mgr or can_as_hr or is_admin:
-            from .stats_utils import _get_online_work_used, online_quota_amount
-            _cfg = CompanyConfig.objects.filter(is_active=True).order_by('-effective_from').first()
-            max_online = float(_cfg.max_online_work_count_per_month) if _cfg else 3.0
+            from .stats_utils import _get_online_work_used, get_max_online_work_quota, online_quota_amount
+            max_online = get_max_online_work_quota(event.employee)
             online_used = _get_online_work_used(event.employee, event.event_date)
             online_amount = online_quota_amount(event.employee, event.event_date, d)
 
@@ -2155,10 +2154,8 @@ class OnlineWorkRequestViewSet(BulkRejectMixin, FinalizationLockMixin, viewsets.
         results, errors = [], []
         now_str = timezone.now().isoformat()
 
-        from .stats_utils import _get_online_work_used
+        from .stats_utils import _get_online_work_used, get_max_online_work_quota
         _cfg = CompanyConfig.objects.filter(is_active=True).order_by('-effective_from').first()
-        MAX_ONLINE_WORK_PER_MONTH = float(_cfg.max_online_work_count_per_month) if _cfg else 3.0
-        quota_exceeded_note = f"Từ chối tự động: Vượt quá hạn mức làm việc online tối đa ({MAX_ONLINE_WORK_PER_MONTH} ngày/tháng)."
         online_quota_cache = {}  # (employee_id, year, month) -> remaining quota
         
         for event in events:
@@ -2181,11 +2178,14 @@ class OnlineWorkRequestViewSet(BulkRejectMixin, FinalizationLockMixin, viewsets.
                 errors.append({"id": event.id, "error": online_deadline_error})
                 continue
 
-            # Kiểm tra quota làm việc online (tối đa MAX_ONLINE_WORK_PER_MONTH ngày/tháng)
+            # Kiểm tra quota làm việc online — hạn mức tính riêng cho TỪNG nhân viên
+            # (có thể bị ghi đè theo nhân viên / vị trí / phòng ban).
+            max_online = get_max_online_work_quota(event.employee, _cfg)
+            quota_exceeded_note = f"Từ chối tự động: Vượt quá hạn mức làm việc online tối đa ({max_online} ngày/tháng)."
             key = (event.employee_id, event.event_date.year, event.event_date.month)
             if key not in online_quota_cache:
                 used = _get_online_work_used(event.employee, event.event_date)
-                online_quota_cache[key] = max(0.0, MAX_ONLINE_WORK_PER_MONTH - used)
+                online_quota_cache[key] = max(0.0, max_online - used)
             from .stats_utils import online_quota_amount
             this_amount = online_quota_amount(event.employee, event.event_date, d)
             if this_amount > 0 and online_quota_cache[key] < this_amount:

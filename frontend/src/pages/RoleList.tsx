@@ -9,6 +9,7 @@ import {
   PencilSquareIcon,
   TrashIcon,
   ExclamationCircleIcon,
+  ComputerDesktopIcon,
 } from '@heroicons/react/24/outline';
 import {
   employeePermissionService,
@@ -18,11 +19,20 @@ import {
 import { employeesAPI } from '../utils/api';
 import { SelectBox } from '../components/LandingLayout/SelectBox';
 import Pagination from '../components/Pagination';
+import OnlineWorkQuotaTab from '../components/OnlineWorkQuotaTab';
+
+type MainTabKey = 'employees' | 'online_quota';
+
+const MAIN_TABS: { key: MainTabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { key: 'employees', label: 'Danh sách nhân viên', icon: ShieldCheckIcon },
+  { key: 'online_quota', label: 'Hạn mức ngày online', icon: ComputerDesktopIcon },
+];
 
 const PAGE_SIZE = 20;
 
 const RoleList: React.FC = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<MainTabKey>('employees');
   const [permissions, setPermissions] = useState<EmployeePermission[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -202,6 +212,30 @@ const RoleList: React.FC = () => {
         </div>
       </div>
 
+      <div className="flex border-b border-gray-200">
+        {MAIN_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`flex items-center gap-2 py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === tab.key
+                ? 'border-primary-600 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <tab.icon className="h-4 w-4" />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'online_quota' && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <OnlineWorkQuotaTab />
+        </div>
+      )}
+
+      {activeTab === 'employees' && (
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col gap-6">
         {/* Statistics */}
         <div>
@@ -468,6 +502,7 @@ const RoleList: React.FC = () => {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 };

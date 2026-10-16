@@ -11927,3 +11927,17 @@ class LivestreamAllowanceConfigViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user.employee if hasattr(self.request.user, 'employee') else None)
+
+
+class OnlineWorkQuotaOverrideViewSet(viewsets.ModelViewSet):
+    """Ghi đè hạn mức ngày làm online theo nhân viên / vị trí / phòng ban (Admin/HCNS)."""
+    permission_classes = [IsAuthenticated, IsAdminOrHR]
+    pagination_class = StandardResultsSetPagination
+
+    def get_queryset(self):
+        from .models import OnlineWorkQuotaOverride
+        return OnlineWorkQuotaOverride.objects.select_related('employee', 'position', 'department').order_by('-updated_at')
+
+    def get_serializer_class(self):
+        from .serializers import OnlineWorkQuotaOverrideSerializer
+        return OnlineWorkQuotaOverrideSerializer
