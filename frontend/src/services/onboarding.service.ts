@@ -239,6 +239,8 @@ export const onboardingService = {
     ordering?: string;
     month?: number;
     year?: number;
+    probation_months?: number;
+    probation_ending_within?: number;
   }): Promise<PaginatedResponse<OnboardingProcess>> => {
     const response: AxiosResponse<PaginatedResponse<OnboardingProcess>> =
       await managementApi.get('/api-hrm/onboardings/', { params });
