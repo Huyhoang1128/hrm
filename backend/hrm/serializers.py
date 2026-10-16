@@ -5642,6 +5642,7 @@ class OnboardingProcessListSerializer(serializers.ModelSerializer):
                 'task1_status',
                 'cv_file_url', 'id_card_front_url', 'id_card_back_url', 'diploma_file_url',
                 'citizen_id_file_url',
+                'contract_type', 'probation_period_months', 'expected_end_date',
             ]
 
         def get_employee_id(self, obj):

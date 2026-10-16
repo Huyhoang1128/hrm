@@ -382,6 +382,8 @@ const CreateOnboardingModal: React.FC<CreateModalProps> = ({ onClose, onSuccess,
 // MAIN COMPONENT
 // ============================================
 
+const PROBATION_ENDING_DAYS = 7;
+
 const Onboarding: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -449,6 +451,8 @@ const Onboarding: React.FC = () => {
   }, []);
   const [filterYear, setFilterYear] = useState<number>(new Date().getFullYear());
   const [filterSearch, setFilterSearch] = useState<string>('');
+  // Thử việc sắp hết trong PROBATION_ENDING_DAYS ngày tới (mọi độ dài thử việc)
+  const [filterProbationEndingSoon, setFilterProbationEndingSoon] = useState<boolean>(false);
   const debouncedSearch = useDebounce(filterSearch, 400);
 
   // ✅ Pagination — dùng cùng pattern với EmployeeList
@@ -496,6 +500,7 @@ const Onboarding: React.FC = () => {
       }
       if (filterPosition) (params as any).position = filterPosition;
       if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
+      if (filterProbationEndingSoon) params.probation_ending_within = PROBATION_ENDING_DAYS;
       const data = await onboardingService.list(params);
       const items = Array.isArray(data) ? data : data.results ?? [];
       setTotalCount(Array.isArray(data) ? items.length : (data.count ?? items.length));
@@ -520,7 +525,7 @@ const Onboarding: React.FC = () => {
 
   useEffect(() => {
     fetchOnboardings();
-  }, [filterStatus, filterMonth, filterYear, filterPosition, debouncedSearch, currentPage, itemsPerPage]);
+  }, [filterStatus, filterMonth, filterYear, filterPosition, debouncedSearch, currentPage, itemsPerPage, filterProbationEndingSoon]);
 
   const isWaitingEmployeeFill = (item: OnboardingItem) => item.token_status === 'active';
 
@@ -902,13 +907,27 @@ const Onboarding: React.FC = () => {
             </div>
           </div>
 
-          {(filterStatus !== '' || filterMonth > 0 || filterPosition !== '' || filterSearch !== '') && (
+          <button
+            onClick={() => { setFilterProbationEndingSoon((v) => !v); setCurrentPage(1); }}
+            className={`self-end px-3 py-2 text-sm rounded-xl border font-medium transition-all active:scale-95 flex items-center gap-1.5 ${
+              filterProbationEndingSoon
+                ? 'bg-amber-500 border-amber-500 text-white hover:bg-amber-600'
+                : 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
+            }`}
+            title={`Quy trình thử việc có ngày kết thúc thử việc trong ${PROBATION_ENDING_DAYS} ngày tới`}
+          >
+            <ExclamationCircleIcon className="w-4 h-4" />
+            Sắp hết thử việc
+          </button>
+
+          {(filterStatus !== '' || filterMonth > 0 || filterPosition !== '' || filterSearch !== '' || filterProbationEndingSoon) && (
             <button
               onClick={() => {
                 setFilterStatus('');
                 setFilterMonth(0);
                 setFilterPosition('');
                 setFilterSearch('');
+                setFilterProbationEndingSoon(false);
                 setCurrentPage(1);
               }}
               className="btn-secondary"
@@ -965,7 +984,7 @@ const Onboarding: React.FC = () => {
               ) : onboardings.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-4 py-10 text-center text-gray-500">
-                    Chưa có ứng viên nào{filterStatus || filterMonth > 0 || filterSearch ? ' khớp với bộ lọc' : ''}.
+                    Chưa có ứng viên nào{filterStatus || filterMonth > 0 || filterSearch || filterProbationEndingSoon ? ' khớp với bộ lọc' : ''}.
                   </td>
                 </tr>
               ) : (

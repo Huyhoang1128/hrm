@@ -7967,6 +7967,26 @@ class OnboardingProcessViewSet(viewsets.ModelViewSet):
             elif year_val:
                 qs = qs.filter(start_date__year=year_val)
 
+        # Lọc thử việc sắp hết theo ngày kết thúc thử việc đã lưu (expected_end_date):
+        #   ?probation_ending_within=N → kết thúc trong N ngày tới, tính cả hôm nay (mặc định 7)
+        #   ?probation_months=M        → chỉ quy trình thử việc M tháng
+        ending_within = self.request.query_params.get('probation_ending_within')
+        probation_months = self.request.query_params.get('probation_months')
+        if ending_within or probation_months:
+            from datetime import timedelta
+            from rest_framework.exceptions import ValidationError
+            try:
+                days = int(ending_within) if ending_within else 7
+                months = int(probation_months) if probation_months else None
+            except ValueError:
+                raise ValidationError({'detail': 'probation_ending_within và probation_months phải là số nguyên.'})
+            if days < 0:
+                raise ValidationError({'probation_ending_within': 'Phải >= 0.'})
+            today = timezone.localdate()
+            qs = qs.filter(contract_type='PROBATION', expected_end_date__range=(today, today + timedelta(days=days)))
+            if months is not None:
+                qs = qs.filter(probation_period_months=months)
+
         # Lọc theo vị trí tuyển dụng
         position_id = self.request.query_params.get('position')
         if position_id:
