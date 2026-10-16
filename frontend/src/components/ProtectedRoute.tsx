@@ -20,7 +20,12 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    // Giữ lại đường dẫn đang truy cập (VD quét mã QR tài sản mở
+    // /dashboard/assets/123 khi chưa đăng nhập) — Login.tsx đọc lại param
+    // này để quay đúng trang sau khi đăng nhập, thay vì luôn về trang chủ.
+    const target = window.location.pathname + window.location.search;
+    const loginUrl = target && target !== '/' ? `/login?redirect=${encodeURIComponent(target)}` : '/login';
+    return <Navigate to={loginUrl} replace />;
   }
 
   // Always check staff access restrictions

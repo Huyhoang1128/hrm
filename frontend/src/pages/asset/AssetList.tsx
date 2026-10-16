@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { assetsAPI, positionsAPI } from '../../utils/api';
 import {
@@ -13,6 +14,7 @@ import {
   ArrowPathRoundedSquareIcon,
   ArrowDownTrayIcon,
   ArrowUpTrayIcon,
+  DocumentArrowDownIcon,
 } from '@heroicons/react/24/outline';
 import AssetCreateModal from './AssetCreateModal';
 import AssetEditModal from './AssetEditModal';
@@ -25,22 +27,7 @@ import { Asset, AssetStats } from '../../utils/api';
 import { SelectBox, SelectOption, MultiSelectBox } from '../../components/LandingLayout/SelectBox';
 import FeedbackDialog, { FeedbackVariant } from '../../components/FeedbackDialog';
 import Pagination from '../../components/Pagination';
-
-const ASSET_TYPE_OPTIONS: SelectOption<string>[] = [
-  { value: 'LAPTOP', label: 'Laptop' },
-  { value: 'DESKTOP', label: 'Máy tính để bàn' },
-  { value: 'MONITOR', label: 'Màn hình' },
-  { value: 'PHONE', label: 'Điện thoại' },
-  { value: 'TABLET', label: 'Máy tính bảng' },
-  { value: 'PRINTER', label: 'Máy in' },
-  { value: 'SCANNER', label: 'Máy scan' },
-  { value: 'NETWORK', label: 'Thiết bị mạng' },
-  { value: 'SERVER', label: 'Máy chủ' },
-  { value: 'SIM', label: 'Sim' },
-  { value: 'FURNITURE', label: 'Nội thất' },
-  { value: 'VEHICLE', label: 'Phương tiện' },
-  { value: 'OTHER', label: 'Khác' },
-];
+import { assetTypeOptionsFrom, isMultiHolderType } from './assetTypes';
 
 // Màu badge loại tài sản — chỉ dùng màu semantic được phép trong design system
 const ASSET_TYPE_COLOR_MAP: Record<string, string> = {
@@ -130,11 +117,17 @@ export default function AssetList() {
   const [feedback, setFeedback] = useState<{ variant: FeedbackVariant; title: React.ReactNode; message?: React.ReactNode } | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<number>>(new Set());
   const [isBulkAssignModalOpen, setIsBulkAssignModalOpen] = useState(false);
   const [isBulkReturnModalOpen, setIsBulkReturnModalOpen] = useState(false);
   const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
+  // Deep-link mở thẳng 1 tài sản (VD quét mã QR dán trên tài sản → /dashboard/assets/:assetId)
+  const { assetId } = useParams<{ assetId: string }>();
+  const navigate = useNavigate();
+  const [deepLinkError, setDeepLinkError] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -155,6 +148,27 @@ export default function AssetList() {
   useEffect(() => {
     fetchAssets();
   }, [handoverFilter]);
+
+  // Nếu vào bằng deep-link /dashboard/assets/:assetId (quét mã QR) — tự fetch
+  // đúng tài sản đó (có thể không nằm trong trang đầu của danh sách phân trang)
+  // và mở modal chi tiết luôn.
+  useEffect(() => {
+    if (!assetId) return;
+    const id = Number(assetId);
+    if (!Number.isFinite(id)) {
+      setDeepLinkError('Mã tài sản không hợp lệ.');
+      return;
+    }
+    setDeepLinkError(null);
+    assetsAPI.getById(id)
+      .then((asset) => {
+        setSelectedAsset(asset);
+        setIsDetailModalOpen(true);
+      })
+      .catch(() => {
+        setDeepLinkError('Không tìm thấy tài sản này hoặc bạn không có quyền xem.');
+      });
+  }, [assetId]);
 
   const fetchAssets = async () => {
     try {
@@ -290,7 +304,7 @@ export default function AssetList() {
     setSelectedAsset(asset);
     // MONITOR single-holder: pass holder info cho ReturnModal
     const holders = asset.holders || [];
-    if (['MONITOR', 'OTHER'].includes(asset.asset_type) && holders.length === 1) {
+    if (isMultiHolderType(asset.asset_type) && holders.length === 1) {
       const h = holders[0];
       setReturnHolder({ historyId: h.history_id, holderName: h.name, holderQuantity: h.assigned_quantity });
     } else {
@@ -327,6 +341,31 @@ export default function AssetList() {
       });
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    setIsDownloadingTemplate(true);
+    try {
+      const blob = await assetsAPI.exportTemplate();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'mau-import-tai-san.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      console.error('Download template error:', err);
+      const msg = err.response?.data?.error || err.message || 'Đã có lỗi xảy ra khi tải file mẫu.';
+      setFeedback({
+        variant: 'error',
+        title: 'Tải file mẫu thất bại',
+        message: `${msg}\n\nVui lòng thử lại hoặc liên hệ quản trị viên.`,
+      });
+    } finally {
+      setIsDownloadingTemplate(false);
     }
   };
 
@@ -483,6 +522,17 @@ export default function AssetList() {
 
   return (
     <div className="space-y-6">
+      {deepLinkError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3 flex items-center justify-between">
+          <span>{deepLinkError}</span>
+          <button
+            onClick={() => { setDeepLinkError(null); navigate('/dashboard/assets'); }}
+            className="text-red-600 hover:text-red-800 font-medium text-xs"
+          >
+            Về danh sách tài sản
+          </button>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -500,9 +550,29 @@ export default function AssetList() {
             onChange={handleImportFile}
           />
           <button
+            onClick={handleDownloadTemplate}
+            disabled={isDownloadingTemplate}
+            className="btn-secondary inline-flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isDownloadingTemplate ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-primary-600" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+                  <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+                </svg>
+                Đang tải...
+              </>
+            ) : (
+              <>
+                <DocumentArrowDownIcon className="h-4 w-4" />
+                Tải file mẫu
+              </>
+            )}
+          </button>
+          <button
             onClick={handleImportClick}
             disabled={isImporting}
-            className="btn-secondary bg-white inline-flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="btn-secondary inline-flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isImporting ? (
               <>
@@ -522,7 +592,7 @@ export default function AssetList() {
           <button
             onClick={handleExportExcel}
             disabled={isExporting}
-            className="btn-secondary bg-white inline-flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="btn-secondary inline-flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isExporting ? (
               <>
@@ -549,40 +619,43 @@ export default function AssetList() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-              <div className="flex items-center gap-4">
+      {/* Stats + Filters — KHÔNG sticky: khối này cao (thống kê + 2 hàng filter), ghim lại
+          thì cuộn xuống nó che mất phần bảng. Bảng có khung cuộn riêng + tiêu đề cột cố định. */}
+      <div className="-mx-4 px-4 sm:-mx-6 sm:px-6 py-4 space-y-4">
+        {/* Stats Cards */}
+        {stats && (
+          <div className="grid grid-cols-3 md:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-5">
+              <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-4">
                 <div className="h-9 w-9 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center flex-shrink-0">
                   <ComputerDesktopIcon className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-[11px] font-medium text-gray-600 uppercase tracking-wide">Tổng số tài sản</p>
+                  <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Tổng số tài sản</p>
                   <p className="text-2xl font-extrabold text-gray-900 tracking-tight">{formatNumber(stats.total)}</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-              <div className="flex items-center gap-4">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-5">
+              <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-4">
                 <div className="h-9 w-9 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
                   <UserIcon className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-[11px] font-medium text-gray-600 uppercase tracking-wide">Đang sử dụng</p>
+                  <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Đang sử dụng</p>
                   <p className="text-2xl font-extrabold text-gray-900 tracking-tight">{formatNumber(stats.in_use)}</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-              <div className="flex items-center gap-4">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-5">
+              <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-4">
                 <div className="h-9 w-9 bg-red-100 text-red-600 rounded-xl flex items-center justify-center flex-shrink-0">
                   <ShieldCheckIcon className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-[11px] font-medium text-gray-600 uppercase tracking-wide">Hết hạn bảo hành</p>
+                  <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Hết hạn bảo hành</p>
                   <p className="text-2xl font-extrabold text-gray-900 tracking-tight">{formatNumber(stats.expired_warranty)}</p>
                 </div>
               </div>
@@ -590,8 +663,8 @@ export default function AssetList() {
           </div>
         )}
 
-      {/* Filters */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+        {/* Filters */}
+        <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
               <label htmlFor="search" className="block text-sm font-medium text-gray-700">
@@ -634,7 +707,7 @@ export default function AssetList() {
             <MultiSelectBox
               label="Loại tài sản"
               value={typeFilter}
-              options={ASSET_TYPE_OPTIONS}
+              options={assetTypeOptionsFrom(assets)}
               onChange={(val) => setTypeFilter(val)}
               allLabel="Tất cả loại"
             />
@@ -706,6 +779,7 @@ export default function AssetList() {
               )}
             </div>
           </div>
+        </div>
       </div>
 
       {/* Error Message */}
@@ -726,7 +800,7 @@ export default function AssetList() {
 
       {/* Bulk action toolbar */}
       {selectedAssetIds.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-primary-50 border border-primary-200 rounded-2xl">
+        <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 bg-primary-50 border border-primary-200 rounded-2xl">
           <span className="text-sm font-medium text-primary-800">Đã chọn {selectedAssetIds.size} tài sản</span>
           <button
             onClick={() => setIsBulkAssignModalOpen(true)}
@@ -760,8 +834,8 @@ export default function AssetList() {
 
       {/* Assets Table */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="overflow-auto max-h-[calc(100vh-28rem)]">
-          <table className="min-w-full divide-y divide-gray-100">
+        <div className="overflow-auto max-h-[calc(100vh-16rem)]">
+          <table className="min-w-full divide-y divide-gray-100 whitespace-nowrap sm:whitespace-normal">
             <thead className="bg-gray-50 sticky top-0 z-10">
               <tr>
                 <th scope="col" className="w-10 px-3 py-3 text-center">
@@ -933,7 +1007,7 @@ export default function AssetList() {
                     </td>
                     <td className="px-6 py-4">
                       {(() => {
-                        const isMulti = ['MONITOR', 'OTHER'].includes(asset.asset_type) && (asset.total_quantity ?? 1) > 1;
+                        const isMulti = isMultiHolderType(asset.asset_type) && (asset.total_quantity ?? 1) > 1;
                         const holders = asset.holders || [];
                         if (isMulti) {
                           const total = asset.total_quantity ?? 1;
@@ -1025,6 +1099,11 @@ export default function AssetList() {
                           BH: {formatDate(asset.warranty_expiry)}
                         </div>
                       )}
+                      {asset.current_value != null && (
+                        <div className="text-xs text-emerald-600 mt-1">
+                          Giá trị hiện tại: {Number(asset.current_value).toLocaleString('vi-VN')} đ
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={asset.supplier || ''}>
                       {asset.supplier || '-'}
@@ -1056,7 +1135,7 @@ export default function AssetList() {
                         {/* Row 2: Bàn giao + Thu hồi + Xóa */}
                         <div className="flex gap-1.5">
                           {(() => {
-                            const isMulti = ['MONITOR', 'OTHER'].includes(asset.asset_type) && (asset.total_quantity ?? 1) > 1;
+                            const isMulti = isMultiHolderType(asset.asset_type) && (asset.total_quantity ?? 1) > 1;
                             const canAssignMore = isMulti && (asset.remaining_quantity ?? 0) > 0;
                             const showAssign = !asset.assigned_to_name || canAssignMore;
                             const hasHolders = (asset.holders?.length ?? 0) > 0;
@@ -1152,6 +1231,9 @@ export default function AssetList() {
         onClose={() => {
           setIsDetailModalOpen(false);
           setSelectedAsset(null);
+          // Vào bằng deep-link QR thì đóng modal xong quay lại danh sách bình
+          // thường, tránh mở lại modal cũ khi component re-render với :assetId cũ.
+          if (assetId) navigate('/dashboard/assets');
         }}
         asset={selectedAsset}
         viewMode="manager"
@@ -1277,7 +1359,7 @@ export default function AssetList() {
                     </div>
                   </div>
                 </div>
-                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex flex-row-reverse gap-3">
+                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex flex-row-reverse flex-wrap gap-3">
                   <button
                     type="button"
                     disabled={isBulkDeleting}

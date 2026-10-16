@@ -17,7 +17,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
 from employee.models import CompanyUnit, Department, Employee, Position
-from .models import Asset
+from .models import STANDARD_ASSET_TYPES, Asset
 
 
 SHEET_NAME = "Tài sản"
@@ -49,10 +49,26 @@ COLUMNS = [
     ("Tên loại chi tiết",    "OTHER"),
     ("Ngày mua",             "COMMON"),
     ("Bảo hành (tháng)",     "COMMON"),
+    ("Giá mua",              "COMMON"),
+    ("Thời gian khấu hao (tháng)", "COMMON"),
+    ("Phương pháp khấu hao", "COMMON"),
     ("Nhà cung cấp",         "COMMON"),
     ("Phòng ban quản lý",    "COMMON"),
     ("Mã NQL (Kho)",         "COMMON"),
     ("Tên NQL (Kho)",        "COMMON"),
+    ("Kích thước",           "COMMON"),
+    ("Khu vực sử dụng",      "COMMON"),
+    ("Mã phòng ban",         "COMMON"),
+    ("Mã cơ sở",             "COMMON"),
+    # "Người sử dụng" = người đang GIỮ/DÙNG tài sản (field assigned_to — xem
+    # AssetDetailModal.tsx hiển thị đây là tên chính, không nhãn "bàn giao").
+    # "Người bàn giao" = người THỰC HIỆN việc bàn giao (field assigned_by —
+    # AssetDetailModal.tsx nhãn rõ "Người bàn giao:"). Trước 2026-09-22, 2 cột
+    # "Mã/Tên người bàn giao" trong Excel dùng NHẦM data của assigned_to (thực
+    # chất là người sử dụng) (xem asset_import.py
+    # để tương thích ngược với file export cũ).
+    ("Mã người sử dụng",     "HANDOVER"),
+    ("Tên người sử dụng",    "HANDOVER"),
     ("Mã người bàn giao",    "HANDOVER"),
     ("Tên người bàn giao",   "HANDOVER"),
     ("Ngày bàn giao",        "HANDOVER"),
@@ -78,24 +94,15 @@ HEADER_ALIGN = Alignment(horizontal="center", vertical="center", wrap_text=True)
 # Dropdown data validation — cùng option list với template, để file export
 # vẫn editable và round-trip được khi user sửa.
 DROPDOWN_OPTIONS = {
-    "Phân loại": [
-        "Laptop", "Máy tính để bàn", "Màn hình", "Sim", "Điện thoại",
-        "Máy tính bảng", "Máy in", "Máy scan", "Thiết bị mạng", "Máy chủ",
-        "Nội thất", "Phương tiện", "Khác",
-    ],
-    "Tình trạng vật lý": [
-        "Mới 100%", "Cũ (Chất lượng tốt)", "Cũ (Trầy xước / Cấn móp)",
-        "Cũ (Kém / Lỗi chức năng)", "Hỏng (Không hoạt động)",
-    ],
-    "Trạng thái vận hành": [
-        "Sẵn dùng (Mới 100%)", "Sẵn dùng (Trong kho)", "Đang sử dụng",
-        "Đang sửa chữa / Bảo hành", "Lỗi / Chờ thanh lý", "Đã thanh lý",
-        "Đã cắt", "Bị mất",
-        "Mới (Chưa kích hoạt)", "Tạm khóa", "Mất / Hỏng",
-    ],
+    # "Phân loại" và "Tình trạng vật lý" KHÔNG có dropdown — để trống tự do
+    # (cùng logic đã áp dụng cho "Trạng thái vận hành"
+    # trước đó). asset_import.py vẫn map các nhãn quen thuộc nếu khớp; với
+    # "Phân loại" gõ tự do không khớp danh sách cũ, hàng sẽ được lưu là loại
+    # "Khác" và giữ nguyên text vào "Tên loại chi tiết" (không chặn import).
     "Nhà mạng": ["Viettel", "Vinaphone", "Mobifone", "Vietnamobile"],
     "Loại Sim": ["Trả trước", "Trả sau"],
     "Vùng miền": ["Miền Bắc", "Miền Trung", "Miền Nam"],
+    "Phương pháp khấu hao": ["Đường thẳng"],
 }
 
 
@@ -134,6 +141,10 @@ REGION_LABELS = {
     "MIEN_BAC": "Miền Bắc",
     "MIEN_TRUNG": "Miền Trung",
     "MIEN_NAM": "Miền Nam",
+}
+
+DEPRECIATION_METHOD_LABELS = {
+    "STRAIGHT_LINE": "Đường thẳng",
 }
 
 ASSET_TYPE_LABELS = {
@@ -231,6 +242,12 @@ def department_label(dept) -> str:
     return dept.name or dept.code or ""
 
 
+def department_code(dept) -> str:
+    if not dept:
+        return ""
+    return dept.code or ""
+
+
 def employee_label(emp) -> str:
     if not emp:
         return ""
@@ -266,7 +283,7 @@ def _build_base_fields(asset: Asset) -> dict:
     vga = specs.get("vga", "") if t in ("DESKTOP", "LAPTOP") else ""
     power_supply = specs.get("power_supply", "") if t in ("DESKTOP", "LAPTOP") else ""
 
-    quantity = specs.get("quantity", "") if t in Asset.MULTI_HOLDER_TYPES else ""
+    quantity = specs.get("quantity", "") if Asset.is_multi_holder_type(t) else ""
 
     if t == "SIM":
         phone_number = specs.get("phone_number", "")
@@ -281,7 +298,7 @@ def _build_base_fields(asset: Asset) -> dict:
         phone_number = network_provider = sim_type = doctor = region = vi_tri = cong_ty = ""
         ngay_bao_huy = ""
 
-    type_name = specs.get("type_name", "") if t == "OTHER" else ""
+    type_name = specs.get("type_name", "") if t == "OTHER" or t not in STANDARD_ASSET_TYPES else ""
 
     return {
         'name': asset.name or "",
@@ -298,15 +315,23 @@ def _build_base_fields(asset: Asset) -> dict:
         'type_name': type_name,
         'purchase_date': format_date(asset.purchase_date),
         'warranty_period': asset.warranty_period or 0,
+        'purchase_price': asset.purchase_price if asset.purchase_price is not None else "",
+        'depreciation_period_months': asset.depreciation_period_months if asset.depreciation_period_months is not None else "",
+        'depreciation_method': DEPRECIATION_METHOD_LABELS.get(asset.depreciation_method, asset.depreciation_method or ""),
         'supplier': asset.supplier or "",
         'department': department_label(asset.department),
         'managed_by_code': employee_code(asset.managed_by),
         'managed_by_name': employee_label(asset.managed_by),
+        'dimensions': asset.dimensions or "",
+        'usage_area': asset.usage_area or "",
+        'usage_department_code': department_code(asset.usage_department),
+        'facility_code': asset.facility_code or "",
         'description': asset.description or "",
     }
 
 
-def _row_from_base(base: dict, nguoi_nhan_code: str, nguoi_nhan_name: str,
+def _row_from_base(base: dict, nguoi_su_dung_code: str, nguoi_su_dung_name: str,
+                   nguoi_ban_giao_code: str, nguoi_ban_giao_name: str,
                    ngay_ban_giao: str, ghi_chu_ban_giao: str, handover_quantity) -> list:
     return [
         base['name'], base['asset_type'], base['model'], base['condition'], base['status'],
@@ -316,21 +341,28 @@ def _row_from_base(base: dict, nguoi_nhan_code: str, nguoi_nhan_name: str,
         base['doctor'], base['region'], base['vi_tri'], base['cong_ty'],
         base['ngay_bao_huy'],
         base['type_name'],
-        base['purchase_date'], base['warranty_period'], base['supplier'],
+        base['purchase_date'], base['warranty_period'],
+        base['purchase_price'], base['depreciation_period_months'], base['depreciation_method'],
+        base['supplier'],
         base['department'], base['managed_by_code'], base['managed_by_name'],
-        nguoi_nhan_code, nguoi_nhan_name, ngay_ban_giao, ghi_chu_ban_giao, handover_quantity,
+        base['dimensions'], base['usage_area'], base['usage_department_code'], base['facility_code'],
+        nguoi_su_dung_code, nguoi_su_dung_name, nguoi_ban_giao_code, nguoi_ban_giao_name,
+        ngay_ban_giao, ghi_chu_ban_giao, handover_quantity,
         base['description'],
     ]
 
 
 
-def _row_continuation(asset_name: str, nguoi_nhan_code: str, nguoi_nhan_name: str,
+def _row_continuation(asset_name: str, nguoi_su_dung_code: str, nguoi_su_dung_name: str,
+                      nguoi_ban_giao_code: str, nguoi_ban_giao_name: str,
                       ngay_ban_giao: str, ghi_chu_ban_giao: str, handover_quantity) -> list:
     """Row thứ 2..N của cùng 1 asset multi-holder — chỉ có Mã thiết bị + handover."""
-    empty_count = 26  # cột 2..27 trống (đã tính thêm "Ngày báo huỷ"), col 28=Mã người bàn giao
+    # Số cột trống giữa "Mã thiết bị" và cột handover đầu tiên ("Mã người sử dụng").
+    empty_count = [h for h, _ in COLUMNS].index("Mã người sử dụng") - 1
     return (
         [asset_name] + [""] * empty_count
-        + [nguoi_nhan_code, nguoi_nhan_name, ngay_ban_giao, ghi_chu_ban_giao, handover_quantity]
+        + [nguoi_su_dung_code, nguoi_su_dung_name, nguoi_ban_giao_code, nguoi_ban_giao_name,
+           ngay_ban_giao, ghi_chu_ban_giao, handover_quantity]
         + [""]  # Mô tả / Ghi chú
     )
 
@@ -353,7 +385,7 @@ def build_rows(asset: Asset) -> list:
     )
 
     if not holders:
-        return [_row_from_base(base, "", "", "", "", "")]
+        return [_row_from_base(base, "", "", "", "", "", "", "")]
 
     if len(holders) == 1:
         h = holders[0]
@@ -361,6 +393,8 @@ def build_rows(asset: Asset) -> list:
             base,
             employee_code(h.assigned_to),
             employee_label(h.assigned_to),
+            employee_code(h.assigned_by),
+            employee_label(h.assigned_by),
             format_date(h.assigned_date),
             h.assignment_notes or "",
             h.assigned_quantity or 1,
@@ -373,6 +407,8 @@ def build_rows(asset: Asset) -> list:
         base,
         employee_code(first.assigned_to),
         employee_label(first.assigned_to),
+        employee_code(first.assigned_by),
+        employee_label(first.assigned_by),
         format_date(first.assigned_date),
         first.assignment_notes or "",
         first.assigned_quantity or 1,
@@ -382,6 +418,8 @@ def build_rows(asset: Asset) -> list:
             asset.name or "",
             employee_code(h.assigned_to),
             employee_label(h.assigned_to),
+            employee_code(h.assigned_by),
+            employee_label(h.assigned_by),
             format_date(h.assigned_date),
             h.assignment_notes or "",
             h.assigned_quantity or 1,
@@ -420,6 +458,67 @@ def _apply_dropdowns(ws, headers, last_row: int = 500) -> None:
         )
         ws.add_data_validation(dv)
         dv.add(f"{letter}2:{letter}{last_row}")
+
+
+def _example_base(**overrides) -> dict:
+    """Base dict rỗng theo đúng key của ``_build_base_fields()``, override vài
+    field để tạo dòng ví dụ cho file template — dùng chung ``_row_from_base()``
+    nên không thể lệch vị trí cột so với ``asset_import.py``.
+    """
+    base = {
+        'name': '', 'asset_type': '', 'model': '', 'condition': '', 'status': '',
+        'cpu': '', 'mainboard': '', 'ram': '', 'storage': '', 'vga': '', 'power_supply': '',
+        'quantity': '',
+        'phone_number': '', 'network_provider': '', 'sim_type': '', 'doctor': '', 'region': '',
+        'vi_tri': '', 'cong_ty': '', 'ngay_bao_huy': '',
+        'type_name': '',
+        'purchase_date': '', 'warranty_period': '',
+        'purchase_price': '', 'depreciation_period_months': '', 'depreciation_method': '',
+        'supplier': '', 'department': '', 'managed_by_code': '', 'managed_by_name': '',
+        'dimensions': '', 'usage_area': '', 'usage_department_code': '', 'facility_code': '',
+        'description': '',
+    }
+    base.update(overrides)
+    return base
+
+
+def build_template_workbook() -> Workbook:
+    """Workbook mẫu cho nút "Tải file mẫu" ở FE (không phụ thuộc dữ liệu thật).
+
+    Tái dùng ``build_workbook()`` với queryset rỗng để có header + màu nhóm cột +
+    dropdown data validation giống hệt file export thật, rồi thêm 2 dòng ví dụ
+    (Laptop, Sim) build qua ``_row_from_base()`` — cùng hàm dùng khi export dữ
+    liệu thật — để đảm bảo không lệch vị trí cột so với ``hrm.asset_import``.
+    """
+    wb = build_workbook(Asset.objects.none())
+    ws = wb[SHEET_NAME]
+
+    laptop = _example_base(
+        name="LAPTOP-VD-001", asset_type="Laptop", model="Dell Latitude 5420",
+        condition="Mới 100%", status="Sẵn dùng (Trong kho)",
+        cpu="Intel Core i5-1135G7", ram="16GB", storage="512GB SSD",
+        purchase_date="2025-01-15", warranty_period=24,
+        purchase_price=18000000, depreciation_period_months=36,
+        depreciation_method="Đường thẳng", supplier="Công ty ABC",
+        description="Laptop cấp cho nhân viên mới",
+    )
+    sim = _example_base(
+        name="SIM-VD-002", asset_type="Sim", status="Mới (Chưa kích hoạt)",
+        phone_number="0901234567", network_provider="Viettel", sim_type="Trả sau",
+        doctor="BS. Nguyễn Văn A", region="Miền Bắc", cong_ty="ABC",
+        description="Sim cấp cho bác sĩ",
+    )
+    # "Phân loại" gõ tự do (không cần theo danh sách nào) — loại tự do có
+    # Số lượng (tổng số đơn vị) như "Khác".
+    ccdc = _example_base(
+        name="CCDC-VD-003", asset_type="CCDC văn phòng", condition="Mới 100%",
+        status="Sẵn dùng (Trong kho)", quantity=5, dimensions="60x120cm",
+        description="Phân loại gõ tự do; Số lượng = tổng số bàn",
+    )
+    ws.append(_row_from_base(laptop, "", "", "", "", "", "", ""))
+    ws.append(_row_from_base(sim, "", "", "", "", "", "", ""))
+    ws.append(_row_from_base(ccdc, "", "", "", "", "", "", ""))
+    return wb
 
 
 def build_workbook(queryset) -> Workbook:

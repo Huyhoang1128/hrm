@@ -15,6 +15,7 @@ from rest_framework.permissions import IsAuthenticated, BasePermission, SAFE_MET
 from .permissions import IsSuperUser
 from .pagination import StandardResultsSetPagination, DepartmentResultsSetPagination, OnboardingResultsSetPagination
 from rest_framework.views import APIView
+import django_filters
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from .filters import PositionFilter
@@ -24,7 +25,8 @@ from datetime import datetime, timedelta
 from django.utils.dateparse import parse_date
 from django.shortcuts import get_object_or_404
 from employee.models import Employee, Department, Position, CompanyUnit
-from .models import Asset, AssetAssignmentHistory, AssetMaintenance, AttendanceAppDownloadConfig, ContractTemplate, EmployeeContract, OnboardingDocumentTemplate, GenericRequest, RequestTemplate
+from .models import normalize_asset_type
+from .models import Asset, AssetAssignmentHistory, AssetMaintenance, AssetInventoryCheck, AttendanceAppDownloadConfig, ContractTemplate, EmployeeContract, OnboardingDocumentTemplate, GenericRequest, RequestTemplate
 from .serializers import (
     ContractTemplateSerializer, EmployeeContractSerializer, EmployeeSerializer, EmployeeCreateSerializer, EmployeeListSerializer, EmployeeBirthdaySerializer,
     DepartmentSerializer, OnboardingDocumentTemplateListSerializer, OnboardingDocumentTemplateListSerializer, OnboardingDocumentTemplateSerializer, PositionSerializer,
@@ -1224,6 +1226,27 @@ class SectionViewSet(viewsets.ModelViewSet):
 # ASSET MANAGEMENT VIEWSETS
 # ======================
 
+def _asset_type_counts(qs):
+    """Đếm tài sản theo "Phân loại" thực tế đang lưu — gồm cả loại gõ tự do,
+    không chỉ các loại chuẩn trong ASSET_TYPE. Trả [(giá trị, nhãn, số lượng)]."""
+    from django.db.models import Count
+    from .models import ASSET_TYPE
+    labels = dict(ASSET_TYPE)
+    rows = qs.values('asset_type').annotate(n=Count('id')).order_by('-n', 'asset_type')
+    return [(r['asset_type'], labels.get(r['asset_type'], r['asset_type']), r['n'])
+            for r in rows if r['asset_type']]
+
+
+class AssetFilterSet(django_filters.FilterSet):
+    # "Phân loại" là text tự do: lọc bằng CharFilter, không dùng ChoiceFilter tự
+    # sinh từ choices (sẽ báo "Select a valid choice" với loại gõ tự do).
+    asset_type = django_filters.CharFilter(field_name='asset_type')
+
+    class Meta:
+        model = Asset
+        fields = ['asset_type', 'status', 'condition', 'department', 'assigned_to']
+
+
 class AssetViewSet(viewsets.ModelViewSet):
     """
     API endpoint for managing assets
@@ -1249,9 +1272,7 @@ class AssetViewSet(viewsets.ModelViewSet):
             return [IsAuthenticated()]
         return super().get_permissions()
 
-    filterset_fields = [
-        'asset_type', 'status', 'condition', 'department', 'assigned_to'
-    ]
+    filterset_class = AssetFilterSet
     
     search_fields = [
         'asset_code', 'name', 'brand', 'model', 'serial_number',
@@ -1287,7 +1308,102 @@ class AssetViewSet(viewsets.ModelViewSet):
         """
         employee = getattr(self.request.user, 'employee', None)
         serializer.save(created_by=employee)
-    
+
+    @action(detail=True, methods=['post'])
+    def upload_image(self, request, pk=None):
+        """
+        POST /api-hrm/assets/{id}/upload_image/
+        multipart: 'image' = file ảnh, 'image_type' = 'current' | 'purchase'.
+
+        Tách riêng khỏi create/update (thay vì gộp vào payload JSON chính) và luôn
+        upload thẳng lên Cloudfly — đúng pattern field "hình ảnh" đã dùng cho
+        ChangeAvatarView/Employee.avatar, KHÔNG qua cờ CLOUDFLY_ENABLED (cờ này mặc
+        định False nếu thiếu biến môi trường, dùng nó ở đây sẽ âm thầm bỏ qua upload
+        mà không báo lỗi gì).
+        """
+        from .utils import upload_file_to_cloudfly, get_cloudfly_presigned_url
+
+        asset = self.get_object()
+        image_type = request.data.get('image_type')
+        if image_type not in ('current', 'purchase'):
+            return Response({'error': "image_type phải là 'current' hoặc 'purchase'"}, status=status.HTTP_400_BAD_REQUEST)
+
+        image_file = request.FILES.get('image')
+        if not image_file:
+            return Response({'error': 'Vui lòng tải lên file ảnh'}, status=status.HTTP_400_BAD_REQUEST)
+
+        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
+        content_type = getattr(image_file, 'content_type', '') or ''
+        if content_type not in allowed_types:
+            return Response(
+                {'error': 'Chỉ hỗ trợ định dạng ảnh: JPEG, PNG, WebP, GIF'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            s3_key = upload_file_to_cloudfly(image_file, folder='assets/images')
+        except Exception as e:
+            logger.error(f"Asset image upload failed for asset {asset.asset_code}: {type(e).__name__}")
+            return Response({'error': 'Upload ảnh thất bại, vui lòng thử lại'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        field_name = 'current_image' if image_type == 'current' else 'purchase_image'
+        setattr(asset, field_name, s3_key)
+        asset.save(update_fields=[field_name])
+
+        return Response({
+            'success': True,
+            'current_image_url': get_cloudfly_presigned_url(asset.current_image) if asset.current_image else None,
+            'purchase_image_url': get_cloudfly_presigned_url(asset.purchase_image) if asset.purchase_image else None,
+        })
+
+    @action(detail=True, methods=['post'])
+    def clear_image(self, request, pk=None):
+        """
+        POST /api-hrm/assets/{id}/clear_image/
+        Body: {"image_type": "current" | "purchase"}
+        """
+        asset = self.get_object()
+        image_type = request.data.get('image_type')
+        if image_type not in ('current', 'purchase'):
+            return Response({'error': "image_type phải là 'current' hoặc 'purchase'"}, status=status.HTTP_400_BAD_REQUEST)
+
+        field_name = 'current_image' if image_type == 'current' else 'purchase_image'
+        setattr(asset, field_name, None)
+        asset.save(update_fields=[field_name])
+        return Response({'success': True})
+
+    @action(detail=True, methods=['get'], url_path='qr_code')
+    def qr_code(self, request, pk=None):
+        """
+        Trả về ảnh QR (PNG) generate on-the-fly — KHÔNG lưu file, luôn tạo lại
+        theo request nên không bao giờ lệch dữ liệu. QR encode 1 URL mở trang
+        chi tiết tài sản trong HRM (route /dashboard/assets/{id}), đăng nhập
+        rồi mới xem được (ProtectedRoute tự redirect /login?redirect=... rồi
+        quay lại đúng trang sau khi đăng nhập) — tài sản có giá mua/giá trị
+        hiện tại nên không để public.
+        GET /api-hrm/assets/{id}/qr_code/
+        """
+        import qrcode
+        from io import BytesIO
+        from django.http import HttpResponse
+        from django.conf import settings
+
+        asset = self.get_object()
+        target_url = f"{settings.FRONTEND_URL}/dashboard/assets/{asset.id}"
+
+        qr = qrcode.QRCode(box_size=10, border=2)
+        qr.add_data(target_url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+
+        response = HttpResponse(buffer.getvalue(), content_type='image/png')
+        response['Content-Disposition'] = f'inline; filename="qr-{asset.asset_code}.png"'
+        return response
+
     @action(detail=False, methods=['get'])
     def assigned_assets(self, request):
         """
@@ -1332,18 +1448,11 @@ class AssetViewSet(viewsets.ModelViewSet):
         damaged = Asset.objects.filter(status='DAMAGED').count()
         retired = Asset.objects.filter(status='RETIRED').count()
         
-        # Count by asset type
-        from .models import ASSET_TYPE
-        asset_types = dict(ASSET_TYPE)
-        type_stats = []
-        for asset_type, display_name in asset_types.items():
-            count = Asset.objects.filter(asset_type=asset_type).count()
-            if count > 0:
-                type_stats.append({
-                    'asset_type': asset_type,
-                    'asset_type_display': display_name,
-                    'count': count
-                })
+        # Count by asset type (cả loại gõ tự do)
+        type_stats = [
+            {'asset_type': value, 'asset_type_display': label, 'count': count}
+            for value, label, count in _asset_type_counts(Asset.objects.all())
+        ]
         
         # Count by department
         from employee.models import Department
@@ -1606,6 +1715,43 @@ class AssetViewSet(viewsets.ModelViewSet):
         ).select_related('asset', 'assigned_by').order_by('-assigned_date')
         return Response(AssetAssignmentHistorySerializer(qs, many=True).data)
 
+    @action(detail=False, methods=['get'], url_path='type_options')
+    def type_options(self, request):
+        """Các "Phân loại" đang dùng (kèm số tài sản) + các loại chuẩn chưa dùng
+        — FE gợi ý khi gõ ô Phân loại, để HCNS gõ thống nhất (tránh "CCDCVP" /
+        "CCDC VP" thành 2 loại)."""
+        from .models import ASSET_TYPE
+        used = _asset_type_counts(Asset.objects.filter(is_deleted=False))
+        options = [{'value': v, 'label': label, 'count': n} for v, label, n in used]
+        used_values = {v for v, _, _ in used}
+        options += [{'value': code, 'label': label, 'count': 0}
+                    for code, label in ASSET_TYPE if code not in used_values]
+        return Response(options)
+
+    @action(detail=False, methods=['get'], url_path='export_template')
+    def export_template(self, request):
+        """Tải file mẫu (.xlsx) để nhập tài sản hàng loạt — header + dropdown +
+        2 dòng ví dụ, không phụ thuộc dữ liệu thật. FE dùng cho nút "Tải file mẫu"
+        ở mục Nhập Excel (giống Department/Position).
+        """
+        from io import BytesIO
+        from django.http import HttpResponse
+        from .asset_export import build_template_workbook
+
+        wb = build_template_workbook()
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type=(
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            ),
+        )
+        response['Content-Disposition'] = 'attachment; filename="mau-import-tai-san.xlsx"'
+        return response
+
     @action(detail=False, methods=['get'], url_path='export_excel')
     def export_excel(self, request):
         """Xuất Asset queryset (đã filter) ra file Excel theo schema chuẩn.
@@ -1639,9 +1785,17 @@ class AssetViewSet(viewsets.ModelViewSet):
                 | Q(assigned_to__full_name__icontains=search)
             )
 
-        asset_type = (request.query_params.get('asset_type') or '').strip()
-        if asset_type and asset_type.lower() != 'all':
-            qs = qs.filter(asset_type=asset_type.upper())
+        # FE gửi nhiều loại nối bằng dấu phẩy. Loại gõ tự do có thể chứa dấu
+        # phẩy, nên giá trị trùng y hệt 1 loại đang có thì giữ nguyên, không tách.
+        wanted = set()
+        for raw in request.query_params.getlist('asset_type'):
+            raw = raw.strip()
+            if not raw or raw.lower() == 'all':
+                continue
+            parts = [raw] if Asset.objects.filter(asset_type=raw).exists() else raw.split(',')
+            wanted.update(normalize_asset_type(p) for p in parts if p.strip())
+        if wanted:
+            qs = qs.filter(asset_type__in=wanted)
 
         asset_status = (request.query_params.get('status') or '').strip()
         if asset_status and asset_status.lower() != 'all':
@@ -1795,6 +1949,19 @@ class AssetViewSet(viewsets.ModelViewSet):
         serializer = AssetMaintenanceSerializer(maintenance, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['get'])
+    def inventory_history(self, request, pk=None):
+        """Lịch sử kiểm kê của 1 tài sản."""
+        from .serializers import AssetInventoryCheckSerializer
+        asset = self.get_object()
+        checks = asset.inventory_checks.select_related('checked_by', 'created_by').order_by('-check_date', '-id')
+        page = self.paginate_queryset(checks)
+        if page is not None:
+            serializer = AssetInventoryCheckSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = AssetInventoryCheckSerializer(checks, many=True)
+        return Response(serializer.data)
+
 
 class AssetAssignmentHistoryViewSet(viewsets.ModelViewSet):
     """
@@ -1856,6 +2023,28 @@ class AssetAssignmentHistoryViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(assignments, many=True)
         return Response(serializer.data)
+
+
+class AssetInventoryCheckViewSet(viewsets.ModelViewSet):
+    """API kiểm kê tài sản (mỗi bản ghi là 1 lần kiểm kê thực tế)."""
+    queryset = AssetInventoryCheck.objects.select_related('asset', 'checked_by', 'created_by').order_by('-check_date', '-id')
+    permission_classes = [IsAuthenticated, StaffReadOnlyPermission]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['asset', 'result', 'checked_by']
+    search_fields = ['notes', 'asset__asset_code', 'asset__name']
+
+    def get_serializer_class(self):
+        from .serializers import AssetInventoryCheckSerializer
+        return AssetInventoryCheckSerializer
+
+    def perform_create(self, serializer):
+        """Mặc định người tạo bản ghi = nhân viên của user đang đăng nhập."""
+        employee = getattr(self.request.user, 'employee', None)
+        if employee and not serializer.validated_data.get('created_by'):
+            serializer.save(created_by=employee)
+        else:
+            serializer.save()
 
 
 class AssetMaintenanceViewSet(viewsets.ModelViewSet):
@@ -2903,18 +3092,11 @@ class DashboardAPIView(APIView):
         female_count = Employee.objects.filter(gender='F').count()
         other_count = Employee.objects.filter(gender='O').count()
         
-        # Asset type distribution
-        from .models import ASSET_TYPE
-        asset_types = dict(ASSET_TYPE)
-        asset_type_stats = []
-        for asset_type, display_name in asset_types.items():
-            count = Asset.objects.filter(asset_type=asset_type).count()
-            if count > 0:
-                asset_type_stats.append({
-                    'type': asset_type,
-                    'display_name': display_name,
-                    'count': count
-                })
+        # Asset type distribution (cả loại gõ tự do)
+        asset_type_stats = [
+            {'type': value, 'display_name': label, 'count': count}
+            for value, label, count in _asset_type_counts(Asset.objects.all())
+        ]
         
         # Recent hires (last 30 days)
         recent_hires = Employee.objects.filter(

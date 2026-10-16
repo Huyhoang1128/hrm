@@ -4,6 +4,8 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { assetsAPI, departmentsAPI, employeesAPI, positionsAPI, companyUnitsAPI } from '../../utils/api';
 import { SelectBox, SelectOption } from '../../components/LandingLayout/SelectBox';
 import FeedbackDialog from '../../components/FeedbackDialog';
+import AssetTypeInput from './AssetTypeInput';
+import { isMultiHolderType, normalizeAssetType } from './assetTypes';
 
 interface AssetCreateModalProps {
   isOpen: boolean;
@@ -11,20 +13,8 @@ interface AssetCreateModalProps {
   onSuccess: () => void;
 }
 
-const ASSET_TYPES: SelectOption<string>[] = [
-  { value: 'LAPTOP', label: 'Laptop' },
-  { value: 'DESKTOP', label: 'Máy tính để bàn' },
-  { value: 'MONITOR', label: 'Màn hình' },
-  { value: 'SIM', label: 'Sim' },
-  { value: 'PHONE', label: 'Điện thoại' },
-  { value: 'TABLET', label: 'Máy tính bảng' },
-  { value: 'PRINTER', label: 'Máy in' },
-  { value: 'SCANNER', label: 'Máy scan' },
-  { value: 'NETWORK', label: 'Thiết bị mạng' },
-  { value: 'SERVER', label: 'Máy chủ' },
-  { value: 'FURNITURE', label: 'Nội thất' },
-  { value: 'VEHICLE', label: 'Phương tiện' },
-  { value: 'OTHER', label: 'Khác' },
+const DEPRECIATION_METHODS: SelectOption<string>[] = [
+  { value: 'STRAIGHT_LINE', label: 'Đường thẳng' },
 ];
 
 const ASSET_CONDITIONS: SelectOption<string>[] = [
@@ -62,7 +52,7 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    asset_type: 'LAPTOP',
+    asset_type: 'Laptop',
     model: '',
     condition: 'EXCELLENT',
     purchase_date: '',
@@ -91,7 +81,20 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
     monitor_quantity: '',
     // OTHER specific fields
     other_type_name: '',
+    dimensions: '',
+    usage_area: '',
+    usage_department: '',
+    facility_code: '',
+    purchase_price: '',
+    depreciation_period_months: '',
+    depreciation_method: 'STRAIGHT_LINE',
   });
+
+  // Mã loại chuẩn (SIM, DESKTOP...) suy ra từ ô Phân loại gõ tự do
+  const typeCode = normalizeAssetType(formData.asset_type);
+  // Ảnh chỉ upload SAU KHI tạo tài sản thành công (cần id)
+  const [currentImageFile, setCurrentImageFile] = useState<File | null>(null);
+  const [purchaseImageFile, setPurchaseImageFile] = useState<File | null>(null);
 
   /**
    * Khởi chạy khi Modal được mở, thực hiện lấy danh sách Phòng ban và Vị trí (Chức vụ)
@@ -204,7 +207,7 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
   const isFormValid = () => {
     let isValid = formData.name.trim() !== '';
 
-    if (formData.asset_type === 'SIM') {
+    if (typeCode === 'SIM') {
       const phone = formData.phone_number || '';
       isValid = isValid && /^\d{10}$/.test(phone.trim());
     }
@@ -248,19 +251,22 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
       }
 
       // Split technical specs into a separate object if it's a Desktop
-      const { cpu, mainboard, ram, storage, vga, power_supply, monitor_quantity, phone_number, network_provider, doctor, region, position_id, sim_type, sim_company, cancellation_report_date, other_type_name, warranty_period, ...baseData } = formData;
+      const { cpu, mainboard, ram, storage, vga, power_supply, monitor_quantity, phone_number, network_provider, doctor, region, position_id, sim_type, sim_company, cancellation_report_date, other_type_name, warranty_period, purchase_price, depreciation_period_months, depreciation_method, usage_department, ...baseData } = formData;
 
       let specifications = {};
-      if (formData.asset_type === 'DESKTOP') {
+      if (typeCode === 'DESKTOP') {
         specifications = { cpu, mainboard, ram, storage, vga, power_supply };
-      } else if (formData.asset_type === 'MONITOR') {
+      } else if (typeCode === 'MONITOR') {
         specifications = { quantity: parseInt(monitor_quantity) || 0 };
-      } else if (formData.asset_type === 'SIM') {
+      } else if (typeCode === 'SIM') {
         const positionTitle = positions.find(p => p.value === formData.position_id)?.label || '';
         const simCompanyName = companyUnits.find(c => c.value === sim_company)?.label || '';
         specifications = { phone_number, network_provider, doctor, region, position_id, position_title: positionTitle, sim_type, sim_company, sim_company_name: simCompanyName, cancellation_report_date };
-      } else if (formData.asset_type === 'OTHER') {
+      } else if (typeCode === 'OTHER') {
         specifications = { type_name: other_type_name, quantity: parseInt(monitor_quantity) || 0 };
+      } else if (isMultiHolderType(typeCode)) {
+        // Phân loại gõ tự do: giống "Khác" — có Số lượng
+        specifications = { quantity: parseInt(monitor_quantity) || 0 };
       }
 
       const payload = {
@@ -269,6 +275,10 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
         warranty_period: warranty_period ? parseInt(warranty_period) : null,
         department_id: formData.department ? parseInt(formData.department) : null,
         managed_by_id: formData.managed_by ? parseInt(formData.managed_by) : null,
+        purchase_price: purchase_price ? parseFloat(purchase_price) : null,
+        depreciation_period_months: depreciation_period_months ? parseInt(depreciation_period_months) : null,
+        depreciation_method,
+        usage_department_id: usage_department ? parseInt(usage_department) : null,
         specifications
       };
 
@@ -276,6 +286,16 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
       console.log('Payload:', JSON.stringify(payload, null, 2));
 
       const response = await assetsAPI.create(payload as any);
+
+      // Upload ảnh (nếu có) sau khi tài sản đã có id
+      try {
+        if (currentImageFile) await assetsAPI.uploadImage(response.id, 'current', currentImageFile);
+        if (purchaseImageFile) await assetsAPI.uploadImage(response.id, 'purchase', purchaseImageFile);
+      } catch (imgError) {
+        console.error('Error uploading asset images:', imgError);
+      }
+      setCurrentImageFile(null);
+      setPurchaseImageFile(null);
 
       console.log('--- Phản hồi từ Server ---');
       console.log('Data:', response);
@@ -285,7 +305,7 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
       // Reset form
       setFormData({
         name: '',
-        asset_type: 'LAPTOP',
+        asset_type: 'Laptop',
         model: '',
         condition: 'EXCELLENT',
         purchase_date: '',
@@ -310,6 +330,13 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
         sim_company: '',
         cancellation_report_date: '',
         other_type_name: '',
+        dimensions: '',
+        usage_area: '',
+        usage_department: '',
+        facility_code: '',
+        purchase_price: '',
+        depreciation_period_months: '',
+        depreciation_method: 'STRAIGHT_LINE',
       });
     } catch (error: any) {
       console.error('Error creating asset:', error);
@@ -398,12 +425,12 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
                           />
                         </div>
 
-                        <SelectBox
-                          label="Phân loại"
-                          value={formData.asset_type}
-                          options={ASSET_TYPES}
-                          onChange={(val) => handleSelectChange('asset_type', val)}
-                        />
+                        <div>
+                          <label htmlFor="asset_type" className="block text-sm font-medium text-gray-700">
+                            Phân loại
+                          </label>
+                          <AssetTypeInput value={formData.asset_type} onChange={handleChange} />
+                        </div>
 
                         <SelectBox
                           label="Tình trạng"
@@ -413,7 +440,7 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
                         />
 
                         {/* Màn hình / Khác: Số lượng */}
-                        {['MONITOR', 'OTHER'].includes(formData.asset_type) && (
+                        {isMultiHolderType(typeCode) && (
                           <div className="sm:col-span-2 bg-violet-50/60 p-4 rounded-xl border border-violet-100">
                             <h4 className="text-[11px] font-semibold text-violet-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                               <div className="w-1.5 h-1.5 bg-violet-500 rounded-full"></div>
@@ -432,7 +459,7 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
                         )}
 
                         {/* SIM: Thông tin chi tiết */}
-                        {formData.asset_type === 'SIM' && (
+                        {typeCode === 'SIM' && (
                           <div className="sm:col-span-2 bg-emerald-50/60 p-4 rounded-xl border border-emerald-100">
                             <h4 className="text-[11px] font-semibold text-emerald-600 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                               <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
@@ -499,7 +526,7 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
                         )}
 
                         {/* OTHER: Thông tin chi tiết */}
-                        {formData.asset_type === 'OTHER' && (
+                        {typeCode === 'OTHER' && (
                           <div className="sm:col-span-2 bg-gray-50/60 p-4 rounded-xl border border-gray-200">
                             <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                               <div className="w-1.5 h-1.5 bg-gray-500 rounded-full"></div>
@@ -517,7 +544,7 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
                         )}
 
                         {/* Desktop: Cấu hình chi tiết inline */}
-                        {formData.asset_type === 'DESKTOP' && (
+                        {typeCode === 'DESKTOP' && (
                           <div className="sm:col-span-2 bg-primary-50/60 p-4 rounded-xl border border-primary-100">
                             <h4 className="text-[11px] font-semibold text-primary-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                               <div className="w-1.5 h-1.5 bg-primary-500 rounded-full"></div>
@@ -564,7 +591,7 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
                           </div>
                         )}
 
-                        {!['SIM', 'FURNITURE'].includes(formData.asset_type) && (
+                        {!['SIM', 'FURNITURE'].includes(typeCode) && (
                           <div>
                             <label htmlFor="model" className="block text-sm font-medium text-gray-700">
                               Model
@@ -641,7 +668,89 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
 
                     <hr className="border-gray-100" />
 
-                    {/* ── Section 3: Ghi chú ── */}
+                    {/* ── Section 2b: Thông tin sử dụng thực tế ── */}
+                    <section>
+                      <h4 className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Thông tin sử dụng thực tế</h4>
+                      <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+                        <div>
+                          <label htmlFor="dimensions" className="block text-sm font-medium text-gray-700">Kích thước</label>
+                          <input type="text" name="dimensions" id="dimensions" value={formData.dimensions} onChange={handleChange}
+                            className="input-field mt-1" placeholder="VD: 120x60x75cm" />
+                        </div>
+                        <div>
+                          <label htmlFor="usage_area" className="block text-sm font-medium text-gray-700">Khu vực sử dụng</label>
+                          <input type="text" name="usage_area" id="usage_area" value={formData.usage_area} onChange={handleChange}
+                            className="input-field mt-1" placeholder="VD: Tầng 2 - Phòng khám" />
+                        </div>
+                        <SelectBox
+                          label="Phòng ban sử dụng"
+                          value={formData.usage_department}
+                          options={departments}
+                          onChange={(val) => handleSelectChange('usage_department', val)}
+                          placeholder="-- Chọn phòng ban sử dụng --"
+                          searchable
+                        />
+                        <div>
+                          <label htmlFor="facility_code" className="block text-sm font-medium text-gray-700">Mã cơ sở</label>
+                          <input type="text" name="facility_code" id="facility_code" value={formData.facility_code} onChange={handleChange}
+                            className="input-field mt-1" placeholder="VD: CS01" />
+                        </div>
+                      </div>
+                    </section>
+
+                    <hr className="border-gray-100" />
+
+                    {/* ── Section 3: Khấu hao tài sản ── */}
+                    <section>
+                      <h4 className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Khấu hao tài sản</h4>
+                      <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+                        <div>
+                          <label htmlFor="purchase_price" className="block text-sm font-medium text-gray-700">Giá trị khi mua</label>
+                          <input type="number" name="purchase_price" id="purchase_price" min="0" step="1000"
+                            value={formData.purchase_price} onChange={handleChange}
+                            className="input-field mt-1" placeholder="VD: 24000000" />
+                        </div>
+                        <div>
+                          <label htmlFor="depreciation_period_months" className="block text-sm font-medium text-gray-700">Thời gian khấu hao (tháng)</label>
+                          <input type="number" name="depreciation_period_months" id="depreciation_period_months" min="0" step="1"
+                            value={formData.depreciation_period_months} onChange={handleChange}
+                            className="input-field mt-1" placeholder="VD: 36" />
+                        </div>
+                        <SelectBox
+                          label="Phương pháp khấu hao"
+                          value={formData.depreciation_method}
+                          options={DEPRECIATION_METHODS}
+                          onChange={(val) => handleSelectChange('depreciation_method', val)}
+                        />
+                      </div>
+                    </section>
+
+                    <hr className="border-gray-100" />
+
+                    {/* ── Section 4: Hình ảnh tài sản ── */}
+                    <section>
+                      <h4 className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Hình ảnh tài sản</h4>
+                      <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+                        <div>
+                          <label htmlFor="purchase_image" className="block text-sm font-medium text-gray-700">Hình ảnh tài sản mới mua</label>
+                          <input type="file" accept="image/*" name="purchase_image" id="purchase_image"
+                            onChange={(e) => setPurchaseImageFile(e.target.files?.[0] || null)}
+                            className="input-field mt-1 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100" />
+                          {purchaseImageFile && <p className="mt-1 text-xs text-gray-500 truncate">{purchaseImageFile.name}</p>}
+                        </div>
+                        <div>
+                          <label htmlFor="current_image" className="block text-sm font-medium text-gray-700">Hình ảnh tài sản hiện tại</label>
+                          <input type="file" accept="image/*" name="current_image" id="current_image"
+                            onChange={(e) => setCurrentImageFile(e.target.files?.[0] || null)}
+                            className="input-field mt-1 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100" />
+                          {currentImageFile && <p className="mt-1 text-xs text-gray-500 truncate">{currentImageFile.name}</p>}
+                        </div>
+                      </div>
+                    </section>
+
+                    <hr className="border-gray-100" />
+
+                    {/* ── Section 5: Ghi chú ── */}
                     <section>
                       <label htmlFor="description" className="block text-sm font-medium text-gray-700">Mô tả / Ghi chú</label>
                       <textarea
