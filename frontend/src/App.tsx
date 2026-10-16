@@ -102,6 +102,7 @@ import WorkRequestManagement from './pages/WorkRequestManagement';
 import FeedbackManagement from './pages/FeedbackManagement';
 import InternalChat from './pages/InternalChat';
 import SalaryPayroll from './pages/SalaryPayroll';
+import SalaryBonusPrediction from './pages/SalaryBonusPrediction';
 import SalaryEmployeeConfig from './pages/SalaryEmployeeConfig';
 import SalaryData from './pages/SalaryData';
 import OvertimeRateConfigPage from './pages/OvertimeRateConfig';
@@ -1267,6 +1268,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <WorkFinalizationApprovals />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/salary-management/bonus"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <Layout>
+                  <SalaryBonusPrediction />
                 </Layout>
               </ProtectedRoute>
             }

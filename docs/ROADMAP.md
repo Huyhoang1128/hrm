@@ -28,7 +28,7 @@ Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 
 | 1.9 | ✅ **Cảnh báo mâu thuẫn ngày / loại hợp đồng** trên form sửa NV | S | Chỉ sửa FE. |
 | 1.10 | ✅ **Xuất Excel nhân viên theo cột tuỳ chọn** | S | Mở quyền `export-all` cho Admin/HR. |
 | 1.11 | ✅ **Cảnh báo quan trọng**: HĐ sắp/đã hết hạn, đến hạn đóng BHXH, kèm popup | S–M | Các ngưỡng ngày phải cấu hình được. |
-| 1.12 | **Dự đoán chi phí thưởng** (tháng 13 / cuối năm) | S | |
+| 1.12 | ✅ **Dự đoán chi phí thưởng** (tháng 13 / cuối năm) | S | |
 | 1.13 | **Placeholder hợp đồng mở rộng**: số tiền bằng chữ, ngày ký, giới tính… | S | Giữ tương thích các placeholder cũ. |
 | 1.14 | Loại tài liệu **Phụ lục hợp đồng** | S | |
 | 1.15 | **Dữ liệu lương**: ghi đè tiền ăn trưa, gửi xe "điền 0 cho phần còn lại", phân trang + dòng tổng | S | |

@@ -290,6 +290,12 @@ const navigationItems: NavigationItem[] = [
         roles: ['ADMIN'],
       },
       {
+        name: 'Dự đoán thưởng',
+        href: '/dashboard/salary-management/bonus',
+        icon: GiftIcon,
+        roles: ['ADMIN'],
+      },
+      {
         name: 'Cấu hình tính lương',
         href: '/dashboard/salary-management/config',
         icon: CurrencyDollarIcon,
