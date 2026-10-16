@@ -900,6 +900,48 @@ class SalaryService {
     const response = await managementApi.get('/api/v1/salary/records/total-summary/', { params });
     return response.data;
   }
+
+  async predictBonus(params: {
+    scheme: 'fixed_3m_basic' | 'prorated' | 'custom';
+    fixed_amount?: number;
+    bonus_months?: number;
+    department_id?: number;
+    legal_entity?: string;
+    under_one_year_amount?: number;
+  }): Promise<{
+    scheme: string;
+    fixed_amount: number | null;
+    bonus_months: number;
+    department_filter: number | null;
+    legal_entity_filter: string | null;
+    total_employee_count: number;
+    total_bonus: number;
+    employees: Array<{
+      employee_id: number;
+      employee_code: string;
+      employee_name: string;
+      department: string;
+      basic_salary: number;
+      start_date: string | null;
+      months_worked: number;
+      is_over_1_year: boolean;
+      scheme: string;
+      bonus_amount: number;
+      bonus_months: number;
+      reason: string;
+    }>;
+    departments: Array<{
+      department_id: number | null;
+      department_name: string;
+      employee_count: number;
+      total_bonus: number;
+      employees: Array<any>;
+    }>;
+    generated_at: string;
+  }> {
+    const response = await managementApi.post('/api/v1/salary/records/bonus-prediction/', params);
+    return response.data;
+  }
 }
 
 export const salaryService = new SalaryService();
