@@ -10,6 +10,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework.views import APIView
 from .bulk_reject import BulkRejectMixin
+from employee.models import PROBATION_CONTRACT_TYPES
 
 logger = logging.getLogger(__name__)
 from django_filters.rest_framework import DjangoFilterBackend
@@ -2207,7 +2208,7 @@ class MonthlyLeaveViewSet(AttendanceExplanationViewSet):
         if emp:
             contract_type = str(getattr(emp, 'contract_type', '') or '').strip().upper()
             rank = str(getattr(emp, 'rank', '') or '').strip().upper()
-            if contract_type == 'PROBATION':
+            if contract_type in PROBATION_CONTRACT_TYPES:
                 # Cho phép nếu ngày nghỉ đã sau ngày kết thúc thử việc — HR
                 # có thể chưa kịp update contract_type sau khi NV pass thử
                 # việc, nhưng nếu probation_end_date đã qua thì NV đã chính

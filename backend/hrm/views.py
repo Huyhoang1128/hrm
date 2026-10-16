@@ -6,6 +6,7 @@ import re
 from users.utils import get_user_display_name
 from employee.models import EmployeeStatusHistory, TEMPORARILY_OFF_STATUSES
 from datetime import date
+from employee.models import PROBATION_CONTRACT_TYPES, NON_OFFICIAL_CONTRACT_TYPES, OFFICIAL_LABOR_CONTRACT_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -426,7 +427,7 @@ def _working_employee_q(today):
 def _probation_q(today):
     """Còn thử việc: hợp đồng thử việc HOẶC còn hạn probation_end_date
     ("Thử việc" không còn là giá trị của employment_status)."""
-    return Q(contract_type='PROBATION') | Q(probation_end_date__gte=today)
+    return Q(contract_type__in=PROBATION_CONTRACT_TYPES) | Q(probation_end_date__gte=today)
 
 
 def _month_ref_date(month_param):
@@ -2890,7 +2891,7 @@ class DashboardAPIView(APIView):
                 recruiter_position_row['recruiter_name'] = recruiter.full_name
             recruiter_position_row['hired_count'] += 1
             recruiter_position_row['employees'].append(employee_data)
-            if employee.contract_type == 'ONE_YEAR' and employee.contract_start_date is not None:
+            if employee.contract_type in OFFICIAL_LABOR_CONTRACT_TYPES and employee.contract_start_date is not None:
                 recruiter_position_row['official_contracts'] += 1
 
             recruiter_position_detail = recruiter_positions_raw[recruiter_position_key][position_key]
@@ -8219,7 +8220,8 @@ class OnboardingProcessViewSet(viewsets.ModelViewSet):
             if days < 0:
                 raise ValidationError({'probation_ending_within': 'Phải >= 0.'})
             today = timezone.localdate()
-            qs = qs.filter(contract_type='PROBATION', expected_end_date__range=(today, today + timedelta(days=days)))
+            qs = qs.filter(contract_type__in=PROBATION_CONTRACT_TYPES,
+                           expected_end_date__range=(today, today + timedelta(days=days)))
             if months is not None:
                 qs = qs.filter(probation_period_months=months)
 
@@ -10019,10 +10021,8 @@ class EmployeeContractViewSet(viewsets.ModelViewSet):
     CONTRACT_TYPE_TO_GROUP = {
         'INTERN': 'INTERN',
         'COLLABORATOR': 'INTERN',
-        'PROBATION': 'PROBATION',
-        'ONE_YEAR': 'LABOR',
-        'THREE_YEAR': 'LABOR',
-        'INDEFINITE': 'LABOR',
+        **{code: 'PROBATION' for code in PROBATION_CONTRACT_TYPES},
+        **{code: 'LABOR' for code in OFFICIAL_LABOR_CONTRACT_TYPES},
         'SERVICE': 'SERVICE',
         'COMPANY_RULES': 'COMPANY_RULES',
     }
@@ -10745,10 +10745,7 @@ class EmployeeContractViewSet(viewsets.ModelViewSet):
         today = timezone.now().date()
         deadline = today + timedelta(days=days)
 
-        labor_contract_types = [
-            'PROBATION', 'INTERN', 'COLLABORATOR',
-            'ONE_YEAR', 'TWO_YEAR', 'INDEFINITE', 'SERVICE',
-        ]
+        labor_contract_types = sorted(NON_OFFICIAL_CONTRACT_TYPES | OFFICIAL_LABOR_CONTRACT_TYPES | {'SERVICE'})
 
         qs = (
             EmployeeContract.objects
@@ -10799,7 +10796,7 @@ class EmployeeContractViewSet(viewsets.ModelViewSet):
                 'contracts': [],
             })
 
-        LABOR_CONTRACT_TYPES = ['PROBATION', 'INTERN', 'COLLABORATOR', 'ONE_YEAR', 'TWO_YEAR', 'INDEFINITE', 'SERVICE']
+        LABOR_CONTRACT_TYPES = sorted(NON_OFFICIAL_CONTRACT_TYPES | OFFICIAL_LABOR_CONTRACT_TYPES | {'SERVICE'})
         qs = (
             EmployeeContract.objects
             .filter(

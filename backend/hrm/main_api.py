@@ -4,6 +4,7 @@ from .rules import RuleRegistry, get_rules_for_employee, initialize_rule_registr
 import logging
 import math
 import datetime as _dt
+from employee.models import PROBATION_CONTRACT_TYPES
 
 try:
     from hrm.attendance_engine import PolicyLoader as _PolicyLoader
@@ -2808,7 +2809,7 @@ class EmployeeState:
             if (
                 event.event_type == "leave_request"
                 and employee_obj is not None
-                and getattr(employee_obj, 'contract_type', None) == 'PROBATION'
+                and getattr(employee_obj, 'contract_type', None) in PROBATION_CONTRACT_TYPES
             ):
                 print(f"[replay_month] Bỏ qua leave_request cho nhân viên thử việc ngày {event.event_date}")
                 continue
@@ -2859,7 +2860,7 @@ class EmployeeState:
         # Phụ cấp gửi xe: 5.000 VNĐ/ngày thực tế, chỉ áp dụng cho hợp đồng thử việc (PROBATION)
         # Các loại hợp đồng khác đã có vé xe nên không nhận phụ cấp này
         # Nếu có nửa ngày công thì vẫn tính là 1 ngày gửi xe (làm ceil)
-        if employee_obj is not None and employee_obj.contract_type == "PROBATION":
+        if employee_obj is not None and employee_obj.contract_type in PROBATION_CONTRACT_TYPES:
             state.tong_phu_cap_gui_xe = PROBATION_PARKING_ALLOWANCE_PER_DAY * math.ceil(state.tong_ngay_cong)
         else:
             state.tong_phu_cap_gui_xe = 0

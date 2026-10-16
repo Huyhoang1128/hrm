@@ -21,6 +21,7 @@ import logging
 from datetime import timedelta
 from dateutil.relativedelta import relativedelta
 from users.utils import get_user_display_name
+from employee.models import PROBATION_CONTRACT_TYPES, OFFICIAL_LABOR_CONTRACT_TYPES, probation_months_for
 logger = logging.getLogger(__name__)
 
 
@@ -4551,8 +4552,10 @@ class OnboardingProcessCreateSerializer(serializers.ModelSerializer):
                         # self.send_welcome_email(user, default_password, new_employee)
                         # Tính probation_end_date — không critical, lỗi ở đây không nên rollback
                         # cả Employee vừa tạo, nên vẫn giữ try/except riêng (không phá atomic).
-                        if new_employee.contract_type == 'PROBATION' and new_employee.start_date:
+                        if new_employee.contract_type in PROBATION_CONTRACT_TYPES and new_employee.start_date:
                             try:
+                                new_employee.probation_months = probation_months_for(
+                                    new_employee.contract_type, new_employee.probation_months)
                                 new_employee.probation_end_date = calculate_probation_end_date(
                                     new_employee.start_date,
                                     new_employee.probation_months,
@@ -6015,7 +6018,7 @@ class GenericRequestSerializer(serializers.ModelSerializer):
     # ------------------------------------------------------------------
     # SALARY_ADVANCE specific validation
     # ------------------------------------------------------------------
-    SALARY_ADVANCE_OFFICIAL_CONTRACTS = {'ONE_YEAR', 'TWO_YEAR', 'INDEFINITE'}
+    SALARY_ADVANCE_OFFICIAL_CONTRACTS = OFFICIAL_LABOR_CONTRACT_TYPES
     SALARY_ADVANCE_MAX_AMOUNT = 5_000_000
     SALARY_ADVANCE_MAX_RATIO = 0.8
     # Khung tạo đơn tạm ứng (yêu cầu HCNS 2026-10-03): từ 00:00 ngày 1 đến

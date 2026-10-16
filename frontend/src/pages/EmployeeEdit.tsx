@@ -72,10 +72,14 @@ const BLOCK_OPTIONS = [
 
 const CONTRACT_TYPE_OPTIONS = [
   { label: 'Hợp đồng thử việc', value: 'PROBATION' },
+  { label: 'Thử việc 1 tháng', value: 'PROBATION_1M' },
+  { label: 'Thử việc 2 tháng', value: 'PROBATION_2M' },
   { label: 'Hợp đồng thực tập sinh', value: 'INTERN' },
   { label: 'Hợp đồng cộng tác viên', value: 'COLLABORATOR' },
+  { label: 'Hợp đồng lao động 6 tháng', value: 'SIX_MONTH' },
   { label: 'Hợp đồng lao động 12 tháng', value: 'ONE_YEAR' },
   { label: 'Hợp đồng lao động 24 tháng', value: 'TWO_YEAR' },
+  { label: 'Hợp đồng lao động 36 tháng', value: 'THREE_YEAR' },
   { label: 'Hợp đồng vô thời hạn', value: 'INDEFINITE' },
   { label: 'Hợp đồng dịch vụ', value: 'SERVICE' },
 ];

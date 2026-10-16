@@ -58,10 +58,14 @@ const getMaritalStatusLabel = (status?: string) => {
 const getContractTypeLabel = (type?: string, display?: string) => {
   const labels: Record<string, string> = {
     PROBATION: 'Hợp đồng thử việc',
+    PROBATION_1M: 'Thử việc 1 tháng',
+    PROBATION_2M: 'Thử việc 2 tháng',
     INTERN: 'Hợp đồng thực tập sinh',
     COLLABORATOR: 'Hợp đồng cộng tác viên',
+    SIX_MONTH: 'Hợp đồng lao động 6 tháng',
     ONE_YEAR: 'Hợp đồng lao động 12 tháng',
     TWO_YEAR: 'Hợp đồng lao động 24 tháng',
+    THREE_YEAR: 'Hợp đồng lao động 36 tháng',
     INDEFINITE: 'Hợp đồng vô thời hạn',
     SERVICE: 'Hợp đồng dịch vụ',
     CONFIDENTIALITY: 'Thoả thuận bảo mật',
@@ -1634,10 +1638,14 @@ const EmployeeList: React.FC = () => {
               options={[
                 { value: 'all', label: 'Tất cả loại hợp đồng' },
                 { value: 'PROBATION', label: 'Hợp đồng thử việc' },
+                { value: 'PROBATION_1M', label: 'Thử việc 1 tháng' },
+                { value: 'PROBATION_2M', label: 'Thử việc 2 tháng' },
                 { value: 'INTERN', label: 'Hợp đồng thực tập sinh' },
                 { value: 'COLLABORATOR', label: 'Hợp đồng cộng tác viên' },
+                { value: 'SIX_MONTH', label: 'Hợp đồng lao động 6 tháng' },
                 { value: 'ONE_YEAR', label: 'Hợp đồng lao động 12 tháng' },
                 { value: 'TWO_YEAR', label: 'Hợp đồng lao động 24 tháng' },
+                { value: 'THREE_YEAR', label: 'Hợp đồng lao động 36 tháng' },
                 { value: 'INDEFINITE', label: 'Hợp đồng vô thời hạn' },
                 { value: 'SERVICE', label: 'Hợp đồng dịch vụ' },
               ]}
