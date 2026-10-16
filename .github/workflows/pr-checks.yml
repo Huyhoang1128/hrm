@@ -1,0 +1,38 @@
+name: Kiểm tra PR
+
+# Chặn từ lúc mở PR những lỗi làm hỏng deploy: migration xung đột (hai nhánh cùng
+# thêm migration cho một app) hoặc đổi model mà quên tạo migration.
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  migrations:
+    name: Migration
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Cài phụ thuộc
+        run: pip install -r requirements.txt
+
+      # Không truyền DATABASE_URL: settings tự dùng SQLite, và cả hai bước dưới
+      # chỉ đọc file migration chứ không chạm database thật.
+      - name: Phát hiện migration xung đột
+        run: python scripts/check_migrations.py
+
+      - name: Phát hiện model đã đổi mà thiếu migration
+        run: python manage.py makemigrations --check --dry-run

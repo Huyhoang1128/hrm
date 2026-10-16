@@ -33,7 +33,7 @@ Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 
 | 1.14 | ✅ Loại tài liệu **Phụ lục hợp đồng** | S | |
 | 1.15 | ✅ **Dữ liệu lương**: ghi đè tiền ăn trưa, gửi xe "điền 0 cho phần còn lại", phân trang + dòng tổng | S | |
 | 1.16 | ✅ Cải tiến nhỏ: báo cáo vi phạm cho mọi phòng ban, lọc "sắp hết thử việc", hiển thị Họ Tên đúng thứ tự, xem PDF trên Android, nhãn ca rõ hơn, `DateInput`, `formatVND` | S | Bỏ phần nhãn ca: đăng ký ca (Ca 1/Ca 2) đã hiện đủ giờ sáng/chiều. Báo cáo vi phạm giới hạn quyền xem theo vai trò. |
-| 1.17 | CI chặn migration có nhiều nhánh lá | S | |
+| 1.17 | ✅ CI chặn migration có nhiều nhánh lá | S | |
 
 ## Giai đoạn 2: mở rộng tính năng lõi
 
@@ -54,7 +54,7 @@ Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 
 | 2.13 | **Phạt thiếu công** theo danh sách NV được chọn | S–M | Danh sách rỗng thì không có tác dụng. |
 | 2.14 | **Đơn giải trình "Lỗi máy chấm công"** | M | Không tính vào hạn mức giải trình. |
 | 2.15 | **Khoá NV tự sửa hồ sơ** | S | Đặt sau một cờ trong `CompanyConfig`, mặc định tắt. |
-| 2.16 | **Vai trò BOD xem lương** | S | Cần quyết định: vai trò riêng hay giữ "chỉ admin". |
+| 2.16 | ⛔ ~~**Vai trò BOD xem lương**~~ | S | Không làm: giữ "chỉ admin" xem lương. |
 
 ## Giai đoạn 3: tính năng lớn
 
