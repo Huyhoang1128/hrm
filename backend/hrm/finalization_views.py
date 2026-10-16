@@ -4,6 +4,7 @@ API views for Work Finalization (Chốt công).
 import io
 import math
 import calendar as cal_module
+from dataclasses import dataclass
 import datetime as _dt
 from collections import defaultdict
 from datetime import date
@@ -1403,6 +1404,332 @@ def _get_dependent_record_counts(employee_ids, period_start, period_end) -> dict
     return counts
 
 
+# ---------------------------------------------------------------------------
+# BẢNG LƯƠNG THÁNG — dùng chung cho GET /hrm/salary/department/ và các API lương
+# (tổng lương, phiếu lương, email phiếu lương). Không kiểm tra quyền: nơi gọi tự lo.
+# ---------------------------------------------------------------------------
+
+# Tỷ lệ BH/CĐ phần người lao động
+EMPLOYEE_BHXH_RATE = Decimal('0.08')
+EMPLOYEE_BHYT_RATE = Decimal('0.015')
+EMPLOYEE_BHTN_RATE = Decimal('0.01')
+EMPLOYEE_CD_RATE = Decimal('0.01')
+EMPLOYEE_INSURANCE_RATE = EMPLOYEE_BHXH_RATE + EMPLOYEE_BHYT_RATE + EMPLOYEE_BHTN_RATE  # 0.105, trừ khi tính thuế
+EMPLOYEE_BH_TOTAL_RATE = EMPLOYEE_INSURANCE_RATE + EMPLOYEE_CD_RATE  # 0.115, trừ vào lương
+
+
+@dataclass
+class SalaryMonthContext:
+    """Dữ liệu dùng chung của cả tháng, nạp 1 lần cho mọi dòng lương."""
+    year: int
+    month: int
+    calc_date: _dt.date
+    standard_work_days: Decimal
+    tax_cfg: object
+    personal_deduction: Decimal
+    dependent_deduction_per_person: Decimal
+    records: dict            # employee_id -> WorkFinalization
+    salary_records: dict     # employee_id -> MonthlySalaryRecord
+    dependent_counts: dict   # employee_id -> số người phụ thuộc có hồ sơ trong tháng
+    bien_ban_penalties: dict  # employee_id -> tổng phạt biên bản
+    sales_commissions: dict   # employee_id -> tổng hoa hồng
+
+
+def resolve_salary_employees(year: int, month: int, department_id=None, legal_entity: str = '',
+                             employee_code=None) -> list:
+    """Nhân viên có dòng lương trong tháng: đang hoạt động và còn làm trong tháng."""
+    employees_qs = Employee.objects.select_related("department", "position").filter(is_active=True).filter(_active_in_month_q(year, month))
+    if department_id:
+        employees_qs = employees_qs.filter(department_id=department_id)
+    if legal_entity:
+        employees_qs = employees_qs.filter(subsidiary_legal_entity=legal_entity)
+    if employee_code:
+        employees_qs = employees_qs.filter(
+            Q(employee_id__icontains=employee_code) | Q(full_name__icontains=employee_code)
+        )
+    return list(employees_qs.order_by("employee_id"))
+
+
+def build_salary_context(employees: list, year: int, month: int) -> SalaryMonthContext:
+    employee_ids = [e.id for e in employees]
+    _, days_in_month = cal_module.monthrange(year, month)
+    calc_date = _dt.date(year, month, days_in_month)
+    tax_cfg = TaxBracketConfig.get_for_date(calc_date) or TaxBracketConfig.get_active()
+    default_personal_deduction = Decimal('15500000') if year >= 2026 else Decimal('11000000')
+    default_dependent_deduction = Decimal('6200000') if year >= 2026 else Decimal('4400000')
+
+    def sums_by_employee(model):
+        rows = (
+            model.objects
+            .filter(employee_id__in=employee_ids, year=year, month=month)
+            .values('employee_id')
+            .annotate(total=Sum('amount'))
+        )
+        return {row['employee_id']: _to_decimal(row['total']) for row in rows}
+
+    return SalaryMonthContext(
+        year=year,
+        month=month,
+        calc_date=calc_date,
+        standard_work_days=_get_salary_standard_work_days(year, month),
+        tax_cfg=tax_cfg,
+        personal_deduction=(tax_cfg.personal_deduction if tax_cfg else default_personal_deduction),
+        dependent_deduction_per_person=(tax_cfg.dependent_deduction if tax_cfg else default_dependent_deduction),
+        records={
+            rec.employee_id: rec
+            for rec in WorkFinalization.objects.filter(year=year, month=month, employee_id__in=employee_ids)
+        },
+        salary_records={
+            sr.employee_id: sr
+            for sr in MonthlySalaryRecord.objects.filter(year=year, month=month, employee_id__in=employee_ids)
+        },
+        dependent_counts=_get_dependent_record_counts(
+            employee_ids, _dt.date(year, month, 1), _dt.date(year, month, days_in_month)
+        ),
+        bien_ban_penalties=sums_by_employee(DisciplinaryPenalty),
+        sales_commissions=sums_by_employee(SalesCommission),
+    )
+
+
+def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
+    """Một dòng bảng lương của nhân viên trong tháng của ctx."""
+    year, month = ctx.year, ctx.month
+    calc_date = ctx.calc_date
+    standard_work_days = ctx.standard_work_days
+    tax_cfg = ctx.tax_cfg
+    personal_deduction = ctx.personal_deduction
+    dependent_deduction_per_person = ctx.dependent_deduction_per_person
+    rec = ctx.records.get(employee.id)
+    sr = ctx.salary_records.get(employee.id)
+    contract_type = (employee.contract_type or "").upper()
+    is_non_official_contract = contract_type in NON_OFFICIAL_CONTRACT_TYPES
+    contract_status = "THU_VIEC" if is_non_official_contract else "CHINH_THUC"
+
+    basic_salary, fixed_allowance = _get_salary_profile_for_month(employee, year, month)
+    actual_work_days = _to_decimal(rec.cong_thuc_te if rec else 0)
+    total_work_days = _to_decimal(rec.tong_cong if rec else 0)
+    holiday_probation_days, holiday_official_days = _holiday_credit_to_add(rec, employee)
+    probation_work_days = _to_decimal(rec.cong_thu_viec if rec else 0) + holiday_probation_days
+    official_work_days = _to_decimal(rec.cong_chinh_thuc if rec else 0) + holiday_official_days
+    has_probation_days = probation_work_days > Decimal('0')
+    has_official_days = official_work_days > Decimal('0')
+    probation_only = has_probation_days and not has_official_days
+    mixed_probation_official = has_probation_days and has_official_days
+    mixed_official_days_eligible_progressive_tax = mixed_probation_official and official_work_days >= Decimal('14')
+    probation_rate_percent = _resolve_probation_rate_percent(employee)
+    probation_rate_multiplier = probation_rate_percent / Decimal('100')
+    base_day_salary = (basic_salary / standard_work_days) if standard_work_days > 0 else Decimal('0')
+    probation_workday_salary = base_day_salary * probation_work_days * probation_rate_multiplier
+    official_workday_salary = base_day_salary * official_work_days
+    split_workday_salary = probation_workday_salary + official_workday_salary
+    lunch_allowance = _calculate_lunch_allowance(employee, total_work_days, year, month)
+    stored_parking = _to_decimal(rec.phu_cap_gui_xe if rec else 0)
+    parking_override = _get_parking_allowance_override(employee, year, month)
+    parking_allowance = parking_override if parking_override is not None else _calculate_parking_allowance(employee, actual_work_days, stored_parking)
+
+    config_allowances = _resolve_config_allowances(employee)
+    responsibility_allowance = _calculate_responsibility_allowance(employee, total_work_days, year, month)
+    other_allowance = _get_other_allowance(employee, year, month)
+    other_fixed_income = _to_decimal(employee.other_fixed_monthly_income)
+    advance_amount = _get_advance(employee, year, month)
+    sales_commission = ctx.sales_commissions.get(employee.id, Decimal('0'))
+    livestream_sessions = max(int(_to_decimal(rec.live if rec else 0)), 0)
+    livestream_allowance_config = _resolve_livestream_allowance_config(employee, calc_date)
+    livestream_amount_per_session = _to_decimal(
+        livestream_allowance_config.amount_per_session if livestream_allowance_config else 0
+    )
+    livestream_allowance = livestream_amount_per_session * Decimal(str(livestream_sessions))
+    total_allowance = (
+        fixed_allowance
+        + lunch_allowance
+        + parking_allowance
+        + config_allowances
+        + responsibility_allowance
+        + other_allowance
+        + livestream_allowance
+    )
+
+    attendance_penalty = _to_decimal(rec.tong_phat if rec else 0)
+    bien_ban_penalty = ctx.bien_ban_penalties.get(employee.id, Decimal('0'))
+    total_penalty = attendance_penalty + bien_ban_penalty
+
+    # Lương tăng ca: ưu tiên từ salary record đã tính, fallback tính từ OT rate config
+    ot_pay = Decimal('0')
+    if sr and sr.components_detail:
+        ot_component = sr.components_detail.get('OT_PAY', {})
+        ot_pay = _to_decimal(ot_component.get('amount', 0))
+
+    tang_ca_hours = _to_decimal(rec.tang_ca if rec else 0)
+    if ot_pay == Decimal('0') and tang_ca_hours > 0:
+        _, std_days = cal_module.monthrange(year, month)
+        sundays = sum(1 for d in range(1, std_days + 1) if cal_module.weekday(year, month, d) == 6)
+        standard_work_days_f = float(max(std_days - sundays - 1, 1))
+        ot_rate = OvertimeRateConfig.get_for_employee(
+            employee, calc_date,
+            basic_salary=float(basic_salary),
+            standard_work_days=standard_work_days_f,
+        )
+        ot_pay = _to_decimal(round(float(tang_ca_hours) * ot_rate, 2))
+
+    # Compute insurance base salary from Employee field (Mức đóng BHXH)
+    ins_base = max(_to_decimal(employee.social_insurance_contribution_level), Decimal('0'))
+
+    adjustments = _as_dict(employee.salary_adjustments)
+    tax_policy = _as_dict(_as_dict(adjustments.get('payroll_config')).get('taxPolicy'))
+    if probation_only:
+        ins_base = Decimal('0')
+        bh_deduction = Decimal('0')
+    elif is_non_official_contract and not mixed_probation_official:
+        ins_base = Decimal('0')
+        bh_deduction = Decimal('0')
+    else:
+        bh_deduction = ins_base * EMPLOYEE_BH_TOTAL_RATE
+
+    if employee.id in ctx.dependent_counts:
+        dependent_count = ctx.dependent_counts[employee.id]
+    else:
+        dependent_count = max(int(_to_decimal(tax_policy.get('dependentCount'), Decimal('0'))), 0)
+    deductions_config = _as_dict(_as_dict(adjustments.get('payroll_config')).get('deductions'))
+    union_fee = _to_decimal(deductions_config.get('unionFee'), Decimal('0'))
+    insurance_deduction_for_tax = Decimal('0') if (probation_only or (is_non_official_contract and not mixed_probation_official)) else (ins_base * EMPLOYEE_INSURANCE_RATE)
+    taxable_allowance = max(total_allowance - lunch_allowance, Decimal('0'))
+    actual_total_days = _to_decimal(rec.tong_cong if rec else 0)
+    if has_probation_days:
+        taxable_basic_income = split_workday_salary
+    else:
+        taxable_basic_income = (
+            (basic_salary / standard_work_days) * actual_total_days
+            if actual_total_days > 0
+            else Decimal('0')
+        )
+    gross_income_for_tax = (
+        taxable_basic_income
+        + taxable_allowance
+        + sales_commission
+        + other_fixed_income
+        + _to_decimal(rec.truc_toi if rec else 0)
+        + ot_pay
+    )
+    # Nếu đã đóng BHXH/BHYT/BHTN thì phải tính thuế luỹ tiến;
+    # không được vừa trừ bảo hiểm vừa khấu trừ thêm 10% flat.
+    has_mandatory_insurance = insurance_deduction_for_tax > Decimal('0')
+
+    if probation_only:
+        # Thử việc thuần tuý: không đóng BH → áp 10%
+        taxable_income = max(gross_income_for_tax, Decimal('0'))
+        pit_amount = taxable_income * Decimal('0.10')
+        personal_deduction_applied = Decimal('0')
+        dependent_deduction_applied = Decimal('0')
+        tax_method = 'FLAT_10_PROBATION'
+    elif mixed_probation_official and not mixed_official_days_eligible_progressive_tax and not has_mandatory_insurance:
+        # Có cả công TV + CT, CT < 14 ngày, nhưng KHÔNG đóng BH → 10%
+        taxable_income = max(gross_income_for_tax, Decimal('0'))
+        pit_amount = taxable_income * Decimal('0.10')
+        personal_deduction_applied = Decimal('0')
+        dependent_deduction_applied = Decimal('0')
+        tax_method = 'FLAT_10_MIXED_LT14'
+    elif is_non_official_contract and not has_mandatory_insurance:
+        # Hợp đồng không chính thức, không đóng BH → 10%
+        taxable_income = max(gross_income_for_tax, Decimal('0'))
+        pit_amount = taxable_income * Decimal('0.10')
+        personal_deduction_applied = Decimal('0')
+        dependent_deduction_applied = Decimal('0')
+        tax_method = 'FLAT_10_NON_OFFICIAL'
+    else:
+        taxable_income = max(
+            gross_income_for_tax
+            - insurance_deduction_for_tax
+            - personal_deduction
+            - (dependent_deduction_per_person * Decimal(dependent_count)),
+            Decimal('0'),
+        )
+        pit_amount = _compute_progressive_tax_with_default(taxable_income, year, tax_cfg)
+        personal_deduction_applied = personal_deduction
+        dependent_deduction_applied = dependent_deduction_per_person * Decimal(dependent_count)
+        tax_method = 'PROGRESSIVE'
+
+    salary_income_for_net = taxable_basic_income
+    net_salary = salary_income_for_net + total_allowance + sales_commission + other_fixed_income - total_penalty - advance_amount - bh_deduction
+    con_phai_thanh_toan = net_salary - pit_amount
+
+    return {
+        "employee_id": employee.id,
+        "ma_nv": employee.employee_id,
+        "ho_va_ten": employee.full_name,
+        "phong_ban": employee.department.name if employee.department else None,
+        "phap_nhan_con": employee.subsidiary_legal_entity,
+        "vi_tri": employee.position.title if employee.position else None,
+        "luong_co_ban": float(basic_salary),
+        "phu_cap": float(total_allowance),
+        "luong_doanh_so": float(sales_commission),
+        "thu_nhap_khac": float(other_fixed_income),
+        "ngay_cong": float(actual_work_days),
+        "cong_thu_viec": float(probation_work_days),
+        # Công tính lương: đã gồm công lễ theo ranh giới thử việc.
+        "cong_chinh_thuc": float(official_work_days),
+        "probation_rate_percent": float(probation_rate_percent),
+        "luong_ngay_cong_thu_viec": float(probation_workday_salary),
+        "luong_ngay_cong_chinh_thuc": float(official_workday_salary),
+        "luong_ngay_cong": float(taxable_basic_income),
+        "tang_ca": float(_to_decimal(rec.tang_ca if rec else 0)),
+        "truc_toi": float(_to_decimal(rec.truc_toi if rec else 0)),
+        "lam_them_gio": float(_to_decimal(rec.lam_them_gio if rec else 0)),
+        "phu_cap_gui_xe": float(parking_allowance),
+        "phu_cap_khac": float(other_allowance),
+        "phu_cap_livestream": float(livestream_allowance),
+        "so_phien_livestream": livestream_sessions,
+        "muc_phu_cap_moi_phien_livestream": float(livestream_amount_per_session),
+        "tong_cong": float(_to_decimal(rec.tong_cong if rec else 0)),
+        "cong_chuan": float(standard_work_days),
+        "tong_phat": float(attendance_penalty),
+        "tong_phat_bienban": float(bien_ban_penalty),
+        "bh_deduction": float(bh_deduction),
+        "muc_luong_dong_bh": float(ins_base),
+        "luong_tang_ca": float(ot_pay),
+        "so_gio_tang_ca": float(tang_ca_hours),
+        "contract_type": employee.contract_type,
+        "contract_status": contract_status,
+        "phu_cap_an_trua": float(lunch_allowance),
+        "tong_thu_nhap_chiu_thue": float(gross_income_for_tax),
+        "thue_tncn": float(pit_amount),
+        "tax_method": tax_method,
+        "so_nguoi_phu_thuoc": dependent_count,
+        "thu_nhap_tinh_thue": float(taxable_income),
+        "giam_tru_ban_than": float(personal_deduction_applied),
+        "giam_tru_nguoi_phu_thuoc": float(dependent_deduction_applied),
+        "bao_hiem_bat_buoc": float(insurance_deduction_for_tax),
+        "cong_doan": float(union_fee),
+        "tam_ung": float(advance_amount),
+        "luong_thuc_linh": float(net_salary),
+        "con_phai_thanh_toan": float(con_phai_thanh_toan),
+        "year": year,
+        "month": month,
+    }
+
+
+def get_salary_rows(year: int, month: int, department_id=None, legal_entity: str = '', employee_code=None) -> dict:
+    """Bảng lương tháng — đúng dữ liệu GET /hrm/salary/department/ trả về."""
+    legal_entity = (legal_entity or '').strip()
+    employees = resolve_salary_employees(year, month, department_id, legal_entity, employee_code)
+    department_name = None
+    if employees and department_id:
+        dept = Department.objects.filter(id=department_id).first()
+        department_name = dept.name if dept else None
+    results = []
+    if employees:
+        ctx = build_salary_context(employees, year, month)
+        results = [build_salary_row(employee, ctx) for employee in employees]
+    return {
+        "year": year,
+        "month": month,
+        "department_id": int(department_id) if department_id else None,
+        "legal_entity": legal_entity or None,
+        "department_name": department_name,
+        "total": len(results),
+        "results": results,
+    }
+
+
 class SalaryDepartmentView(APIView):
     """
     GET /hrm/salary/department/
@@ -1410,10 +1737,8 @@ class SalaryDepartmentView(APIView):
       - year (required)
       - month (required)
       - department_id (optional)
-            - legal_entity (optional)
+      - legal_entity (optional)
       - employee_code (optional)
-
-
     """
 
     permission_classes = [IsAuthenticated]
@@ -1425,332 +1750,22 @@ class SalaryDepartmentView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        year = request.query_params.get("year")
-        month = request.query_params.get("month")
-        department_id = request.query_params.get("department_id")
-        legal_entity = (request.query_params.get("legal_entity") or "").strip()
-        employee_code = request.query_params.get("employee_code")
-
         try:
-            year = int(year)
-            month = int(month)
+            year = int(request.query_params.get("year"))
+            month = int(request.query_params.get("month"))
         except (TypeError, ValueError):
             return Response(
                 {"error": "year và month là bắt buộc và phải là số nguyên"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        employees_qs = Employee.objects.select_related("department", "position").filter(is_active=True).filter(_active_in_month_q(year, month))
-        if department_id:
-            employees_qs = employees_qs.filter(department_id=department_id)
-        if legal_entity:
-            employees_qs = employees_qs.filter(subsidiary_legal_entity=legal_entity)
-        if employee_code:
-            from django.db.models import Q
-            employees_qs = employees_qs.filter(
-                Q(employee_id__icontains=employee_code) | Q(full_name__icontains=employee_code)
-            )
-        employees = list(employees_qs.order_by("employee_id"))
-
-        if not employees:
-            return Response(
-                {
-                    "year": year,
-                    "month": month,
-                    "department_id": int(department_id) if department_id else None,
-                    "legal_entity": legal_entity or None,
-                    "department_name": None,
-                    "total": 0,
-                    "results": [],
-                }
-            )
-
-        employee_ids = [e.id for e in employees]
-
-        records_map = {
-            rec.employee_id: rec
-            for rec in WorkFinalization.objects.filter(
-                year=year,
-                month=month,
-                employee_id__in=employee_ids,
-            )
-        }
-
-        salary_records_map = {
-            sr.employee_id: sr
-            for sr in MonthlySalaryRecord.objects.filter(
-                year=year,
-                month=month,
-                employee_id__in=employee_ids,
-            )
-        }
-
-        _, _last_day = cal_module.monthrange(year, month)
-        dependent_records_map = _get_dependent_record_counts(
-            employee_ids, _dt.date(year, month, 1), _dt.date(year, month, _last_day)
-        )
-
-        department_name = None
-        if department_id:
-            dept = Department.objects.filter(id=department_id).first()
-            department_name = dept.name if dept else None
-
-        # Batch load DisciplinaryPenalty sums per employee for this period
-        penalty_sums = (
-            DisciplinaryPenalty.objects
-            .filter(employee_id__in=employee_ids, year=year, month=month)
-            .values('employee_id')
-            .annotate(total=Sum('amount'))
-        )
-        bien_ban_penalty_map = {row['employee_id']: _to_decimal(row['total']) for row in penalty_sums}
-
-        commission_sums = (
-            SalesCommission.objects
-            .filter(employee_id__in=employee_ids, year=year, month=month)
-            .values('employee_id')
-            .annotate(total=Sum('amount'))
-        )
-        sales_commission_map = {row['employee_id']: _to_decimal(row['total']) for row in commission_sums}
-
-        # BH/CĐ rates (employee share)
-        BHXH_RATE = Decimal('0.08')
-        BHYT_RATE = Decimal('0.015')
-        BHTN_RATE = Decimal('0.01')
-        CD_RATE   = Decimal('0.01')
-        INSURANCE_RATE = BHXH_RATE + BHYT_RATE + BHTN_RATE  # 0.105
-        BH_TOTAL_RATE = BHXH_RATE + BHYT_RATE + BHTN_RATE + CD_RATE  # 0.105
-
-        _, days_in_month = cal_module.monthrange(year, month)
-        calc_date = _dt.date(year, month, days_in_month)
-        standard_work_days = _get_salary_standard_work_days(year, month)
-        tax_cfg = TaxBracketConfig.get_for_date(calc_date) or TaxBracketConfig.get_active()
-        default_personal_deduction = Decimal('15500000') if year >= 2026 else Decimal('11000000')
-        default_dependent_deduction = Decimal('6200000') if year >= 2026 else Decimal('4400000')
-        personal_deduction = (tax_cfg.personal_deduction if tax_cfg else default_personal_deduction)
-        dependent_deduction_per_person = (tax_cfg.dependent_deduction if tax_cfg else default_dependent_deduction)
-
-        results = []
-        for employee in employees:
-            rec = records_map.get(employee.id)
-            sr = salary_records_map.get(employee.id)
-            contract_type = (employee.contract_type or "").upper()
-            is_non_official_contract = contract_type in NON_OFFICIAL_CONTRACT_TYPES
-            contract_status = "THU_VIEC" if is_non_official_contract else "CHINH_THUC"
-
-            basic_salary, fixed_allowance = _get_salary_profile_for_month(employee, year, month)
-            actual_work_days = _to_decimal(rec.cong_thuc_te if rec else 0)
-            total_work_days = _to_decimal(rec.tong_cong if rec else 0)
-            holiday_probation_days, holiday_official_days = _holiday_credit_to_add(rec, employee)
-            probation_work_days = _to_decimal(rec.cong_thu_viec if rec else 0) + holiday_probation_days
-            official_work_days = _to_decimal(rec.cong_chinh_thuc if rec else 0) + holiday_official_days
-            has_probation_days = probation_work_days > Decimal('0')
-            has_official_days = official_work_days > Decimal('0')
-            probation_only = has_probation_days and not has_official_days
-            mixed_probation_official = has_probation_days and has_official_days
-            mixed_official_days_eligible_progressive_tax = mixed_probation_official and official_work_days >= Decimal('14')
-            probation_rate_percent = _resolve_probation_rate_percent(employee)
-            probation_rate_multiplier = probation_rate_percent / Decimal('100')
-            base_day_salary = (basic_salary / standard_work_days) if standard_work_days > 0 else Decimal('0')
-            probation_workday_salary = base_day_salary * probation_work_days * probation_rate_multiplier
-            official_workday_salary = base_day_salary * official_work_days
-            split_workday_salary = probation_workday_salary + official_workday_salary
-            lunch_allowance = _calculate_lunch_allowance(employee, total_work_days, year, month)
-            stored_parking = _to_decimal(rec.phu_cap_gui_xe if rec else 0)
-            parking_override = _get_parking_allowance_override(employee, year, month)
-            parking_allowance = parking_override if parking_override is not None else _calculate_parking_allowance(employee, actual_work_days, stored_parking)
-
-            config_allowances = _resolve_config_allowances(employee)
-            responsibility_allowance = _calculate_responsibility_allowance(employee, total_work_days, year, month)
-            other_allowance = _get_other_allowance(employee, year, month)
-            other_fixed_income = _to_decimal(employee.other_fixed_monthly_income)
-            advance_amount = _get_advance(employee, year, month)
-            sales_commission = sales_commission_map.get(employee.id, Decimal('0'))
-            livestream_sessions = max(int(_to_decimal(rec.live if rec else 0)), 0)
-            livestream_allowance_config = _resolve_livestream_allowance_config(employee, calc_date)
-            livestream_amount_per_session = _to_decimal(
-                livestream_allowance_config.amount_per_session if livestream_allowance_config else 0
-            )
-            livestream_allowance = livestream_amount_per_session * Decimal(str(livestream_sessions))
-            total_allowance = (
-                fixed_allowance
-                + lunch_allowance
-                + parking_allowance
-                + config_allowances
-                + responsibility_allowance
-                + other_allowance
-                + livestream_allowance
-            )
-
-            attendance_penalty = _to_decimal(rec.tong_phat if rec else 0)
-            bien_ban_penalty = bien_ban_penalty_map.get(employee.id, Decimal('0'))
-            total_penalty = attendance_penalty + bien_ban_penalty
-
-            # Lương tăng ca: ưu tiên từ salary record đã tính, fallback tính từ OT rate config
-            ot_pay = Decimal('0')
-            if sr and sr.components_detail:
-                ot_component = sr.components_detail.get('OT_PAY', {})
-                ot_pay = _to_decimal(ot_component.get('amount', 0))
-
-            tang_ca_hours = _to_decimal(rec.tang_ca if rec else 0)
-            if ot_pay == Decimal('0') and tang_ca_hours > 0:
-                _, std_days = cal_module.monthrange(year, month)
-                sundays = sum(1 for d in range(1, std_days + 1) if cal_module.weekday(year, month, d) == 6)
-                standard_work_days_f = float(max(std_days - sundays - 1, 1))
-                ot_rate = OvertimeRateConfig.get_for_employee(
-                    employee, calc_date,
-                    basic_salary=float(basic_salary),
-                    standard_work_days=standard_work_days_f,
-                )
-                ot_pay = _to_decimal(round(float(tang_ca_hours) * ot_rate, 2))
-
-            # Compute insurance base salary from Employee field (Mức đóng BHXH)
-            ins_base = max(_to_decimal(employee.social_insurance_contribution_level), Decimal('0'))
-
-            adjustments = _as_dict(employee.salary_adjustments)
-            tax_policy = _as_dict(_as_dict(adjustments.get('payroll_config')).get('taxPolicy'))
-            if probation_only:
-                ins_base = Decimal('0')
-                bh_deduction = Decimal('0')
-            elif is_non_official_contract and not mixed_probation_official:
-                ins_base = Decimal('0')
-                bh_deduction = Decimal('0')
-            else:
-                bh_deduction = ins_base * BH_TOTAL_RATE
-
-            if employee.id in dependent_records_map:
-                dependent_count = dependent_records_map[employee.id]
-            else:
-                dependent_count = max(int(_to_decimal(tax_policy.get('dependentCount'), Decimal('0'))), 0)
-            deductions_config = _as_dict(_as_dict(adjustments.get('payroll_config')).get('deductions'))
-            union_fee = _to_decimal(deductions_config.get('unionFee'), Decimal('0'))
-            insurance_deduction_for_tax = Decimal('0') if (probation_only or (is_non_official_contract and not mixed_probation_official)) else (ins_base * INSURANCE_RATE)
-            taxable_allowance = max(total_allowance - lunch_allowance, Decimal('0'))
-            actual_total_days = _to_decimal(rec.tong_cong if rec else 0)
-            if has_probation_days:
-                taxable_basic_income = split_workday_salary
-            else:
-                taxable_basic_income = (
-                    (basic_salary / standard_work_days) * actual_total_days
-                    if actual_total_days > 0
-                    else Decimal('0')
-                )
-            gross_income_for_tax = (
-                taxable_basic_income
-                + taxable_allowance
-                + sales_commission
-                + other_fixed_income
-                + _to_decimal(rec.truc_toi if rec else 0)
-                + ot_pay
-            )
-            # Nếu đã đóng BHXH/BHYT/BHTN thì phải tính thuế luỹ tiến;
-            # không được vừa trừ bảo hiểm vừa khấu trừ thêm 10% flat.
-            has_mandatory_insurance = insurance_deduction_for_tax > Decimal('0')
-
-            if probation_only:
-                # Thử việc thuần tuý: không đóng BH → áp 10%
-                taxable_income = max(gross_income_for_tax, Decimal('0'))
-                pit_amount = taxable_income * Decimal('0.10')
-                personal_deduction_applied = Decimal('0')
-                dependent_deduction_applied = Decimal('0')
-                tax_method = 'FLAT_10_PROBATION'
-            elif mixed_probation_official and not mixed_official_days_eligible_progressive_tax and not has_mandatory_insurance:
-                # Có cả công TV + CT, CT < 14 ngày, nhưng KHÔNG đóng BH → 10%
-                taxable_income = max(gross_income_for_tax, Decimal('0'))
-                pit_amount = taxable_income * Decimal('0.10')
-                personal_deduction_applied = Decimal('0')
-                dependent_deduction_applied = Decimal('0')
-                tax_method = 'FLAT_10_MIXED_LT14'
-            elif is_non_official_contract and not has_mandatory_insurance:
-                # Hợp đồng không chính thức, không đóng BH → 10%
-                taxable_income = max(gross_income_for_tax, Decimal('0'))
-                pit_amount = taxable_income * Decimal('0.10')
-                personal_deduction_applied = Decimal('0')
-                dependent_deduction_applied = Decimal('0')
-                tax_method = 'FLAT_10_NON_OFFICIAL'
-            else:
-                taxable_income = max(
-                    gross_income_for_tax
-                    - insurance_deduction_for_tax
-                    - personal_deduction
-                    - (dependent_deduction_per_person * Decimal(dependent_count)),
-                    Decimal('0'),
-                )
-                pit_amount = _compute_progressive_tax_with_default(taxable_income, year, tax_cfg)
-                personal_deduction_applied = personal_deduction
-                dependent_deduction_applied = dependent_deduction_per_person * Decimal(dependent_count)
-                tax_method = 'PROGRESSIVE'
-
-            salary_income_for_net = taxable_basic_income
-            net_salary = salary_income_for_net + total_allowance + sales_commission + other_fixed_income - total_penalty - advance_amount - bh_deduction
-            con_phai_thanh_toan = net_salary - pit_amount
-
-            results.append(
-                {
-                    "employee_id": employee.id,
-                    "ma_nv": employee.employee_id,
-                    "ho_va_ten": employee.full_name,
-                    "phong_ban": employee.department.name if employee.department else None,
-                    "phap_nhan_con": employee.subsidiary_legal_entity,
-                    "vi_tri": employee.position.title if employee.position else None,
-                    "luong_co_ban": float(basic_salary),
-                    "phu_cap": float(total_allowance),
-                    "luong_doanh_so": float(sales_commission),
-                    "thu_nhap_khac": float(other_fixed_income),
-                    "ngay_cong": float(actual_work_days),
-                    "cong_thu_viec": float(probation_work_days),
-                    # Công tính lương: đã gồm công lễ theo ranh giới thử việc.
-                    "cong_chinh_thuc": float(official_work_days),
-                    "probation_rate_percent": float(probation_rate_percent),
-                    "luong_ngay_cong_thu_viec": float(probation_workday_salary),
-                    "luong_ngay_cong_chinh_thuc": float(official_workday_salary),
-                    "luong_ngay_cong": float(taxable_basic_income),
-                    "tang_ca": float(_to_decimal(rec.tang_ca if rec else 0)),
-                    "truc_toi": float(_to_decimal(rec.truc_toi if rec else 0)),
-                    "lam_them_gio": float(_to_decimal(rec.lam_them_gio if rec else 0)),
-                    "phu_cap_gui_xe": float(parking_allowance),
-                    "phu_cap_khac": float(other_allowance),
-                    "phu_cap_livestream": float(livestream_allowance),
-                    "so_phien_livestream": livestream_sessions,
-                    "muc_phu_cap_moi_phien_livestream": float(livestream_amount_per_session),
-                    "tong_cong": float(_to_decimal(rec.tong_cong if rec else 0)),
-                    "cong_chuan": float(standard_work_days),
-                    "tong_phat": float(attendance_penalty),
-                    "tong_phat_bienban": float(bien_ban_penalty),
-                    "bh_deduction": float(bh_deduction),
-                    "muc_luong_dong_bh": float(ins_base),
-                    "luong_tang_ca": float(ot_pay),
-                    "so_gio_tang_ca": float(tang_ca_hours),
-                    "contract_type": employee.contract_type,
-                    "contract_status": contract_status,
-                    "phu_cap_an_trua": float(lunch_allowance),
-                    "tong_thu_nhap_chiu_thue": float(gross_income_for_tax),
-                    "thue_tncn": float(pit_amount),
-                    "tax_method": tax_method,
-                    "so_nguoi_phu_thuoc": dependent_count,
-                    "thu_nhap_tinh_thue": float(taxable_income),
-                    "giam_tru_ban_than": float(personal_deduction_applied),
-                    "giam_tru_nguoi_phu_thuoc": float(dependent_deduction_applied),
-                    "bao_hiem_bat_buoc": float(insurance_deduction_for_tax),
-                    "cong_doan": float(union_fee),
-                    "tam_ung": float(advance_amount),
-                    "luong_thuc_linh": float(net_salary),
-                    "con_phai_thanh_toan": float(con_phai_thanh_toan),
-                    "year": year,
-                    "month": month,
-                }
-            )
-
-        return Response(
-            {
-                "year": year,
-                "month": month,
-                "department_id": int(department_id) if department_id else None,
-                "legal_entity": legal_entity or None,
-                "department_name": department_name,
-                "total": len(results),
-                "results": results,
-            }
-        )
+        return Response(get_salary_rows(
+            year,
+            month,
+            department_id=request.query_params.get("department_id"),
+            legal_entity=request.query_params.get("legal_entity") or "",
+            employee_code=request.query_params.get("employee_code"),
+        ))
 
 
 # ---------------------------------------------------------------------------
