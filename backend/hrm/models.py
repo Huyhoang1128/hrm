@@ -3812,6 +3812,13 @@ CONTRACT_TYPE = [
     ('NURSING_COMMITMENT', 'Cam kết của CBNV Điều dưỡng'),
 ]
 
+# Loại của template / hợp đồng đã tạo: thêm Phụ lục hợp đồng. Không thêm vào
+# CONTRACT_TYPE vì danh sách đó còn là loại HĐ của onboarding / hồ sơ nhân viên —
+# nhân viên không có "loại HĐ = phụ lục".
+CONTRACT_DOCUMENT_TYPE = CONTRACT_TYPE + [
+    ('APPENDIX', 'Phụ lục hợp đồng'),
+]
+
 
 class OnboardingProcess(models.Model):
     """Quy trình onboarding cho nhân viên mới"""
@@ -5284,7 +5291,7 @@ class ContractTemplate(models.Model):
     ]
     
     name = models.CharField(max_length=255, verbose_name="Tên template")
-    contract_type = models.CharField(max_length=20, choices=CONTRACT_TYPE, verbose_name="Loại hợp đồng")
+    contract_type = models.CharField(max_length=20, choices=CONTRACT_DOCUMENT_TYPE, verbose_name="Loại hợp đồng")
     file = models.FileField(upload_to=contract_template_upload_path, verbose_name="File template (docx)")
     description = models.TextField(blank=True, verbose_name="Mô tả")
     status = models.CharField(max_length=20, choices=CONTRACT_STATUS, default='ACTIVE')
@@ -5345,7 +5352,7 @@ class EmployeeContract(models.Model):
         ContractTemplate, on_delete=models.SET_NULL, null=True, blank=True,
         verbose_name="Template sử dụng"
     )
-    contract_type = models.CharField(max_length=20, choices=CONTRACT_TYPE, verbose_name="Loại hợp đồng")
+    contract_type = models.CharField(max_length=20, choices=CONTRACT_DOCUMENT_TYPE, verbose_name="Loại hợp đồng")
     status = models.CharField(max_length=20, choices=CONTRACT_STATUS, default='DRAFT')
     
     # Files
