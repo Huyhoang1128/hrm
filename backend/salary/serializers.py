@@ -4,7 +4,7 @@ salary/serializers.py – DRF serializers cho Payroll module.
 from rest_framework import serializers
 
 from .models import MonthlySalaryRecord, SalaryComponent, SalaryFormula, SalaryComponentOverride
-from .salary_data_models import EmployeeSalaryHistory, EmployeeKPIRecord, TaxBracketConfig, TaxBracket, DisciplinaryPenalty, SalesCommission, OvertimeRateConfig, SalaryAdvance, OtherAllowance, ParkingAllowanceOverride, EmployeeMonthlySalaryInput
+from .salary_data_models import EmployeeSalaryHistory, EmployeeKPIRecord, TaxBracketConfig, TaxBracket, DisciplinaryPenalty, SalesCommission, OvertimeRateConfig, SalaryAdvance, OtherAllowance, ParkingAllowanceOverride, LunchAllowanceOverride, EmployeeMonthlySalaryInput
 from employee.models import Department, Position, Employee as EmployeeModel
 
 
@@ -322,6 +322,25 @@ class BulkImportParkingAllowanceSerializer(serializers.Serializer):
     year    = serializers.IntegerField(min_value=2000, max_value=2100)
     month   = serializers.IntegerField(min_value=1, max_value=12)
     records = serializers.ListField(child=BulkImportParkingAllowanceItemSerializer(), min_length=1)
+
+
+# ---------------------------------------------------------------------------
+# LunchAllowanceOverride (bulk-import dùng chung BulkImportParkingAllowanceSerializer
+# vì cùng dạng dữ liệu: year, month, records[employee_code, amount, notes])
+# ---------------------------------------------------------------------------
+
+class LunchAllowanceOverrideSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source='employee.full_name', read_only=True)
+    employee_code = serializers.CharField(source='employee.employee_id', read_only=True)
+
+    class Meta:
+        model = LunchAllowanceOverride
+        fields = [
+            'id', 'employee', 'employee_name', 'employee_code',
+            'year', 'month', 'amount', 'notes',
+            'created_by', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'employee_name', 'employee_code', 'created_at', 'updated_at']
 
 
 # ---------------------------------------------------------------------------

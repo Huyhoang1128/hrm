@@ -17,7 +17,7 @@ from hrm.models import MonthlyWorkCredit, CompanyAnnouncement
 from users.utils import get_user_role
 
 from .models import MonthlySalaryRecord, SalaryComponent, SalaryFormula, SalaryComponentOverride
-from .salary_data_models import EmployeeSalaryHistory, EmployeeKPIRecord, TaxBracketConfig, TaxBracket, DisciplinaryPenalty, SalesCommission, OvertimeRateConfig, SalaryAdvance, OtherAllowance, ParkingAllowanceOverride, EmployeeMonthlySalaryInput
+from .salary_data_models import EmployeeSalaryHistory, EmployeeKPIRecord, TaxBracketConfig, TaxBracket, DisciplinaryPenalty, SalesCommission, OvertimeRateConfig, SalaryAdvance, OtherAllowance, ParkingAllowanceOverride, LunchAllowanceOverride, EmployeeMonthlySalaryInput
 from .salary_engine import SalaryRuleEngine
 from .serializers import (
     ApproveSalarySerializer,
@@ -30,6 +30,7 @@ from .serializers import (
     BulkImportPenaltySerializer,
     OtherAllowanceSerializer,
     ParkingAllowanceOverrideSerializer,
+    LunchAllowanceOverrideSerializer,
     SalaryAdvanceSerializer,
     CalculateSalarySerializer,
     DisciplinaryPenaltySerializer,
@@ -50,6 +51,7 @@ from .serializers import (
     TaxBracketSerializer,
 )
 import logging
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -504,6 +506,10 @@ class ParkingAllowanceOverridePermission(BasePermission):
         except Employee.DoesNotExist:
             return False
         return bool(employee.is_hr)
+
+
+class LunchAllowanceOverridePermission(ParkingAllowanceOverridePermission):
+    """Truy cập Phụ cấp ăn trưa (LunchAllowanceOverride): cùng quy tắc với phụ cấp gửi xe."""
 
 
 class SalaryPenaltyPermission(BasePermission):
@@ -1230,19 +1236,14 @@ class OtherAllowanceViewSet(viewsets.ModelViewSet):
 # ParkingAllowanceOverride ViewSet
 # ---------------------------------------------------------------------------
 
-class ParkingAllowanceOverrideViewSet(viewsets.ModelViewSet):
+class _AllowanceOverrideViewSetBase(viewsets.ModelViewSet):
     """
-    CRUD cho phụ cấp gửi xe nhập tay (ParkingAllowanceOverride).
-    Khi tồn tại bản ghi cho (employee, year, month), giá trị này luôn được
-    ưu tiên dùng thay cho kết quả tính theo parkingAllowancePolicy khi chốt
-    lương (xem hrm/finalization_views.py::_get_parking_allowance_override).
-    Hỗ trợ filter: ?year=<y>&month=<m>&employee=<id>
+    Phần dùng chung của các bảng phụ cấp nhập tay theo kỳ (gửi xe, ăn trưa):
+    filter ?year=&month=&employee=, import hàng loạt từ Excel và tạo bản ghi
+    cho những nhân viên đang hoạt động chưa có trong kỳ.
     """
-    queryset = ParkingAllowanceOverride.objects.select_related('employee').order_by(
-        '-year', '-month', 'employee__full_name'
-    )
-    serializer_class = ParkingAllowanceOverrideSerializer
-    permission_classes = [IsAuthenticated, ParkingAllowanceOverridePermission]
+    override_model = None
+    label = ''
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -1257,7 +1258,7 @@ class ParkingAllowanceOverrideViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], url_path='bulk-import')
     def bulk_import(self, request):
-        """Import hàng loạt phụ cấp gửi xe (đã tính sẵn) từ Excel (update_or_create)."""
+        """Import hàng loạt phụ cấp (đã tính sẵn) từ Excel (update_or_create)."""
         ser = BulkImportParkingAllowanceSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         data = ser.validated_data
@@ -1272,7 +1273,7 @@ class ParkingAllowanceOverrideViewSet(viewsets.ModelViewSet):
                 results['errors'].append({'employee_code': code, 'error': f"Không tìm thấy nhân viên '{code}'."})
                 continue
             try:
-                obj, created = ParkingAllowanceOverride.objects.update_or_create(
+                obj, created = self.override_model.objects.update_or_create(
                     employee=emp, year=year, month=month,
                     defaults={'amount': row['amount'], 'notes': row.get('notes', '')},
                 )
@@ -1286,6 +1287,109 @@ class ParkingAllowanceOverrideViewSet(viewsets.ModelViewSet):
             except Exception as exc:
                 results['errors'].append({'employee_code': code, 'error': str(exc)})
         return Response(results, status=status.HTTP_200_OK)
+
+    def _create_missing_for_period(self, request, amount_for, notes):
+        """
+        Tạo bản ghi cho TẤT CẢ nhân viên đang hoạt động CHƯA có bản ghi ở kỳ
+        (year, month) trong request. `amount_for(employees, year, month)` trả về
+        dict {employee_id: số tiền}. KHÔNG đụng tới các bản ghi đã tồn tại
+        (kể cả đã sửa tay từ trước).
+        """
+        try:
+            year, month = int(request.data.get('year')), int(request.data.get('month'))
+        except (TypeError, ValueError):
+            return Response({'detail': 'Thiếu hoặc sai định dạng year/month.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not (2000 <= year <= 2100 and 1 <= month <= 12):
+            return Response({'detail': 'Thiếu hoặc sai định dạng year/month.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        created_by = Employee.objects.filter(user=request.user).only('id').first()
+        existing_employee_ids = set(
+            self.override_model.objects.filter(year=year, month=month).values_list('employee_id', flat=True)
+        )
+        remaining = list(Employee.objects.filter(is_active=True).exclude(id__in=existing_employee_ids))
+        amounts = amount_for(remaining, year, month)
+
+        created_count = 0
+        errors = []
+        for emp in remaining:
+            try:
+                _, created = self.override_model.objects.get_or_create(
+                    employee=emp, year=year, month=month,
+                    defaults={'amount': amounts.get(emp.id, Decimal('0')), 'notes': notes, 'created_by': created_by},
+                )
+                created_count += int(created)
+            except Exception as exc:
+                errors.append({'employee_code': emp.employee_id, 'error': str(exc)})
+
+        return Response({
+            'created_count': created_count,
+            'skipped_existing_count': len(existing_employee_ids),
+            'errors': errors,
+        }, status=status.HTTP_200_OK)
+
+
+class ParkingAllowanceOverrideViewSet(_AllowanceOverrideViewSetBase):
+    """
+    CRUD cho phụ cấp gửi xe nhập tay (ParkingAllowanceOverride).
+    Khi tồn tại bản ghi cho (employee, year, month), giá trị này luôn được
+    ưu tiên dùng thay cho kết quả tính theo parkingAllowancePolicy khi chốt
+    lương (xem hrm/finalization_views.py::_get_parking_allowance_override).
+    Hỗ trợ filter: ?year=<y>&month=<m>&employee=<id>
+    """
+    queryset = ParkingAllowanceOverride.objects.select_related('employee').order_by(
+        '-year', '-month', 'employee__full_name'
+    )
+    serializer_class = ParkingAllowanceOverrideSerializer
+    permission_classes = [IsAuthenticated, ParkingAllowanceOverridePermission]
+    override_model = ParkingAllowanceOverride
+
+    @action(detail=False, methods=['post'], url_path='fill-remaining-zero')
+    def fill_remaining_zero(self, request):
+        """
+        Đặt phụ cấp gửi xe = 0 cho mọi nhân viên đang hoạt động chưa có bản ghi
+        ở kỳ — dùng khi HR đã import xong danh sách người ĐƯỢC phụ cấp và muốn
+        những người còn lại về 0 mà không phải gõ tay từng người vào file Excel.
+        """
+        return self._create_missing_for_period(
+            request, lambda employees, year, month: {}, 'Tự động: không có trong danh sách import',
+        )
+
+
+class LunchAllowanceOverrideViewSet(_AllowanceOverrideViewSetBase):
+    """
+    CRUD cho phụ cấp ăn trưa nhập tay (LunchAllowanceOverride).
+    Khi tồn tại bản ghi cho (employee, year, month), giá trị này luôn được
+    ưu tiên dùng thay cho kết quả tính theo lunchAllowancePolicy khi tính
+    lương (xem hrm/finalization_views.py::_calculate_lunch_allowance).
+    Hỗ trợ filter: ?year=<y>&month=<m>&employee=<id>
+    """
+    queryset = LunchAllowanceOverride.objects.select_related('employee').order_by(
+        '-year', '-month', 'employee__full_name'
+    )
+    serializer_class = LunchAllowanceOverrideSerializer
+    permission_classes = [IsAuthenticated, LunchAllowanceOverridePermission]
+    override_model = LunchAllowanceOverride
+
+    @action(detail=False, methods=['post'], url_path='sync-current')
+    def sync_current(self, request):
+        """
+        Tạo bản ghi = giá trị đang được TÍNH TỰ ĐỘNG (lunchAllowancePolicy của
+        từng nhân viên + tổng công đã chốt của kỳ) cho mọi nhân viên đang hoạt
+        động chưa có bản ghi — làm điểm khởi đầu để HR rà soát/sửa tay sau.
+        """
+        from hrm.finalization_views import _calculate_lunch_allowance
+        from hrm.models import WorkFinalization
+
+        def amount_for(employees, year, month):
+            work_days = dict(WorkFinalization.objects.filter(
+                year=year, month=month, employee_id__in=[e.id for e in employees],
+            ).values_list('employee_id', 'tong_cong'))
+            return {
+                emp.id: _calculate_lunch_allowance(emp, Decimal(str(work_days.get(emp.id) or 0)), year, month)
+                for emp in employees
+            }
+
+        return self._create_missing_for_period(request, amount_for, 'Tự động: đồng bộ từ tính toán hiện tại')
 
 
 # ---------------------------------------------------------------------------
