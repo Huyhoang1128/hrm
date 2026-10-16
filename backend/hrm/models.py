@@ -4752,8 +4752,22 @@ class WorkFinalization(models.Model):
     # ---- Dữ liệu gốc từ replay_month (để tra cứu) ----
     raw_state = models.JSONField(default=dict, blank=True, verbose_name="Raw state từ rule engine")
 
+    # ---- Khoá số công đã thống nhất bằng tay ----
+    # Máy tính công mặc định cho đủ công khi nhân viên không có bản ghi chấm công
+    # nào, nên số công HCNS sửa tay sẽ bị "Chốt công tất cả" ghi đè lại. Khoá bản
+    # ghi để mọi đường tính lại (1 người / phòng ban / toàn công ty) bỏ qua nó.
+    is_locked = models.BooleanField(
+        default=False, verbose_name="Đã khoá số công",
+        help_text="Đã khoá thì các thao tác chốt công lại sẽ bỏ qua bản ghi này",
+    )
+    lock_note = models.TextField(blank=True, default='', verbose_name="Lý do khoá")
+    locked_by = models.ForeignKey(
+        Employee, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='locked_work_finalizations', verbose_name="Người khoá",
+    )
+    locked_at = models.DateTimeField(null=True, blank=True, verbose_name="Thời điểm khoá")
+
     # ---- Thông tin hệ thống ----
-    # is_locked = models.BooleanField(default=False, verbose_name="Đã khóa dữ liệu", help_text="Dữ liệu sẽ không được tính toán lại nếu đã khóa")
     finalized_at = models.DateTimeField(auto_now=True, verbose_name="Thời điểm chốt công")
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -4765,7 +4779,7 @@ class WorkFinalization(models.Model):
         indexes = [
             models.Index(fields=['employee', 'year', 'month']),
             models.Index(fields=['year', 'month']),
-            # models.Index(fields=['is_locked']),
+            models.Index(fields=['year', 'month', 'is_locked']),
         ]
 
     def __str__(self):

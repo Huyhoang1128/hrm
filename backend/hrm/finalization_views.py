@@ -36,6 +36,7 @@ from salary.salary_data_models import (
     TaxBracketConfig,
     SalesCommission,
 )
+from django.utils import timezone
 
 
 MAX_LUNCH_ALLOWANCE_CAP = Decimal("500000")
@@ -666,6 +667,25 @@ def _get_disciplinary_penalty(employee_id: int, year: int, month: int) -> float:
         return 0.0
 
 
+def locked_finalizations(year: int, month: int, employees=None) -> dict:
+    """Map employee_id -> WorkFinalization đã khoá của tháng (nạp 1 lượt, không query trong vòng lặp)."""
+    qs = WorkFinalization.objects.filter(year=year, month=month, is_locked=True)
+    if employees is not None:
+        qs = qs.filter(employee__in=employees)
+    return {rec.employee_id: rec for rec in qs}
+
+
+def _skipped_locked_result(employee: Employee, rec: WorkFinalization) -> dict:
+    """Một dòng kết quả cho nhân viên bị bỏ qua vì đã khoá số công."""
+    return {
+        "employee_code": employee.employee_id,
+        "ho_va_ten": employee.full_name,
+        "status": "SKIPPED_LOCKED",
+        "lock_note": rec.lock_note,
+        "tong_cong": rec.tong_cong,
+    }
+
+
 def _serialize_record(rec: WorkFinalization, stt: int = None) -> dict:
     """Convert a WorkFinalization instance to the API response dict."""
     giam_tru_khac = _get_disciplinary_penalty(rec.employee_id, rec.year, rec.month)
@@ -718,6 +738,10 @@ def _serialize_record(rec: WorkFinalization, stt: int = None) -> dict:
         "year": rec.year,
         "month": rec.month,
         "finalized_at": rec.finalized_at,
+        "is_locked": rec.is_locked,
+        "lock_note": rec.lock_note,
+        "locked_at": rec.locked_at,
+        "locked_by": rec.locked_by.full_name if rec.locked_by_id else None,
         "daily_summary": daily_summary,
     }
     if stt is not None:
@@ -830,13 +854,20 @@ class FinalizeAttendanceView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # ---- Check if locked (Commented) ----
-        # existing_record = WorkFinalization.objects.filter(employee=employee, year=year, month=month).first()
-        # if existing_record and existing_record.is_locked:
-        #     return Response(
-        #         {"error": "Dữ liệu chốt công của nhân viên này đã được Quản lý duyệt và khóa, không thể tính toán lại."},
-        #         status=status.HTTP_403_FORBIDDEN,
-        #     )
+        # ---- Bỏ qua nếu số công tháng này đã được khoá bằng tay ----
+        existing_record = WorkFinalization.objects.filter(
+            employee=employee, year=year, month=month, is_locked=True
+        ).first()
+        if existing_record:
+            return Response(
+                {
+                    "message": "Số công tháng này đã được khoá, không tính lại.",
+                    "skipped_locked": True,
+                    "lock_note": existing_record.lock_note,
+                    "data": _serialize_record(existing_record),
+                },
+                status=status.HTTP_200_OK,
+            )
 
         # ---- Calculate using rule engine ----
         try:
@@ -916,20 +947,18 @@ class FinalizeAllAttendanceView(APIView):
             "department", "position"
         ).filter(is_active=True).filter(_active_in_month_q(year, month))
 
+        locked = locked_finalizations(year, month, employees)
+
         results = []
         errors = []
+        skipped = []
 
         for employee in employees:
             try:
-                # Check if locked (Commented)
-                # existing = WorkFinalization.objects.filter(employee=employee, year=year, month=month).first()
-                # if existing and existing.is_locked:
-                #     results.append({
-                #         "employee_code": employee.employee_id,
-                #         "ho_va_ten": employee.full_name,
-                #         "status": "SKIPPED_LOCKED"
-                #     })
-                #     continue
+                locked_rec = locked.get(employee.pk)
+                if locked_rec is not None:
+                    skipped.append(_skipped_locked_result(employee, locked_rec))
+                    continue
 
                 fields = _build_finalization_record(employee, year, month)
                 record, created = WorkFinalization.objects.update_or_create(
@@ -960,8 +989,10 @@ class FinalizeAllAttendanceView(APIView):
                 "month": month,
                 "total_processed": len(results),
                 "total_errors": len(errors),
+                "total_skipped_locked": len(skipped),
                 "results": results,
                 "errors": errors,
+                "skipped_locked": skipped,
             },
             status=status.HTTP_200_OK,
         )
@@ -1041,20 +1072,18 @@ class FinalizeDepartmentAttendanceView(APIView):
             "department", "position"
         ).filter(is_active=True, department=department).filter(_active_in_month_q(year, month))
 
+        locked = locked_finalizations(year, month, employees)
+
         results = []
         errors = []
+        skipped = []
 
         for employee in employees:
             try:
-                # Check if locked (Commented)
-                # existing = WorkFinalization.objects.filter(employee=employee, year=year, month=month).first()
-                # if existing and existing.is_locked:
-                #     results.append({
-                #         "employee_code": employee.employee_id,
-                #         "ho_va_ten": employee.full_name,
-                #         "status": "SKIPPED_LOCKED"
-                #     })
-                #     continue
+                locked_rec = locked.get(employee.pk)
+                if locked_rec is not None:
+                    skipped.append(_skipped_locked_result(employee, locked_rec))
+                    continue
 
                 fields = _build_finalization_record(employee, year, month)
                 record, created = WorkFinalization.objects.update_or_create(
@@ -1088,8 +1117,10 @@ class FinalizeDepartmentAttendanceView(APIView):
                 "department_name": department.name,
                 "total_processed": len(results),
                 "total_errors": len(errors),
+                "total_skipped_locked": len(skipped),
                 "results": results,
                 "errors": errors,
+                "skipped_locked": skipped,
             },
             status=status.HTTP_200_OK,
         )
@@ -1125,6 +1156,28 @@ class WorkFinalizationListView(APIView):
                 {"error": "year và month là bắt buộc và phải là số nguyên"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        # records_only: chỉ các bản ghi ĐANG CÓ trong bảng chốt công của tháng (kể cả
+        # NV đã nghỉ) — dùng cho trang "Data chốt công" của HCNS/Admin.
+        if str(request.query_params.get("records_only", "")).lower() in {"1", "true", "yes"}:
+            if not _is_hr_or_admin(request):
+                return Response({"error": "Chỉ HCNS hoặc Admin được xem data chốt công."},
+                                status=status.HTTP_403_FORBIDDEN)
+            records_qs = WorkFinalization.objects.select_related(
+                "employee", "employee__department", "employee__position", "locked_by"
+            ).filter(year=year, month=month)
+            if department_id:
+                records_qs = records_qs.filter(employee__department_id=department_id)
+            if employee_code:
+                records_qs = records_qs.filter(employee_code__iexact=employee_code)
+            if search:
+                records_qs = records_qs.filter(
+                    Q(employee_code__icontains=search) | Q(ho_va_ten__icontains=search)
+                    | Q(employee__full_name__icontains=search)
+                )
+            records = list(records_qs.order_by("employee_code"))
+            results = [_serialize_record(rec, stt=idx + 1) for idx, rec in enumerate(records)]
+            return Response({"year": year, "month": month, "total": len(results), "results": results})
 
         # Lấy toàn bộ nhân sự active (không giới hạn số lượng)
         employees_qs = Employee.objects.select_related(
@@ -1206,9 +1259,10 @@ class WorkFinalizationListView(APIView):
 
 class WorkFinalizationDetailView(APIView):
     """
-    GET   /hrm/work-finalization/<employee_code>/<year>/<month>/
-    PATCH /hrm/work-finalization/<employee_code>/<year>/<month>/
-      Body (partial): { tong_cong, tang_ca, tong_phat, cong_thuc_te, ... }
+    GET    /hrm/work-finalization/<employee_code>/<year>/<month>/  — HR/Admin, chính NV đó hoặc QLTT
+    PATCH  /hrm/work-finalization/<employee_code>/<year>/<month>/  — HR/Admin
+      Body (partial): { tong_cong, tang_ca, tong_phat, cong_thuc_te, ..., is_locked, lock_note }
+    DELETE /hrm/work-finalization/<employee_code>/<year>/<month>/  — HR/Admin
     """
 
     permission_classes = [IsAuthenticated]
@@ -1230,9 +1284,18 @@ class WorkFinalizationDetailView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        if not _is_hr_or_admin(request):
+            viewer = getattr(request.user, 'employee', None)
+            if viewer is None or (record.employee_id != viewer.pk and record.employee.manager_id != viewer.pk):
+                return Response({"error": "Bạn không có quyền xem dữ liệu chốt công này."},
+                                status=status.HTTP_403_FORBIDDEN)
+
         return Response(_serialize_record(record))
 
     def patch(self, request, employee_code, year, month):
+        if not _is_hr_or_admin(request):
+            return Response({"error": "Chỉ HCNS hoặc Admin được sửa dữ liệu chốt công."},
+                            status=status.HTTP_403_FORBIDDEN)
         try:
             record = WorkFinalization.objects.get(
                 employee_code=employee_code, year=year, month=month
@@ -1259,9 +1322,29 @@ class WorkFinalizationDetailView(APIView):
                 setattr(record, field, request.data[field])
                 updated.append(field)
 
+        # Khoá/mở khoá đi kèm luôn trong cùng một lần PATCH: sửa công rồi khoá là
+        # một thao tác, tách ra hai request thì "chốt công tất cả" có thể chen vào
+        # giữa và ghi đè mất số vừa sửa.
+        if 'is_locked' in request.data:
+            want_lock = str(request.data['is_locked']).lower() in ('true', '1')
+            record.is_locked = want_lock
+            if want_lock:
+                record.lock_note = str(request.data.get('lock_note', '') or '')
+                record.locked_at = timezone.now()
+                record.locked_by = getattr(request.user, 'employee', None)
+            else:
+                record.lock_note = ''
+                record.locked_at = None
+                record.locked_by = None
+            updated += ['is_locked', 'lock_note', 'locked_at', 'locked_by']
+        elif 'lock_note' in request.data and record.is_locked:
+            record.lock_note = str(request.data['lock_note'] or '')
+            updated.append('lock_note')
+
         if not updated:
+            allowed = sorted(self._PATCHABLE_FIELDS | {'is_locked', 'lock_note'})
             return Response(
-                {"error": f"Không có trường hợp lệ. Cho phép: {sorted(self._PATCHABLE_FIELDS)}"},
+                {"error": f"Không có trường hợp lệ. Cho phép: {allowed}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -1270,6 +1353,18 @@ class WorkFinalizationDetailView(APIView):
             updated = sorted(set(updated) | credit_fields | {"raw_state"})
         record.save(update_fields=updated)
         return Response(_serialize_record(record))
+
+    def delete(self, request, employee_code, year, month):
+        if not _is_hr_or_admin(request):
+            return Response({"error": "Chỉ HCNS hoặc Admin được xoá dữ liệu chốt công."},
+                            status=status.HTTP_403_FORBIDDEN)
+        deleted, _ = WorkFinalization.objects.filter(
+            employee_code=employee_code, year=year, month=month
+        ).delete()
+        if not deleted:
+            return Response({"error": "Chưa có dữ liệu chốt công cho nhân viên và tháng này"},
+                            status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 def _get_dependent_record_counts(employee_ids, period_start, period_end) -> dict:

@@ -2689,14 +2689,14 @@ class WorkFinalizationAdmin(admin.ModelAdmin):
         'employee_code', 'ho_va_ten', 'phong_ban', 'vi_tri',
         'hinh_thuc_lam_viec', 'year', 'month',
         'cong_thu_viec', 'cong_chinh_thuc', 'tong_cong',
-        'tang_ca', 'truc_toi', 'tong_phat', 'finalized_at',
+        'tang_ca', 'truc_toi', 'tong_phat', 'is_locked', 'finalized_at',
     )
 
-    list_filter = ('year', 'month', 'hinh_thuc_lam_viec', 'on_off', 'trang_thai_lam_viec')
+    list_filter = ('year', 'month', 'is_locked', 'hinh_thuc_lam_viec', 'on_off', 'trang_thai_lam_viec')
     search_fields = ('employee_code', 'ho_va_ten', 'phong_ban', 'vi_tri', 'employee__employee_id')
     ordering = ('-year', '-month', 'employee_code')
     raw_id_fields = ('employee',)
-    readonly_fields = ('finalized_at', 'created_at')
+    readonly_fields = ('finalized_at', 'created_at', 'locked_at', 'locked_by')
 
     fieldsets = (
         ('Thông tin kỳ công', {
@@ -2717,6 +2717,9 @@ class WorkFinalizationAdmin(admin.ModelAdmin):
                 'tang_ca', 'lam_toi', 'truc_toi', 'lam_them_gio',
                 'live', 'phu_cap_gui_xe', 'nghi_phep_thang',
             ),
+        }),
+        ('Khoá số công', {
+            'fields': ('is_locked', 'lock_note', 'locked_by', 'locked_at'),
         }),
         ('Dữ liệu hệ thống', {
             'fields': ('raw_state', 'finalized_at', 'created_at'),

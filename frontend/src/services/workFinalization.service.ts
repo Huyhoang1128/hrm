@@ -13,6 +13,10 @@ export interface DailySummaryItem {
 export interface WorkFinalizationRecord {
   stt: number;
   id: number;
+  is_locked?: boolean;
+  lock_note?: string;
+  locked_at?: string | null;
+  locked_by?: string | null;
   employee_id: number;
   ma_nv: string;
   ho_va_ten: string;
@@ -61,6 +65,9 @@ export interface WorkFinalizationParams {
   month: number;
   employee_code?: string;
   department_id?: number;
+  search?: string;
+  /** Chỉ bản ghi đã có trong bảng chốt công (HCNS/Admin) */
+  records_only?: boolean;
 }
 
 export interface FinalizeRequest {
@@ -73,6 +80,9 @@ export interface FinalizeResponse {
   message: string;
   created: boolean;
   data: WorkFinalizationRecord;
+  /** Bản ghi đã khoá số công nên không tính lại */
+  skipped_locked?: boolean;
+  lock_note?: string;
 }
 
 export interface FinalizeAllRequest {
@@ -288,6 +298,23 @@ class WorkFinalizationService {
       `/api-hrm/work-finalization/${employeeCode}/${year}/${month}/`
     );
     return response.data;
+  }
+
+  async update(
+    employeeCode: string,
+    year: number,
+    month: number,
+    data: Record<string, number | string | boolean | null>
+  ): Promise<WorkFinalizationRecord> {
+    const response = await managementApi.patch(
+      `/api-hrm/work-finalization/${employeeCode}/${year}/${month}/`,
+      data
+    );
+    return response.data;
+  }
+
+  async delete(employeeCode: string, year: number, month: number): Promise<void> {
+    await managementApi.delete(`/api-hrm/work-finalization/${employeeCode}/${year}/${month}/`);
   }
 
   // ─── Finalization Lock ───
