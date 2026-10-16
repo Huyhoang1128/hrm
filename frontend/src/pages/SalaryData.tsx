@@ -22,12 +22,15 @@ import {
   type BulkImportOtherAllowanceRecord,
   type ParkingAllowanceOverrideRecord,
   type BulkImportParkingAllowanceRecord,
+  type LunchAllowanceOverrideRecord,
+  type BulkImportLunchAllowanceRecord,
   type SalaryAdjustmentRecord,
   type BulkImportSalaryAdjustmentRecord,
   type MonthlySalaryInputRecord,
   type BulkImportMonthlySalaryInputRecord,
 } from '../services/salary.service';
 import { SelectBox } from '../components/LandingLayout/SelectBox';
+import Pagination from '../components/Pagination';
 import { employeesAPI } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -64,6 +67,14 @@ interface ParsedParkingAllowanceRow {
   parseError?: string;
 }
 
+interface ParsedLunchAllowanceRow {
+  employee_code: string;
+  amount: number;
+  notes: string;
+  rowIndex: number;
+  parseError?: string;
+}
+
 interface ParsedSalaryAdjustmentRow {
   employee_code: string;
   amount: number;
@@ -84,7 +95,7 @@ interface ParsedMonthlyInputRow {
   parseError?: string;
 }
 
-type TabKey = 'commission' | 'penalty' | 'other_allowance' | 'parking_allowance' | 'salary_adjustment' | 'monthly_input';
+type TabKey = 'commission' | 'penalty' | 'other_allowance' | 'parking_allowance' | 'lunch_allowance' | 'salary_adjustment' | 'monthly_input';
 
 interface AddFormState {
   open: boolean;
@@ -117,6 +128,7 @@ const TABS: { key: TabKey; label: string; icon: React.ElementType; hrAllowed?: b
   { key: 'penalty',         label: 'Phạt Biên Bản', icon: ExclamationCircleIcon },
   { key: 'other_allowance', label: 'Phụ Cấp Khác',  icon: CurrencyDollarIcon },
   { key: 'parking_allowance', label: 'Phụ Cấp Gửi Xe', icon: CurrencyDollarIcon, hrAllowed: true },
+  { key: 'lunch_allowance',   label: 'Phụ Cấp Ăn Trưa', icon: CurrencyDollarIcon, hrAllowed: true },
   { key: 'salary_adjustment', label: 'Điều Chỉnh Lương', icon: CurrencyDollarIcon },
   { key: 'monthly_input', label: 'Dữ Liệu Lương Tháng', icon: CurrencyDollarIcon },
 ];
@@ -127,6 +139,7 @@ const now = new Date();
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 const YEARS  = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i);
 const SEARCH_DEBOUNCE_MS = 250;
+const DEFAULT_PAGE_SIZE = 20;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -206,6 +219,7 @@ const SalaryData: React.FC = () => {
     penalty: { ...INITIAL_ADD_FORM_STATE },
     other_allowance: { ...INITIAL_ADD_FORM_STATE },
     parking_allowance: { ...INITIAL_ADD_FORM_STATE },
+    lunch_allowance: { ...INITIAL_ADD_FORM_STATE },
     salary_adjustment: { ...INITIAL_ADD_FORM_STATE },
     monthly_input: { ...INITIAL_ADD_FORM_STATE },
   });
@@ -259,7 +273,26 @@ const SalaryData: React.FC = () => {
   const [paSaving,     setPaSaving]     = useState(false);
   const [paDeletingId, setPaDeletingId] = useState<number | null>(null);
   const [paDeleting,   setPaDeleting]   = useState(false);
+  const [paFillingZero, setPaFillingZero] = useState(false);
   const paFileRef = useRef<HTMLInputElement>(null);
+
+  // ── LunchAllowanceOverride state ──
+  const [laRecords,    setLaRecords]    = useState<LunchAllowanceOverrideRecord[]>([]);
+  const [loadingLa,    setLoadingLa]    = useState(false);
+  const [laLoaded,     setLaLoaded]     = useState(false);
+  const [laParsedRows, setLaParsedRows] = useState<ParsedLunchAllowanceRow[] | null>(null);
+  const [laFile,       setLaFile]       = useState<File | null>(null);
+  const [laParsing,    setLaParsing]    = useState(false);
+  const [laParseError, setLaParseError] = useState<string | null>(null);
+  const [laImporting,  setLaImporting]  = useState(false);
+  const [laSearch,     setLaSearch]     = useState('');
+  const [laEditingId,  setLaEditingId]  = useState<number | null>(null);
+  const [laEditValues, setLaEditValues] = useState({ amount: '', notes: '' });
+  const [laSaving,     setLaSaving]     = useState(false);
+  const [laDeletingId, setLaDeletingId] = useState<number | null>(null);
+  const [laDeleting,   setLaDeleting]   = useState(false);
+  const [laSyncing,    setLaSyncing]    = useState(false);
+  const laFileRef = useRef<HTMLInputElement>(null);
 
   // ── SalaryAdjustment state ──
   const [sRecords,    setSRecords]    = useState<SalaryAdjustmentRecord[]>([]);
@@ -309,8 +342,17 @@ const SalaryData: React.FC = () => {
   const [pImportErr, setPImportErr] = useState<{ errors: {employee_code:string;error:string}[]; failedRows: ParsedPenaltyRow[] } | null>(null);
   const [oImportErr, setOImportErr] = useState<{ errors: {employee_code:string;error:string}[]; failedRows: ParsedOtherAllowanceRow[] } | null>(null);
   const [paImportErr, setPaImportErr] = useState<{ errors: {employee_code:string;error:string}[]; failedRows: ParsedParkingAllowanceRow[] } | null>(null);
+  const [laImportErr, setLaImportErr] = useState<{ errors: {employee_code:string;error:string}[]; failedRows: ParsedLunchAllowanceRow[] } | null>(null);
   const [sImportErr, setSImportErr] = useState<{ errors: {employee_code:string;error:string}[]; failedRows: ParsedSalaryAdjustmentRow[] } | null>(null);
   const [mImportErr, setMImportErr] = useState<{ errors: {employee_code:string;error:string}[]; failedRows: ParsedMonthlyInputRow[] } | null>(null);
+
+  // ── Phân trang từng tab (cắt phía client trên danh sách đã lọc) ──
+  const [pages, setPages] = useState<Record<TabKey, { page: number; size: number }>>(
+    () => Object.fromEntries(TABS.map((tab) => [tab.key, { page: 1, size: DEFAULT_PAGE_SIZE }])) as Record<TabKey, { page: number; size: number }>,
+  );
+  const setPage = useCallback((tab: TabKey, page: number) => {
+    setPages((prev) => ({ ...prev, [tab]: { ...prev[tab], page } }));
+  }, []);
 
   // ── Shared toasts ──
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -371,6 +413,20 @@ const SalaryData: React.FC = () => {
       setErrorMsg('Không thể tải danh sách phụ cấp gửi xe.');
     } finally {
       setLoadingPa(false);
+    }
+  }, [selectedMonth, selectedYear]);
+
+  const loadLunchAllowances = useCallback(async (month = selectedMonth, year = selectedYear) => {
+    setLoadingLa(true);
+    setLaLoaded(false);
+    try {
+      const data = await salaryService.listLunchAllowanceOverrides({ year, month });
+      setLaRecords(data);
+      setLaLoaded(true);
+    } catch {
+      setErrorMsg('Không thể tải danh sách phụ cấp ăn trưa.');
+    } finally {
+      setLoadingLa(false);
     }
   }, [selectedMonth, selectedYear]);
 
@@ -476,6 +532,10 @@ const SalaryData: React.FC = () => {
       loadParkingAllowances(selectedMonth, selectedYear);
       return;
     }
+    if (activeTab === 'lunch_allowance') {
+      loadLunchAllowances(selectedMonth, selectedYear);
+      return;
+    }
     // Các tab còn lại chỉ dành cho Admin — không gọi API cho HR để tránh 403.
     if (!isAdmin) return;
     if (activeTab === 'commission') loadCommissions(selectedMonth, selectedYear);
@@ -485,13 +545,27 @@ const SalaryData: React.FC = () => {
     else loadMonthlyInputs(selectedMonth, selectedYear);
   }, [activeTab, selectedMonth, selectedYear, isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // HR (không phải Admin) chỉ được dùng tab "Phụ cấp gửi xe" — ép về tab này
-  // khi thông tin user đã sẵn sàng, tránh việc mặc định vào tab 'commission' rồi bị 403.
+  // HR (không phải Admin) chỉ được dùng các tab phụ cấp gửi xe / ăn trưa — ép về tab
+  // đầu tiên được phép khi thông tin user đã sẵn sàng, tránh mặc định vào 'commission' rồi bị 403.
   useEffect(() => {
-    if (!isAdmin && isHR && activeTab !== 'parking_allowance') {
+    if (!isAdmin && isHR && !TABS.some((tab) => tab.key === activeTab && tab.hrAllowed)) {
       setActiveTab('parking_allowance');
     }
   }, [isAdmin, isHR]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Về trang 1 khi đổi kỳ hoặc đổi từ khoá tìm kiếm của tab
+  useEffect(() => {
+    setPages((prev) => Object.fromEntries(
+      Object.entries(prev).map(([tab, state]) => [tab, { ...state, page: 1 }]),
+    ) as Record<TabKey, { page: number; size: number }>);
+  }, [selectedMonth, selectedYear]);
+  useEffect(() => { setPage('commission', 1); }, [cSearch, setPage]);
+  useEffect(() => { setPage('penalty', 1); }, [pSearch, setPage]);
+  useEffect(() => { setPage('other_allowance', 1); }, [oSearch, setPage]);
+  useEffect(() => { setPage('parking_allowance', 1); }, [paSearch, setPage]);
+  useEffect(() => { setPage('lunch_allowance', 1); }, [laSearch, setPage]);
+  useEffect(() => { setPage('salary_adjustment', 1); }, [sSearch, setPage]);
+  useEffect(() => { setPage('monthly_input', 1); }, [mSearch, setPage]);
 
   useEffect(() => {
     if (!activeAddForm.open) return;
@@ -519,6 +593,7 @@ const SalaryData: React.FC = () => {
     setPParsedRows(null); setPFile(null); setPImportErr(null); if (pFileRef.current) pFileRef.current.value = '';
     setOParsedRows(null); setOFile(null); setOImportErr(null); if (oFileRef.current) oFileRef.current.value = '';
     setPaParsedRows(null); setPaFile(null); setPaImportErr(null); if (paFileRef.current) paFileRef.current.value = '';
+    setLaParsedRows(null); setLaFile(null); setLaImportErr(null); if (laFileRef.current) laFileRef.current.value = '';
     setSParsedRows(null); setSFile(null); setSImportErr(null); if (sFileRef.current) sFileRef.current.value = '';
     setMParsedRows(null); setMFile(null); setMImportErr(null); if (mFileRef.current) mFileRef.current.value = '';
   };
@@ -1075,6 +1150,183 @@ const SalaryData: React.FC = () => {
     }
   };
 
+  // ─── ParkingAllowanceOverride: đặt 0 cho người còn lại ────────────────────
+
+  const handlePaFillRemainingZero = async () => {
+    const confirmed = window.confirm(
+      `Đặt phụ cấp gửi xe = 0 cho TẤT CẢ nhân viên đang hoạt động chưa có trong danh sách tháng ${selectedMonth}/${selectedYear}?\n` +
+      'Không ảnh hưởng tới các bản ghi đã có (kể cả > 0).',
+    );
+    if (!confirmed) return;
+    setPaFillingZero(true); setSuccessMsg(null); setErrorMsg(null);
+    try {
+      const res = await salaryService.fillRemainingParkingAllowanceZero({ year: selectedYear, month: selectedMonth });
+      setSuccessMsg(`Đã đặt 0 cho ${res.created_count} nhân viên còn lại.${res.errors.length ? ` (${res.errors.length} lỗi)` : ''}`);
+      await loadParkingAllowances();
+    } catch (err: any) {
+      setErrorMsg(err?.response?.data?.detail || 'Không thể đặt 0 cho người còn lại.');
+    } finally {
+      setPaFillingZero(false);
+    }
+  };
+
+  // ─── LunchAllowanceOverride: template ───────────────────────────────────
+
+  const handleDownloadLunchAllowanceTemplate = async () => {
+    const ExcelJS = (await import('exceljs')).default;
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Phụ Cấp Ăn Trưa');
+    ws.columns = [
+      { header: 'Mã nhân viên',              key: 'employee_code', width: 20 },
+      { header: 'Số tiền phụ cấp ăn trưa',    key: 'amount',        width: 24 },
+      { header: 'Ghi chú',                    key: 'notes',         width: 30 },
+    ];
+    ws.getRow(1).eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEA580C' } };
+      cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 12 };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    });
+    ws.getRow(1).height = 28;
+    ws.addRow({ employee_code: 'NV001', amount: 300000, notes: '' });
+    ws.addRow({ employee_code: 'NV002', amount: 450000, notes: 'Đã tính theo số ngày công thực tế' });
+    const buf = await wb.xlsx.writeBuffer();
+    const url = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = `template_phu_cap_an_trua_T${selectedMonth}_${selectedYear}.xlsx`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ─── LunchAllowanceOverride: parse Excel ────────────────────────────────
+
+  const handleLunchAllowanceFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (!f.name.match(/\.xlsx$/i)) { setLaParseError('Chỉ chấp nhận file Excel (.xlsx)'); return; }
+    setLaFile(f); setLaParseError(null); setLaParsedRows(null); setSuccessMsg(null); setErrorMsg(null); setLaParsing(true);
+    try {
+      const ExcelJS = (await import('exceljs')).default;
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(await f.arrayBuffer());
+      const ws = wb.worksheets[0];
+      if (!ws) { setLaParseError('File không có sheet nào.'); return; }
+      const rows: ParsedLunchAllowanceRow[] = [];
+      ws.eachRow((row, idx) => {
+        if (idx === 1) return;
+        const code = row.getCell(1).value != null ? String(row.getCell(1).value).trim() : '';
+        if (!code) return;
+        const amount = extractCellNumber(row.getCell(2).value);
+        const notes = extractCellString(row.getCell(3).value);
+        rows.push({ employee_code: code, amount, notes, rowIndex: idx, parseError: amount < 0 ? 'Số tiền không hợp lệ' : undefined });
+      });
+      if (!rows.length) { setLaParseError('File không có dữ liệu.'); return; }
+      setLaParsedRows(rows);
+    } catch { setLaParseError('Không thể đọc file.'); }
+    finally { setLaParsing(false); }
+  };
+
+  // ─── LunchAllowanceOverride: import ─────────────────────────────────────
+
+  const handleLunchAllowanceImport = async () => {
+    if (!laParsedRows) return;
+    const valid = laParsedRows.filter((r) => !r.parseError);
+    if (!valid.length) return;
+    setLaImporting(true);
+    try {
+      const records: BulkImportLunchAllowanceRecord[] = valid.map((r) => ({ employee_code: r.employee_code, amount: r.amount, notes: r.notes }));
+      const res = await salaryService.bulkImportLunchAllowanceOverrides({ year: selectedYear, month: selectedMonth, records });
+      if (res.success.length > 0) setSuccessMsg(`Import thành công ${res.success.length} phụ cấp ăn trưa.`);
+      if (res.errors.length > 0) {
+        const errorCodes = new Set(res.errors.map((e) => e.employee_code));
+        const failedRows = (laParsedRows ?? []).filter((r) => errorCodes.has(r.employee_code));
+        setLaImportErr({ errors: res.errors, failedRows });
+      }
+      setLaParsedRows(null); setLaFile(null); if (laFileRef.current) laFileRef.current.value = '';
+      await loadLunchAllowances();
+    } catch { setErrorMsg('Lỗi kết nối máy chủ.'); }
+    finally { setLaImporting(false); }
+  };
+
+  // ─── LunchAllowanceOverride: edit/delete ────────────────────────────────
+
+  const startLaEdit = (rec: LunchAllowanceOverrideRecord) => { setLaEditingId(rec.id); setLaEditValues({ amount: String(Number(rec.amount)), notes: rec.notes }); setLaDeletingId(null); };
+  const cancelLaEdit = () => setLaEditingId(null);
+
+  const handleLaSave = async (id: number) => {
+    const amount = parseFloat(laEditValues.amount.replace(/,/g, '')) || 0;
+    setLaSaving(true);
+    try {
+      const updated = await salaryService.updateLunchAllowanceOverride(id, { amount, notes: laEditValues.notes });
+      setLaRecords((prev) => prev.map((r) => r.id === id ? { ...r, ...updated } : r));
+      setLaEditingId(null); setSuccessMsg('Đã cập nhật phụ cấp ăn trưa.');
+    } catch { setErrorMsg('Không thể cập nhật.'); }
+    finally { setLaSaving(false); }
+  };
+
+  const handleLaDelete = async (id: number) => {
+    setLaDeleting(true);
+    try {
+      await salaryService.deleteLunchAllowanceOverride(id);
+      setLaRecords((prev) => prev.filter((r) => r.id !== id));
+      setLaDeletingId(null); setSuccessMsg('Đã xoá phụ cấp ăn trưa.');
+    } catch { setErrorMsg('Không thể xoá.'); }
+    finally { setLaDeleting(false); }
+  };
+
+  const handleCreateLunchAllowance = async () => {
+    const form = addForms.lunch_allowance;
+    const parsedAmount = Number(form.amount.replace(/,/g, ''));
+
+    setSuccessMsg(null);
+    setErrorMsg(null);
+    if (!form.employeeId) {
+      setErrorMsg('Vui lòng chọn nhân sự trước khi thêm phụ cấp ăn trưa.');
+      return;
+    }
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setErrorMsg('Số tiền phụ cấp ăn trưa phải lớn hơn 0.');
+      return;
+    }
+
+    setAddForm('lunch_allowance', { creating: true });
+    try {
+      await salaryService.createLunchAllowanceOverride({
+        employee: Number(form.employeeId),
+        year: selectedYear,
+        month: selectedMonth,
+        amount: parsedAmount,
+        notes: form.notes || undefined,
+      });
+      setSuccessMsg('Đã thêm phụ cấp ăn trưa cho nhân sự.');
+      resetAddForm('lunch_allowance');
+      await loadLunchAllowances();
+    } catch (err: any) {
+      const apiMessage = err?.response?.data?.detail || err?.response?.data?.message;
+      setErrorMsg(apiMessage || 'Không thể thêm phụ cấp ăn trưa.');
+    } finally {
+      setAddForm('lunch_allowance', { creating: false });
+    }
+  };
+
+  // ─── LunchAllowanceOverride: đồng bộ giá trị đang tính tự động ───────────
+
+  const handleLaSyncCurrent = async () => {
+    const confirmed = window.confirm(
+      `Tạo bản ghi phụ cấp ăn trưa theo giá trị đang tính tự động cho các nhân viên chưa có trong danh sách tháng ${selectedMonth}/${selectedYear}?\n` +
+      'Không ảnh hưởng tới các bản ghi đã có.',
+    );
+    if (!confirmed) return;
+    setLaSyncing(true); setSuccessMsg(null); setErrorMsg(null);
+    try {
+      const res = await salaryService.syncCurrentLunchAllowances({ year: selectedYear, month: selectedMonth });
+      setSuccessMsg(`Đã đồng bộ ${res.created_count} nhân viên (bỏ qua ${res.skipped_existing_count} đã có).${res.errors.length ? ` (${res.errors.length} lỗi)` : ''}`);
+      await loadLunchAllowances();
+    } catch (err: any) {
+      setErrorMsg(err?.response?.data?.detail || 'Không thể đồng bộ phụ cấp ăn trưa.');
+    } finally {
+      setLaSyncing(false);
+    }
+  };
+
   // ─── SalaryAdjustment: template ───────────────────────────────────────────
 
   const handleDownloadSalaryAdjustmentTemplate = async () => {
@@ -1425,6 +1677,26 @@ const SalaryData: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleExportLunchAllowanceErrors = async () => {
+    if (!laImportErr?.errors.length) return;
+    const rowMap = new Map(laImportErr.failedRows.map((r) => [r.employee_code, r]));
+    const cols = [
+      { header: 'Mã nhân viên',           key: 'a', width: 20 },
+      { header: 'Số tiền phụ cấp ăn trưa', key: 'b', width: 24 },
+      { header: 'Ghi chú',                key: 'c', width: 30 },
+      { header: 'Lý do lỗi',              key: 'd', width: 44 },
+    ];
+    const dataRows = laImportErr.errors.map((e) => {
+      const orig = rowMap.get(e.employee_code);
+      return [e.employee_code, orig?.amount ?? '', orig?.notes ?? '', e.error];
+    });
+    const wb = await buildErrorExcel('Phụ Cấp Ăn Trưa', 'FFEA580C', cols, dataRows);
+    const buf = await wb.xlsx.writeBuffer();
+    const url = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    const a = document.createElement('a'); a.href = url; a.download = `phu_cap_an_trua_loi_T${selectedMonth}_${selectedYear}.xlsx`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleExportSalaryAdjustmentErrors = async () => {
     if (!sImportErr?.errors.length) return;
     const rowMap = new Map(sImportErr.failedRows.map((r) => [r.employee_code, r]));
@@ -1492,6 +1764,9 @@ const SalaryData: React.FC = () => {
   const filteredParkingAllowances = paRecords.filter((r) =>
     !paSearch || r.employee_code.toLowerCase().includes(paSearch.toLowerCase()) || r.employee_name.toLowerCase().includes(paSearch.toLowerCase())
   );
+  const filteredLunchAllowances = laRecords.filter((r) =>
+    !laSearch || r.employee_code.toLowerCase().includes(laSearch.toLowerCase()) || r.employee_name.toLowerCase().includes(laSearch.toLowerCase())
+  );
   const filteredSalaryAdjustments = sRecords.filter((r) =>
     !sSearch || r.employee_code.toLowerCase().includes(sSearch.toLowerCase()) || r.employee_name.toLowerCase().includes(sSearch.toLowerCase())
   );
@@ -1499,7 +1774,47 @@ const SalaryData: React.FC = () => {
     !mSearch || r.employee_code.toLowerCase().includes(mSearch.toLowerCase()) || r.employee_name.toLowerCase().includes(mSearch.toLowerCase())
   );
 
+  const pageView = <T,>(tab: TabKey, rows: T[]) => {
+    const { size } = pages[tab];
+    const totalPages = Math.max(1, Math.ceil(rows.length / size));
+    const page = Math.min(pages[tab].page, totalPages);
+    return { rows: rows.slice((page - 1) * size, page * size), offset: (page - 1) * size, page, size, totalPages, totalItems: rows.length };
+  };
+  const sumAmount = (rows: { amount: number | string }[]) => rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+
+  const commissionPage = pageView('commission', filteredCommissions);
+  const penaltyPage = pageView('penalty', filteredPenalties);
+  const otherAllowancePage = pageView('other_allowance', filteredOtherAllowances);
+  const parkingAllowancePage = pageView('parking_allowance', filteredParkingAllowances);
+  const lunchAllowancePage = pageView('lunch_allowance', filteredLunchAllowances);
+  const salaryAdjustmentPage = pageView('salary_adjustment', filteredSalaryAdjustments);
+  const monthlyInputPage = pageView('monthly_input', filteredMonthlyInputs);
+
   // ─── Render helpers ────────────────────────────────────────────────────────
+
+  /** Dòng tổng (trên toàn bộ danh sách đã lọc, không chỉ trang hiện tại) + phân trang. */
+  const renderListFooter = (tab: TabKey, view: ReturnType<typeof pageView>, totalAmount?: number) => {
+    if (view.totalItems === 0) return null;
+    return (
+      <div className="border-t border-gray-100">
+        {totalAmount !== undefined && (
+          <div className="flex items-center justify-between px-4 py-3 bg-gray-50">
+            <span className="text-sm font-medium text-gray-600">Tổng số tiền ({view.totalItems} dòng)</span>
+            <span className="text-base font-semibold text-gray-900">{fmtMoney(totalAmount)}</span>
+          </div>
+        )}
+        <Pagination
+          className="px-4 py-3"
+          currentPage={view.page}
+          totalPages={view.totalPages}
+          totalItems={view.totalItems}
+          itemsPerPage={view.size}
+          onPageChange={(page) => setPage(tab, page)}
+          onItemsPerPageChange={(size) => setPages((prev) => ({ ...prev, [tab]: { page: 1, size } }))}
+        />
+      </div>
+    );
+  };
 
   const renderLoading = (color = 'primary') => (
     <div className="flex items-center justify-center py-16">
@@ -1828,6 +2143,52 @@ const SalaryData: React.FC = () => {
       );
     }
 
+    if (tab === 'lunch_allowance') {
+      return (
+        <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+          {renderAddEmployeePicker(tab)}
+          <div>
+            <label className="block text-sm text-gray-700 mb-1">Số tiền phụ cấp ăn trưa</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={form.amount}
+              onChange={(e) => setAddForm(tab, { amount: e.target.value })}
+              placeholder="Ví dụ: 300000"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm text-gray-700 mb-1">Ghi chú</label>
+            <input
+              type="text"
+              value={form.notes}
+              onChange={(e) => setAddForm(tab, { notes: e.target.value })}
+              placeholder="Nhập ghi chú (nếu có)"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+            />
+          </div>
+          <div className="md:col-span-2 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => resetAddForm(tab)}
+              className="px-4 py-2 text-sm font-medium border border-gray-300 text-gray-700 rounded-xl hover:bg-white"
+            >
+              Huỷ
+            </button>
+            <button
+              type="button"
+              onClick={handleCreateLunchAllowance}
+              disabled={form.creating}
+              className="px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded-xl hover:bg-orange-700 disabled:opacity-60"
+            >
+              {form.creating ? 'Đang thêm...' : 'Thêm phụ cấp ăn trưa'}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
         {renderAddEmployeePicker(tab)}
@@ -1880,7 +2241,7 @@ const SalaryData: React.FC = () => {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Dữ liệu</h1>
-        <p className="text-gray-900 mt-0.5 text-sm">Quản lý lương hoa hồng và phạt biên bản theo tháng/năm.</p>
+        <p className="text-gray-900 mt-0.5 text-sm">Quản lý hoa hồng, phạt, phụ cấp và dữ liệu lương theo tháng/năm.</p>
       </div>
 
       {/* Toasts */}
@@ -1907,11 +2268,11 @@ const SalaryData: React.FC = () => {
             <SelectBox<number> label="Năm" value={selectedYear} options={YEARS.map((y) => ({ value: y, label: String(y) }))} onChange={handleYearChange} />
           </div>
           <button
-            onClick={() => activeTab === 'commission' ? loadCommissions() : activeTab === 'penalty' ? loadPenalties() : activeTab === 'other_allowance' ? loadOtherAllowances() : activeTab === 'parking_allowance' ? loadParkingAllowances() : activeTab === 'salary_adjustment' ? loadSalaryAdjustments() : loadMonthlyInputs()}
-            disabled={loadingCommission || loadingPenalty || loadingO || loadingPa || loadingS || loadingM}
+            onClick={() => activeTab === 'commission' ? loadCommissions() : activeTab === 'penalty' ? loadPenalties() : activeTab === 'other_allowance' ? loadOtherAllowances() : activeTab === 'parking_allowance' ? loadParkingAllowances() : activeTab === 'lunch_allowance' ? loadLunchAllowances() : activeTab === 'salary_adjustment' ? loadSalaryAdjustments() : loadMonthlyInputs()}
+            disabled={loadingCommission || loadingPenalty || loadingO || loadingPa || loadingLa || loadingS || loadingM}
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-700 disabled:opacity-60 transition-colors"
           >
-            <ArrowPathIcon className={`h-4 w-4 ${(loadingCommission || loadingPenalty || loadingO || loadingPa || loadingS || loadingM) ? 'animate-spin' : ''}`} />
+            <ArrowPathIcon className={`h-4 w-4 ${(loadingCommission || loadingPenalty || loadingO || loadingPa || loadingLa || loadingS || loadingM) ? 'animate-spin' : ''}`} />
             Tải dữ liệu
           </button>
         </div>
@@ -2040,12 +2401,12 @@ const SalaryData: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-100">
-                        {filteredCommissions.map((rec, i) => {
+                        {commissionPage.rows.map((rec, i) => {
                           const isEditing  = cEditingId  === rec.id;
                           const isDeleting = cDeletingId === rec.id;
                           return (
                             <tr key={rec.id} className={isDeleting ? 'bg-red-50' : 'hover:bg-gray-50 transition-colors'}>
-                              <td className="table-cell text-gray-400 text-xs">{i + 1}</td>
+                              <td className="table-cell text-gray-400 text-xs">{commissionPage.offset + i + 1}</td>
                               <td className="table-cell">
                                 <div className="flex items-center gap-3">
                                   {renderAvatar(rec.employee_name, 'bg-primary-50 text-primary-700')}
@@ -2098,6 +2459,7 @@ const SalaryData: React.FC = () => {
                     </table>
                   </div>
                 )}
+                {renderListFooter('commission', commissionPage, sumAmount(filteredCommissions))}
               </div>
             </>
           )}
@@ -2201,12 +2563,12 @@ const SalaryData: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-100">
-                        {filteredOtherAllowances.map((rec, i) => {
+                        {otherAllowancePage.rows.map((rec, i) => {
                           const isEditing  = oEditingId  === rec.id;
                           const isDeleting = oDeletingId === rec.id;
                           return (
                             <tr key={rec.id} className={isDeleting ? 'bg-red-50' : 'hover:bg-gray-50 transition-colors'}>
-                              <td className="table-cell text-gray-400 text-xs">{i + 1}</td>
+                              <td className="table-cell text-gray-400 text-xs">{otherAllowancePage.offset + i + 1}</td>
                               <td className="table-cell">
                                 <div className="flex items-center gap-3">
                                   {renderAvatar(rec.employee_name, 'bg-violet-50 text-violet-700')}
@@ -2267,6 +2629,7 @@ const SalaryData: React.FC = () => {
                     </table>
                   </div>
                 )}
+                {renderListFooter('other_allowance', otherAllowancePage, sumAmount(filteredOtherAllowances))}
               </div>
             </>
           )}
@@ -2294,6 +2657,17 @@ const SalaryData: React.FC = () => {
                   <button onClick={handleParkingAllowanceImport} disabled={paImporting} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-xl hover:bg-amber-700 disabled:opacity-60 transition-colors">
                     {paImporting ? <ArrowPathIcon className="h-4 w-4 animate-spin" /> : <CheckIcon className="h-4 w-4" />}
                     {paImporting ? 'Đang import...' : `Xác nhận import (${paParsedRows.filter((r) => !r.parseError).length})`}
+                  </button>
+                )}
+                {paLoaded && (
+                  <button
+                    onClick={handlePaFillRemainingZero}
+                    disabled={paFillingZero}
+                    title="Đặt phụ cấp gửi xe = 0 cho những nhân viên chưa có trong danh sách tháng này"
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 disabled:opacity-60 transition-colors"
+                  >
+                    {paFillingZero ? <ArrowPathIcon className="h-4 w-4 animate-spin" /> : <CheckIcon className="h-4 w-4" />}
+                    {paFillingZero ? 'Đang xử lý...' : 'Đặt 0 cho người còn lại'}
                   </button>
                 )}
                 {paLoaded && (
@@ -2370,12 +2744,12 @@ const SalaryData: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-100">
-                        {filteredParkingAllowances.map((rec, i) => {
+                        {parkingAllowancePage.rows.map((rec, i) => {
                           const isEditing  = paEditingId  === rec.id;
                           const isDeleting = paDeletingId === rec.id;
                           return (
                             <tr key={rec.id} className={isDeleting ? 'bg-red-50' : 'hover:bg-gray-50 transition-colors'}>
-                              <td className="table-cell text-gray-400 text-xs">{i + 1}</td>
+                              <td className="table-cell text-gray-400 text-xs">{parkingAllowancePage.offset + i + 1}</td>
                               <td className="table-cell">
                                 <div className="flex items-center gap-3">
                                   {renderAvatar(rec.employee_name, 'bg-amber-50 text-amber-700')}
@@ -2436,6 +2810,188 @@ const SalaryData: React.FC = () => {
                     </table>
                   </div>
                 )}
+                {renderListFooter('parking_allowance', parkingAllowancePage, sumAmount(filteredParkingAllowances))}
+              </div>
+            </>
+          )}
+
+          {/* ═══ TAB PHỤ CẤP ĂN TRƯA ═══ */}
+          {activeTab === 'lunch_allowance' && (
+            <>
+              {/* Action bar */}
+              <div className="flex flex-wrap gap-3 items-center">
+                <button
+                  onClick={() => setAddForm('lunch_allowance', { open: !addForms.lunch_allowance.open, showEmployeeDropdown: false })}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded-xl hover:bg-orange-700 transition-colors"
+                >
+                  {addForms.lunch_allowance.open ? 'Đóng thêm nhanh' : 'Thêm phụ cấp ăn trưa'}
+                </button>
+                <button onClick={handleDownloadLunchAllowanceTemplate} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors">
+                  <ArrowDownTrayIcon className="h-4 w-4" />Tải file mẫu
+                </button>
+                <label className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-orange-300 text-orange-700 bg-orange-50 rounded-xl hover:bg-orange-100 cursor-pointer transition-colors">
+                  <ArrowUpTrayIcon className="h-4 w-4" />
+                  {laFile ? laFile.name : 'Chọn file Excel'}
+                  <input ref={laFileRef} type="file" accept=".xlsx" className="hidden" onChange={handleLunchAllowanceFileChange} />
+                </label>
+                {laParsedRows && laParsedRows.filter((r) => !r.parseError).length > 0 && (
+                  <button onClick={handleLunchAllowanceImport} disabled={laImporting} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded-xl hover:bg-orange-700 disabled:opacity-60 transition-colors">
+                    {laImporting ? <ArrowPathIcon className="h-4 w-4 animate-spin" /> : <CheckIcon className="h-4 w-4" />}
+                    {laImporting ? 'Đang import...' : `Xác nhận import (${laParsedRows.filter((r) => !r.parseError).length})`}
+                  </button>
+                )}
+                {laLoaded && (
+                  <button
+                    onClick={handleLaSyncCurrent}
+                    disabled={laSyncing}
+                    title="Tạo bản ghi theo giá trị đang tính tự động cho những nhân viên chưa có trong danh sách tháng này"
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 disabled:opacity-60 transition-colors"
+                  >
+                    <ArrowPathIcon className={`h-4 w-4 ${laSyncing ? 'animate-spin' : ''}`} />
+                    {laSyncing ? 'Đang xử lý...' : 'Đồng bộ dữ liệu hiện tại'}
+                  </button>
+                )}
+                {laLoaded && (
+                  <div className="flex-1 relative min-w-48">
+                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input type="text" placeholder="Tìm nhân viên..." value={laSearch} onChange={(e) => setLaSearch(e.target.value)}
+                      className="input-field w-full pl-9" />
+                  </div>
+                )}
+              </div>
+              {renderAddForm('lunch_allowance')}
+              {laParseError && <p className="flex items-center gap-1 text-sm text-red-600"><ExclamationCircleIcon className="h-4 w-4" />{laParseError}</p>}
+              {renderImportErrors(laImportErr, handleExportLunchAllowanceErrors, () => setLaImportErr(null))}
+
+              {/* Preview */}
+              {laParsedRows && !laParsing && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex justify-between text-sm">
+                    <span className="font-medium text-gray-700">Xem trước — {laParsedRows.length} dòng
+                      {laParsedRows.filter((r) => r.parseError).length > 0 && <span className="text-red-500"> · {laParsedRows.filter((r) => r.parseError).length} lỗi</span>}
+                    </span>
+                    <span className="text-gray-500">Tháng {selectedMonth}/{selectedYear}</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-100 text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="table-header w-10">#</th>
+                          <th className="table-header">Mã NV</th>
+                          <th className="table-header text-right">Số tiền</th>
+                          <th className="table-header">Ghi chú</th>
+                          <th className="table-header">Trạng thái</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-100">
+                        {laParsedRows.map((row, i) => (
+                          <tr key={row.rowIndex} className={row.parseError ? 'bg-red-50' : 'hover:bg-gray-50'}>
+                            <td className="table-cell text-gray-400 text-xs">{i + 1}</td>
+                            <td className="table-cell font-mono font-medium text-gray-800">{row.employee_code}</td>
+                            <td className="table-cell text-right text-orange-700 font-medium">{row.amount > 0 ? row.amount.toLocaleString('vi-VN') + ' ₫' : '—'}</td>
+                            <td className="table-cell text-gray-600 max-w-xs truncate">{row.notes || '—'}</td>
+                            <td className="table-cell">
+                              {row.parseError
+                                ? <span className="inline-flex items-center gap-1 text-xs text-red-600"><ExclamationCircleIcon className="h-3.5 w-3.5" />{row.parseError}</span>
+                                : <span className="inline-flex items-center gap-1 text-xs text-emerald-600"><CheckIcon className="h-3.5 w-3.5" />Hợp lệ</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* LunchAllowanceOverride list */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex justify-between">
+                  <p className="text-sm font-medium text-gray-700">
+                    Danh sách phụ cấp ăn trưa — Tháng {selectedMonth}/{selectedYear}
+                    <span className="ml-2 font-normal text-gray-500">{filteredLunchAllowances.length} nhân viên</span>
+                  </p>
+                </div>
+                {loadingLa ? renderLoading('primary') :
+                 filteredLunchAllowances.length === 0 ? renderEmpty(laRecords.length === 0 ? 'Chưa có dữ liệu phụ cấp ăn trưa tháng này.' : 'Không tìm thấy nhân viên.') : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-100 text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="table-header w-10">#</th>
+                          <th className="table-header">Nhân viên</th>
+                          <th className="table-header text-right">Số tiền</th>
+                          <th className="table-header">Ghi chú</th>
+                          <th className="table-header text-center">Thao tác</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-100">
+                        {lunchAllowancePage.rows.map((rec, i) => {
+                          const isEditing  = laEditingId  === rec.id;
+                          const isDeleting = laDeletingId === rec.id;
+                          return (
+                            <tr key={rec.id} className={isDeleting ? 'bg-red-50' : 'hover:bg-gray-50 transition-colors'}>
+                              <td className="table-cell text-gray-400 text-xs">{lunchAllowancePage.offset + i + 1}</td>
+                              <td className="table-cell">
+                                <div className="flex items-center gap-3">
+                                  {renderAvatar(rec.employee_name, 'bg-orange-50 text-orange-700')}
+                                  <div><p className="font-medium text-gray-900">{rec.employee_name}</p><p className="text-xs text-gray-500 font-mono">{rec.employee_code}</p></div>
+                                </div>
+                              </td>
+                              <td className="table-cell text-right">
+                                {isEditing ? (
+                                  <input type="text" value={laEditValues.amount} onChange={(e) => setLaEditValues((v) => ({ ...v, amount: e.target.value }))}
+                                    className="input-field w-36 text-right" placeholder="0" />
+                                ) : (
+                                  <span className="font-medium text-orange-700">{fmtMoney(rec.amount)}</span>
+                                )}
+                              </td>
+                              <td className="table-cell">
+                                {isEditing ? (
+                                  <input type="text" value={laEditValues.notes} onChange={(e) => setLaEditValues((v) => ({ ...v, notes: e.target.value }))}
+                                    className="input-field w-full" placeholder="Ghi chú..." />
+                                ) : (
+                                  <span className="text-gray-700">{rec.notes || '—'}</span>
+                                )}
+                              </td>
+                              <td className="table-cell text-center">
+                                {isDeleting ? (
+                                  <div className="flex items-center justify-center gap-2">
+                                    <span className="text-xs text-red-600">Xác nhận xoá?</span>
+                                    <button onClick={() => handleLaDelete(rec.id)} disabled={laDeleting} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 disabled:opacity-60">
+                                      {laDeleting ? <ArrowPathIcon className="h-3 w-3 animate-spin" /> : <CheckIcon className="h-3 w-3" />}Xoá
+                                    </button>
+                                    <button onClick={() => setLaDeletingId(null)} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium border border-gray-300 text-gray-600 rounded-xl hover:bg-gray-50">
+                                      <XMarkIcon className="h-3 w-3" />Huỷ
+                                    </button>
+                                  </div>
+                                ) : isEditing ? (
+                                  <div className="flex items-center justify-center gap-2">
+                                    <button onClick={() => handleLaSave(rec.id)} disabled={laSaving} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-white bg-orange-600 rounded-xl hover:bg-orange-700 disabled:opacity-60">
+                                      {laSaving ? <ArrowPathIcon className="h-3 w-3 animate-spin" /> : <CheckIcon className="h-3 w-3" />}Lưu
+                                    </button>
+                                    <button onClick={cancelLaEdit} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium border border-gray-300 text-gray-600 rounded-xl hover:bg-gray-50">
+                                      <XMarkIcon className="h-3 w-3" />Huỷ
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-center gap-2">
+                                    <button onClick={() => startLaEdit(rec)} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-xl hover:bg-orange-100 transition-colors">
+                                      <PencilIcon className="h-3.5 w-3.5" />Sửa
+                                    </button>
+                                    <button onClick={() => { setLaDeletingId(rec.id); setLaEditingId(null); }} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors">
+                                      <TrashIcon className="h-3.5 w-3.5" />Xoá
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {renderListFooter('lunch_allowance', lunchAllowancePage, sumAmount(filteredLunchAllowances))}
               </div>
             </>
           )}
@@ -2537,9 +3093,9 @@ const SalaryData: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-100">
-                        {filteredSalaryAdjustments.map((rec, i) => (
+                        {salaryAdjustmentPage.rows.map((rec, i) => (
                           <tr key={rec.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="table-cell text-gray-400 text-xs">{i + 1}</td>
+                            <td className="table-cell text-gray-400 text-xs">{salaryAdjustmentPage.offset + i + 1}</td>
                             <td className="table-cell">
                               <div className="flex items-center gap-3">
                                 {renderAvatar(rec.employee_name, 'bg-blue-50 text-blue-700')}
@@ -2554,6 +3110,7 @@ const SalaryData: React.FC = () => {
                     </table>
                   </div>
                 )}
+                {renderListFooter('salary_adjustment', salaryAdjustmentPage, sumAmount(filteredSalaryAdjustments))}
               </div>
             </>
           )}
@@ -2668,11 +3225,11 @@ const SalaryData: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-100">
-                        {filteredMonthlyInputs.map((rec, i) => {
+                        {monthlyInputPage.rows.map((rec, i) => {
                           const isDeleting = mDeletingId === rec.id;
                           return (
                             <tr key={rec.id} className={isDeleting ? 'bg-red-50' : 'hover:bg-gray-50 transition-colors'}>
-                              <td className="table-cell text-gray-400 text-xs">{i + 1}</td>
+                              <td className="table-cell text-gray-400 text-xs">{monthlyInputPage.offset + i + 1}</td>
                               <td className="table-cell">
                                 <div className="flex items-center gap-3">
                                   {renderAvatar(rec.employee_name, 'bg-teal-50 text-teal-700')}
@@ -2712,6 +3269,7 @@ const SalaryData: React.FC = () => {
                     </table>
                   </div>
                 )}
+                {renderListFooter('monthly_input', monthlyInputPage)}
               </div>
             </>
           )}
@@ -2815,12 +3373,12 @@ const SalaryData: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-100">
-                        {filteredPenalties.map((rec, i) => {
+                        {penaltyPage.rows.map((rec, i) => {
                           const isEditing  = pEditingId  === rec.id;
                           const isDeleting = pDeletingId === rec.id;
                           return (
                             <tr key={rec.id} className={isDeleting ? 'bg-red-50' : 'hover:bg-gray-50 transition-colors'}>
-                              <td className="table-cell text-gray-400 text-xs">{i + 1}</td>
+                              <td className="table-cell text-gray-400 text-xs">{penaltyPage.offset + i + 1}</td>
                               <td className="table-cell">
                                 <div className="flex items-center gap-3">
                                   {renderAvatar(rec.employee_name, 'bg-red-50 text-red-700')}
@@ -2881,6 +3439,7 @@ const SalaryData: React.FC = () => {
                     </table>
                   </div>
                 )}
+                {renderListFooter('penalty', penaltyPage, sumAmount(filteredPenalties))}
               </div>
             </>
           )}

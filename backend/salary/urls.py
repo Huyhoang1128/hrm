@@ -9,6 +9,7 @@ from .views import (
     EmployeeKPIRecordViewSet,
     OtherAllowanceViewSet,
     ParkingAllowanceOverrideViewSet,
+    LunchAllowanceOverrideViewSet,
     EmployeeMonthlySalaryInputViewSet,
     OvertimeRateConfigViewSet,
     SalaryAdvanceViewSet,
@@ -35,6 +36,7 @@ router.register(r'overtime-rates', OvertimeRateConfigViewSet, basename='salary-o
 router.register(r'advances', SalaryAdvanceViewSet, basename='salary-advance')
 router.register(r'other-allowances', OtherAllowanceViewSet, basename='salary-other-allowance')
 router.register(r'parking-allowance-overrides', ParkingAllowanceOverrideViewSet, basename='salary-parking-allowance-override')
+router.register(r'lunch-allowance-overrides', LunchAllowanceOverrideViewSet, basename='salary-lunch-allowance-override')
 router.register(r'monthly-inputs', EmployeeMonthlySalaryInputViewSet, basename='salary-monthly-input')
 
 urlpatterns = [

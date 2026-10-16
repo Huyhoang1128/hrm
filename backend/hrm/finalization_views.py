@@ -30,6 +30,7 @@ from salary.salary_data_models import (
     EmployeeSalaryHistory,
     OtherAllowance,
     ParkingAllowanceOverride,
+    LunchAllowanceOverride,
     SalaryAdvance,
     DisciplinaryPenalty,
     OvertimeRateConfig,
@@ -220,6 +221,16 @@ def _resolve_lunch_policy(employee: Employee) -> dict:
 
 
 def _calculate_lunch_allowance(employee: Employee, actual_work_days: Decimal, year: int, month: int) -> Decimal:
+    """
+    Phụ cấp ăn trưa của nhân viên trong kỳ. Bản ghi nhập tay của kỳ
+    (`LunchAllowanceOverride`) thắng tất cả, kể cả khi là 0; không có thì tính
+    theo lunchAllowancePolicy.
+    """
+    override = LunchAllowanceOverride.objects.filter(
+        employee=employee, year=year, month=month,
+    ).values_list('amount', flat=True).first()
+    if override is not None:
+        return _to_decimal(override)
     policy = _resolve_lunch_policy(employee)
     cap = policy["monthly_cap"]
     if policy["mode"] == "actual_working_day":
