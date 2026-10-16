@@ -126,6 +126,19 @@ def _get_leave_used(employee, date):
             total += 1
     return total
 
+def get_max_online_work_quota(employee, company_config=None) -> float:
+    """Hạn mức số ngày làm online tối đa/tháng của nhân viên: ghi đè theo nhân viên >
+    vị trí > phòng ban (OnlineWorkQuotaOverride) > CompanyConfig (mặc định 3)."""
+    if employee is not None:
+        for scope in (employee, getattr(employee, 'position', None), getattr(employee, 'department', None)):
+            override = getattr(scope, 'online_work_quota_override', None) if scope is not None else None
+            if override is not None:
+                return float(override.max_online_days)
+    if company_config is None:
+        company_config = CompanyConfig.objects.filter(is_active=True).order_by('-effective_from').first()
+    return float(company_config.max_online_work_count_per_month) if company_config else 3.0
+
+
 def get_employee_monthly_stats(employee, date, company_config=None):
     """Trả về dict chứa toàn bộ thống kê quota/số lần duyệt của nhân viên trong tháng.
 
@@ -136,7 +149,7 @@ def get_employee_monthly_stats(employee, date, company_config=None):
     if company_config is None:
         company_config = CompanyConfig.objects.filter(is_active=True).order_by('-effective_from').first()
     max_quota = company_config.max_explanation_count_per_month if company_config else 3
-    max_online_quota = float(company_config.max_online_work_count_per_month) if company_config else 3.0
+    max_online_quota = get_max_online_work_quota(employee, company_config)
     max_leave_quota = float(company_config.max_leave_count_per_month) if company_config else 1.0
 
     # Tính quota_used 1 LẦN rồi suy ra quota_remaining trực tiếp — trước đây

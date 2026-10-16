@@ -22,6 +22,7 @@ from datetime import timedelta
 from dateutil.relativedelta import relativedelta
 from users.utils import get_user_display_name
 from employee.models import PROBATION_CONTRACT_TYPES, OFFICIAL_LABOR_CONTRACT_TYPES, probation_months_for
+from .models import OnlineWorkQuotaOverride
 logger = logging.getLogger(__name__)
 
 
@@ -6264,3 +6265,35 @@ class LivestreamAllowanceConfigSerializer(serializers.ModelSerializer):
             for dept in obj.apply_to_departments.all():
                 dept_names.append({'id': dept.id, 'name': dept.name})
         return dept_names
+
+
+class OnlineWorkQuotaOverrideSerializer(serializers.ModelSerializer):
+    """Một dòng ghi đè hạn mức ngày làm online — ĐÚNG 1 trong 3: nhân viên, vị trí, phòng ban."""
+    employee_detail = serializers.SerializerMethodField()
+    position_detail = serializers.SerializerMethodField()
+    department_detail = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OnlineWorkQuotaOverride
+        fields = [
+            'id', 'employee', 'position', 'department', 'max_online_days',
+            'employee_detail', 'position_detail', 'department_detail', 'updated_at',
+        ]
+        read_only_fields = ['updated_at']
+
+    def get_employee_detail(self, obj):
+        if not obj.employee:
+            return None
+        return {'id': obj.employee.id, 'employee_id': obj.employee.employee_id, 'full_name': obj.employee.full_name}
+
+    def get_position_detail(self, obj):
+        return {'id': obj.position.id, 'title': obj.position.title} if obj.position else None
+
+    def get_department_detail(self, obj):
+        return {'id': obj.department.id, 'name': obj.department.name} if obj.department else None
+
+    def validate(self, data):
+        scopes = [data.get(f, getattr(self.instance, f, None)) for f in ('employee', 'position', 'department')]
+        if sum(1 for v in scopes if v is not None) != 1:
+            raise serializers.ValidationError("Phải chọn đúng 1 trong 3: nhân viên, vị trí hoặc phòng ban.")
+        return data

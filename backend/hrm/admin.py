@@ -25,6 +25,7 @@ from .models import (
     GenericRequest, RequestTemplate, SalaryAdvanceApprovalLock, SalaryAdvanceCreationLock,
 )
 from .event_models import EmployeeEvent, EmployeeEventAuditLog
+from .models import OnlineWorkQuotaOverride
 
 
 class WorkFinalizationCSVUploadForm(forms.Form):
@@ -3384,3 +3385,11 @@ class AssetInventoryCheckAdmin(admin.ModelAdmin):
     search_fields = ('asset__asset_code', 'asset__name', 'notes')
     raw_id_fields = ('asset', 'checked_by', 'created_by')
     date_hierarchy = 'check_date'
+
+
+@admin.register(OnlineWorkQuotaOverride)
+class OnlineWorkQuotaOverrideAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'employee', 'position', 'department', 'max_online_days', 'updated_at')
+    search_fields = ('employee__full_name', 'employee__employee_id', 'position__title', 'department__name')
+    raw_id_fields = ('employee',)
+    readonly_fields = ('updated_at',)

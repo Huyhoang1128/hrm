@@ -1964,7 +1964,14 @@ class AttendanceExplanationViewSet(BulkRejectMixin, FinalizationLockMixin, views
         ).order_by('-effective_from').first()
         
         max_explanations_per_month = company_config.max_explanation_count_per_month if company_config else 3
-        max_online_work_per_month = float(company_config.max_online_work_count_per_month) if company_config else 3.0
+        # Hạn mức online theo đúng người đang xem (employee_id nếu có, không thì chính mình).
+        from .stats_utils import get_max_online_work_quota
+        quota_employee = (
+            Employee.objects.select_related('position', 'department').filter(pk=employee_id).first()
+            if employee_id else
+            Employee.objects.select_related('position', 'department').filter(user=request.user).first()
+        )
+        max_online_work_per_month = get_max_online_work_quota(quota_employee, company_config)
         max_leave_per_month = float(company_config.max_leave_count_per_month) if company_config else 1.0
 
         # --- 4. Làm việc online (ONLINE_WORK) ---
