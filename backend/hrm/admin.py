@@ -745,7 +745,7 @@ class ShiftConfigAdmin(admin.ModelAdmin):
         }),
         ('Thời gian ca làm', {
             'fields': ('start_time', 'end_time', 'break_start_time', 'break_end_time',
-                      'break_duration_minutes', 'total_hours', 'working_hours')
+                      'break_duration_minutes', 'total_hours', 'working_hours', 'fixed_workday')
         }),
         ('Phạm vi áp dụng', {
             'fields': ('apply_to_departments', 'apply_to_positions', 'apply_to_employees')

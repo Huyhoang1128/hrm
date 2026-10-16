@@ -25,6 +25,15 @@ _SHIFT_TYPE_TO_RULE_TYPE = {
 _FULL_DAY_HOURS_THRESHOLD = 5.5
 
 
+def shift_workday(shift_config) -> float:
+    """Số công của 1 ca: ShiftConfig.fixed_workday nếu có, ngược lại tự suy từ
+    working_hours (> 5.5h → 1.0, còn lại → 0.5)."""
+    fixed = getattr(shift_config, 'fixed_workday', None)
+    if fixed is not None:
+        return float(fixed)
+    return 1.0 if float(shift_config.working_hours or 0) > _FULL_DAY_HOURS_THRESHOLD else 0.5
+
+
 def _employee_on_date(employee_code: str, ref_date, _cache: dict = None):
     """(employee như vào ngày ref_date, id ca cá nhân vào ngày đó hoặc None = ca cá
     nhân hiện tại) theo lịch sử điều chuyển (employee/assignment.py) — chuyển phòng
@@ -356,15 +365,14 @@ def shift_configs_to_rules(shift_configs: list) -> list:
     EmployeeState.rules.  Used when no SHIFT_RULE entries exist in
     RuleDefinition so the engine still honours the configured schedule.
 
-    workday is derived from working_hours:
+    workday: ShiftConfig.fixed_workday nếu ca có đặt, ngược lại suy ra từ working_hours:
       - half-day shifts (≤ 5.5 h) → 0.5
       - full-day shifts (> 5.5 h)  → 1.0
     """
     rules = []
     for sc in shift_configs:
         rule_type = _SHIFT_TYPE_TO_RULE_TYPE.get(sc.shift_type, 'SHIFT_RULE_MORNING')
-        hours = float(sc.working_hours or 0)
-        workday = 1.0 if hours > _FULL_DAY_HOURS_THRESHOLD else 0.5
+        workday = shift_workday(sc)
         rules.append({
             'rule_name': f'ShiftConfig: {sc.name}',
             'rule_type': rule_type,

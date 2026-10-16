@@ -871,6 +871,8 @@ export interface ShiftConfig {
   break_duration_minutes?: number;
   total_hours: number;
   working_hours: number;
+  /** Số công cố định của ca; null = tự tính theo giờ làm */
+  fixed_workday?: number | string | null;
   shift_type: string;
   shift_type_display: string;
   apply_scope?: 'CA_NHAN' | 'VI_TRI' | 'PHONG_BAN' | 'DEFAULT' | null;

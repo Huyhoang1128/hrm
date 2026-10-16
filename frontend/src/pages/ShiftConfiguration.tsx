@@ -561,6 +561,7 @@ const ShiftCard: React.FC<{
             <p className="text-xs text-gray-400 mt-0.5">
               {shift.start_time} – {shift.end_time} · {shift.total_hours}h
               {shift.shift_type_display ? ` · ${shift.shift_type_display}` : ''}
+              {shift.fixed_workday != null && shift.fixed_workday !== '' ? ` · ${Number(shift.fixed_workday)} công cố định` : ''}
             </p>
           </div>
         </div>
