@@ -18,7 +18,7 @@ export interface DeptAttendanceViolationItem {
 }
 
 export interface DeptAttendanceViolationResponse {
-  department_id: number;
+  department_id: number | null;
   department_name: string;
   year: number;
   month: number;
@@ -28,7 +28,8 @@ export interface DeptAttendanceViolationResponse {
 }
 
 export interface DeptAttendanceViolationParams {
-  department_id: number;
+  // Bỏ trống để lấy báo cáo TẤT CẢ phòng ban trong 1 lần.
+  department_id?: number;
   year: number;
   month: number;
 }
