@@ -4,6 +4,7 @@ recruitment/serializers.py – Serializers cho RecruitmentNeed, Job, JobChannel.
 from rest_framework import serializers
 
 from .models import RecruitmentNeed, Job, JobChannel
+from users.fields import UserDisplayNameField
 
 
 class JobChannelSerializer(serializers.ModelSerializer):
@@ -36,9 +37,7 @@ class JobListSerializer(serializers.ModelSerializer):
 class JobSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     channels = JobChannelSerializer(many=True, read_only=True)
-    created_by_name = serializers.CharField(
-        source='created_by.get_full_name', read_only=True
-    )
+    created_by_name = UserDisplayNameField(source='created_by')
     position_name = serializers.CharField(source='position.title', read_only=True, default=None)
 
     class Meta:
@@ -67,19 +66,11 @@ class RecruitmentNeedListSerializer(serializers.ModelSerializer):
     employment_type_display = serializers.CharField(
         source='get_employment_type_display', read_only=True
     )
-    approved_by_name = serializers.CharField(
-        source='approved_by.get_full_name', read_only=True
-    )
-    requested_by_name = serializers.CharField(
-        source='requested_by.get_full_name', read_only=True
-    )
-    interviewer_name = serializers.CharField(
-        source='interviewer.get_full_name', read_only=True
-    )
+    approved_by_name = UserDisplayNameField(source='approved_by')
+    requested_by_name = UserDisplayNameField(source='requested_by')
+    interviewer_name = UserDisplayNameField(source='interviewer')
     interviewer_employee_id = serializers.SerializerMethodField()
-    cv_approver_name = serializers.CharField(
-        source='cv_approver.get_full_name', read_only=True
-    )
+    cv_approver_name = UserDisplayNameField(source='cv_approver')
     cv_approver_employee_id = serializers.SerializerMethodField()
 
     def get_interviewer_employee_id(self, obj):
@@ -123,22 +114,12 @@ class RecruitmentNeedSerializer(serializers.ModelSerializer):
     employment_type_display = serializers.CharField(
         source='get_employment_type_display', read_only=True
     )
-    requested_by_name = serializers.CharField(
-        source='requested_by.get_full_name', read_only=True
-    )
-    approved_by_name = serializers.CharField(
-        source='approved_by.get_full_name', read_only=True
-    )
-    published_internally_by_name = serializers.CharField(
-        source='published_internally_by.get_full_name', read_only=True
-    )
-    interviewer_name = serializers.CharField(
-        source='interviewer.get_full_name', read_only=True
-    )
+    requested_by_name = UserDisplayNameField(source='requested_by')
+    approved_by_name = UserDisplayNameField(source='approved_by')
+    published_internally_by_name = UserDisplayNameField(source='published_internally_by')
+    interviewer_name = UserDisplayNameField(source='interviewer')
     interviewer_employee_id = serializers.SerializerMethodField()
-    cv_approver_name = serializers.CharField(
-        source='cv_approver.get_full_name', read_only=True
-    )
+    cv_approver_name = UserDisplayNameField(source='cv_approver')
     cv_approver_employee_id = serializers.SerializerMethodField()
 
     def get_interviewer_employee_id(self, obj):

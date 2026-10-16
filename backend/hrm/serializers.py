@@ -20,6 +20,7 @@ from hrm import branding
 import logging
 from datetime import timedelta
 from dateutil.relativedelta import relativedelta
+from users.utils import get_user_display_name
 logger = logging.getLogger(__name__)
 
 
@@ -4703,7 +4704,7 @@ class OnboardingProcessCreateSerializer(serializers.ModelSerializer):
         try:
             subject = "Thư chào mừng nhân viên mới"
             
-            full_name = employee.full_name if employee else (user.get_full_name() or user.username)
+            full_name = employee.full_name if employee else get_user_display_name(user)
             
             onboarding_link = ""
             if onboarding and token:
@@ -5730,7 +5731,7 @@ def send_account_info_email(user, employee=None, new_password=None):
 
     try:
         subject = "Thông tin tài khoản hệ thống HRM"
-        full_name = employee.full_name if employee else (user.get_full_name() or user.username)
+        full_name = employee.full_name if employee else get_user_display_name(user)
         password_display = new_password if new_password else user.username  # ✅ SỬA: dùng username thay vì password hash
 
         guide_url = branding.user_guide_url()
