@@ -1459,6 +1459,38 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
             for department in departments
         ])
 
+    @action(detail=False, methods=['get'], url_path='comparison-report')
+    def comparison_report(self, request):
+        """
+        Báo cáo biến động lương giữa hai tháng — xem salary/comparison_report.py.
+
+        GET ?month_a=2026-08&month_b=2026-09[&department=<id>][&legal_entity=<tên>][&employee=<mã/tên>]
+        """
+        from .comparison_report import build_comparison, parse_period
+
+        params = request.query_params
+        period_a = parse_period(params.get('month_a'))
+        period_b = parse_period(params.get('month_b'))
+        if period_a is None or period_b is None:
+            return Response(
+                {'detail': 'Cần chọn đủ hai tháng so sánh (month_a, month_b dạng YYYY-MM).'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        department = params.get('department') or None
+        if department is not None and not str(department).isdigit():
+            return Response({'detail': 'department phải là số nguyên.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            data = build_comparison(
+                period_a, period_b,
+                department_id=department,
+                legal_entity=(params.get('legal_entity') or '').strip(),
+                employee=(params.get('employee') or '').strip() or None,
+            )
+        except Exception:
+            logger.exception('[SalaryComparison] Lỗi dựng báo cáo')
+            return Response({'detail': 'Lỗi khi lấy dữ liệu bảng lương.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(data)
+
     @action(detail=False, methods=['get'], url_path='legal-entities')
     def legal_entities(self, request):
         from django.db.models.functions import Trim
