@@ -9,6 +9,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework.views import APIView
+from .bulk_reject import BulkRejectMixin
 
 logger = logging.getLogger(__name__)
 from django_filters.rest_framework import DjangoFilterBackend
@@ -837,7 +838,7 @@ def _create_approval_event(explanation_event, approver, approval_level, action, 
 from .finalization_lock_mixin import FinalizationLockMixin
 
 
-class AttendanceExplanationViewSet(FinalizationLockMixin, viewsets.ViewSet):
+class AttendanceExplanationViewSet(BulkRejectMixin, FinalizationLockMixin, viewsets.ViewSet):
     """
     ViewSet cho attendance explanations lưu trực tiếp vào EmployeeEvent.
 

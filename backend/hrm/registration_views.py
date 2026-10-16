@@ -411,9 +411,10 @@ def _get_visible_q(employee, is_event=True):
 # ─────────────────────────────────────────────────────────────────────────────
 
 from .finalization_lock_mixin import FinalizationLockMixin
+from .bulk_reject import BulkRejectMixin
 
 
-class RegistrationRequestViewSet(FinalizationLockMixin, viewsets.ViewSet):
+class RegistrationRequestViewSet(BulkRejectMixin, FinalizationLockMixin, viewsets.ViewSet):
     """
     ViewSet cho registration requests lưu trực tiếp vào EmployeeEvent.
 
@@ -1770,7 +1771,7 @@ class RegistrationRequestViewSet(FinalizationLockMixin, viewsets.ViewSet):
 # ONLINE WORK REQUEST VIEWSET  (backed by OnlineWorkRequest model)
 # ─────────────────────────────────────────────────────────────────────────────
 
-class OnlineWorkRequestViewSet(FinalizationLockMixin, viewsets.ViewSet):
+class OnlineWorkRequestViewSet(BulkRejectMixin, FinalizationLockMixin, viewsets.ViewSet):
     """
     ViewSet quản lý đơn làm việc online (WFH), nay lưu trực tiếp vào EmployeeEvent.
     """
