@@ -11,6 +11,7 @@ import {
 import { positionsAPI, departmentsAPI, Position, Department } from '../utils/api';
 import { SelectBox } from '../components/LandingLayout/SelectBox';
 import ConfirmDialog from '../components/ConfirmDialog';
+import ImportFileDialog from '../components/ImportFileDialog';
 
 const PositionList: React.FC = () => {
   const navigate = useNavigate();
@@ -23,6 +24,7 @@ const PositionList: React.FC = () => {
   const [isManagementFilter, setIsManagementFilter] = useState<string>('all');
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
   const [positionToDelete, setPositionToDelete] = useState<Position | null>(null);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const fetchPositions = async (search = '', department = 'all', isManagement = 'all') => {
@@ -94,6 +96,42 @@ const PositionList: React.FC = () => {
         Nhân viên
       </span>
     );
+
+  const handleDownloadTemplate = async () => {
+    const ExcelJS = (await import('exceljs')).default;
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Template vị trí');
+
+    sheet.columns = [
+      { header: 'Mã vị trí', key: 'code', width: 16 },
+      { header: 'Chức danh', key: 'title', width: 28 },
+      { header: 'Phòng ban (mã, cách nhau bởi dấu phẩy)', key: 'department', width: 32 },
+      { header: 'Cấp bậc', key: 'level', width: 12 },
+      { header: 'Vị trí quản lý (x = có)', key: 'is_management', width: 20 },
+      { header: 'Vị trí cấp trên (mã)', key: 'parent', width: 18 },
+      { header: 'Mô tả', key: 'description', width: 32 },
+    ];
+
+    const headerRow = sheet.getRow(1);
+    headerRow.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+      cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    });
+    headerRow.height = 26;
+
+    sheet.addRow({ code: 'VT01', title: 'Trưởng phòng Nhân sự', department: 'PB01', level: 3, is_management: 'x', parent: '', description: '' });
+    sheet.addRow({ code: 'VT02', title: 'Chuyên viên Tuyển dụng', department: 'PB01, PB02', level: 1, is_management: '', parent: 'VT01', description: '' });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'template-import-vi-tri.xlsx';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const tableHeaders = ['Mã vị trí', 'Chức danh', 'Phòng ban', 'Cấp bậc', 'Loại', 'Thao tác'];
 
@@ -168,12 +206,23 @@ const PositionList: React.FC = () => {
             <h2 className="text-sm font-bold text-gray-900">Danh sách vị trí</h2>
             <p className="text-xs text-gray-400 mt-0.5">Tổng số: {positions.length} vị trí</p>
           </div>
-          <button
-            className="btn-primary"
-            onClick={() => navigate('/dashboard/positions/create')}
-          >
-            + Thêm vị trí
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              className="bg-amber-500 text-white px-4 py-2 rounded-xl hover:bg-amber-600 transition-colors flex items-center"
+              onClick={() => setShowImportDialog(true)}
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Nhập từ file
+            </button>
+            <button
+              className="btn-primary"
+              onClick={() => navigate('/dashboard/positions/create')}
+            >
+              + Thêm vị trí
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -278,6 +327,16 @@ const PositionList: React.FC = () => {
         loading={deleting}
         onConfirm={handleDeleteConfirm}
         onClose={() => setPositionToDelete(null)}
+      />
+
+      <ImportFileDialog
+        open={showImportDialog}
+        title="Nhập danh sách vị trí từ file"
+        helperText="Mã vị trí là bắt buộc và dùng để nhận diện — vị trí đã tồn tại sẽ được cập nhật, chưa có sẽ được tạo mới. Phòng ban ghi bằng mã, nhiều mã cách nhau bởi dấu phẩy."
+        onDownloadTemplate={handleDownloadTemplate}
+        onImport={(file) => positionsAPI.importFile(file)}
+        onImported={() => fetchPositions(searchTerm, departmentFilter, isManagementFilter)}
+        onClose={() => setShowImportDialog(false)}
       />
     </div>
   );
