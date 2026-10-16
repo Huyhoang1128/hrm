@@ -1575,28 +1575,11 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            from hrm.finalization_views import SalaryDepartmentView
+            from hrm.finalization_views import get_salary_rows
 
-            class FakeEmployee:
-                is_bod = True
-
-            class FakeUser:
-                is_authenticated = True
-                employee = FakeEmployee()
-
-            class FakeRequest:
-                def __init__(self, year, month, employee_code):
-                    self.user = FakeUser()
-                    self.query_params = {
-                        'year': str(year),
-                        'month': str(month),
-                        'employee_code': employee_code,
-                    }
-
-            salary_view = SalaryDepartmentView()
-            salary_response = salary_view.get(FakeRequest(record.year, record.month, record.employee.employee_id))
-            salary_data = salary_response.data if hasattr(salary_response, 'data') else salary_response
-            refreshed_row = (salary_data.get('results') or [{}])[0]
+            salary_data = get_salary_rows(record.year, record.month, employee_code=record.employee.employee_id)
+            # employee_code lọc kiểu "chứa" (mã hoặc tên) → lấy đúng dòng của NV này
+            refreshed_row = next(row for row in salary_data['results'] if row['employee_id'] == record.employee_id)
         except Exception:
             refreshed_row = MonthlySalaryRecordSerializer(updated).data
 
@@ -1654,7 +1637,7 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
     def total_summary(self, request):
         """
         Tính tổng lương công ty cho một tháng.
-        Lấy dữ liệu từ SalaryDepartmentView API (hrm/finalization_views.py).
+        Lấy dữ liệu từ get_salary_rows() (hrm/finalization_views.py) — cùng số với bảng lương.
         """
         from decimal import Decimal
         
@@ -1680,38 +1663,13 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
 
         # Import functions từ finalization_views
         try:
-            from hrm.finalization_views import SalaryDepartmentView
-            salary_view = SalaryDepartmentView()
-            salary_view.request = request
-            
-            # Build params
-            class FakeRequest:
-                def __init__(self, year, month, dept_id, legal_entity):
-                    self.query_params = {}
-                    self.query_params['year'] = str(year)
-                    self.query_params['month'] = str(month)
-                    if dept_id:
-                        self.query_params['department_id'] = str(dept_id)
-                    if legal_entity:
-                        self.query_params['legal_entity'] = legal_entity
-                    self.user = request.user
-            
-            fake_req = FakeRequest(year, month, dept_id, legal_entity)
-            salary_view.request = fake_req
-            
-            # Call the GET method
-            salary_response = salary_view.get(fake_req)
+            from hrm.finalization_views import get_salary_rows
+            salary_data = get_salary_rows(year, month, department_id=dept_id, legal_entity=legal_entity)
         except Exception as e:
             return Response(
                 {'detail': f'Lỗi khi lấy dữ liệu bảng lương: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
-        # Aggregate từ salary response
-        if hasattr(salary_response, 'data'):
-            salary_data = salary_response.data
-        else:
-            salary_data = salary_response
 
         results = salary_data.get('results', [])
 
@@ -1730,7 +1688,7 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
                 'breakdown': [],
             })
 
-        # Đồng bộ chuẩn với frontend: dùng trực tiếp các trường đã được SalaryDepartmentView tính sẵn
+        # Đồng bộ chuẩn với frontend: dùng trực tiếp các trường đã được get_salary_rows() tính sẵn
         # (luong_thuc_linh, thue_tncn, con_phai_thanh_toan) thay vì tự tính lại bằng công thức rút gọn.
         total_luong_thuc_linh = Decimal('0')
         total_con_phai_thanh_toan = Decimal('0')
@@ -1949,7 +1907,7 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=False, methods=['get'], url_path='department-payslip-recipients')
     def department_payslip_recipients(self, request):
         """Preview danh sách người nhận email phiếu lương theo phòng ban/tháng."""
-        from hrm.finalization_views import SalaryDepartmentView
+        from hrm.finalization_views import get_salary_rows
 
         year = request.query_params.get('year')
         month = request.query_params.get('month')
@@ -1975,21 +1933,8 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
         if not department:
             return Response({'detail': 'Không tìm thấy phòng ban.'}, status=status.HTTP_404_NOT_FOUND)
 
-        class FakeRequest:
-            def __init__(self, user, _year, _month, _department_id):
-                self.query_params = {
-                    'year': str(_year),
-                    'month': str(_month),
-                    'department_id': str(_department_id),
-                }
-                self.user = user
-
         try:
-            salary_view = SalaryDepartmentView()
-            fake_req = FakeRequest(request.user, year, month, department_id)
-            salary_view.request = fake_req
-            salary_response = salary_view.get(fake_req)
-            salary_data = salary_response.data if hasattr(salary_response, 'data') else salary_response
+            salary_data = get_salary_rows(year, month, department_id=department_id)
         except Exception as exc:
             return Response(
                 {'detail': f'Lỗi khi lấy dữ liệu bảng lương: {str(exc)}'},
@@ -2051,7 +1996,7 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=False, methods=['get'], url_path='department-payslip-email-statuses')
     def department_payslip_email_statuses(self, request):
         """Trả về trạng thái gửi email phiếu lương theo nhân viên từ bảng EmailQueue."""
-        from hrm.finalization_views import SalaryDepartmentView
+        from hrm.finalization_views import get_salary_rows
         from hrm.models import EmailQueue
 
         year = request.query_params.get('year')
@@ -2084,24 +2029,8 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        class FakeRequest:
-            def __init__(self, user, _year, _month, _department_id, _legal_entity):
-                self.query_params = {
-                    'year': str(_year),
-                    'month': str(_month),
-                }
-                if _department_id is not None:
-                    self.query_params['department_id'] = str(_department_id)
-                if _legal_entity:
-                    self.query_params['legal_entity'] = _legal_entity
-                self.user = user
-
         try:
-            salary_view = SalaryDepartmentView()
-            fake_req = FakeRequest(request.user, year, month, department_id_int, legal_entity)
-            salary_view.request = fake_req
-            salary_response = salary_view.get(fake_req)
-            salary_data = salary_response.data if hasattr(salary_response, 'data') else salary_response
+            salary_data = get_salary_rows(year, month, department_id=department_id_int, legal_entity=legal_entity)
         except Exception as exc:
             return Response(
                 {'detail': f'Lỗi khi lấy dữ liệu bảng lương: {str(exc)}'},
@@ -2162,7 +2091,7 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
         { batch_id, queued, skipped_no_email, total }
         """
         import uuid as _uuid
-        from hrm.finalization_views import SalaryDepartmentView
+        from hrm.finalization_views import get_salary_rows
         from hrm.models import EmailBatch, EmailQueue
 
         year = request.data.get('year')
@@ -2191,21 +2120,8 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
         if not department:
             return Response({'detail': 'Không tìm thấy phòng ban.'}, status=status.HTTP_404_NOT_FOUND)
 
-        class FakeRequest:
-            def __init__(self, user, _year, _month, _department_id):
-                self.query_params = {
-                    'year': str(_year),
-                    'month': str(_month),
-                    'department_id': str(_department_id),
-                }
-                self.user = user
-
         try:
-            salary_view = SalaryDepartmentView()
-            fake_req = FakeRequest(request.user, year, month, department_id)
-            salary_view.request = fake_req
-            salary_response = salary_view.get(fake_req)
-            salary_data = salary_response.data if hasattr(salary_response, 'data') else salary_response
+            salary_data = get_salary_rows(year, month, department_id=department_id)
         except Exception as exc:
             return Response(
                 {'detail': f'Lỗi khi lấy dữ liệu bảng lương: {str(exc)}'},
@@ -2311,7 +2227,7 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=False, methods=['get'], url_path='company-payslip-recipients')
     def company_payslip_recipients(self, request):
         """Preview danh sách người nhận email phiếu lương toàn công ty."""
-        from hrm.finalization_views import SalaryDepartmentView
+        from hrm.finalization_views import get_salary_rows
 
         year = request.query_params.get('year')
         month = request.query_params.get('month')
@@ -2332,19 +2248,8 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        class FakeRequest:
-            def __init__(self, user, _year, _month, _legal_entity):
-                self.query_params = {'year': str(_year), 'month': str(_month)}
-                if _legal_entity:
-                    self.query_params['legal_entity'] = _legal_entity
-                self.user = user
-
         try:
-            salary_view = SalaryDepartmentView()
-            fake_req = FakeRequest(request.user, year, month, legal_entity)
-            salary_view.request = fake_req
-            salary_response = salary_view.get(fake_req)
-            salary_data = salary_response.data if hasattr(salary_response, 'data') else salary_response
+            salary_data = get_salary_rows(year, month, legal_entity=legal_entity)
         except Exception as exc:
             return Response(
                 {'detail': f'Lỗi khi lấy dữ liệu bảng lương: {str(exc)}'},
@@ -2418,7 +2323,7 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
         { batch_id, queued, skipped_no_email, total }
         """
         import uuid as _uuid
-        from hrm.finalization_views import SalaryDepartmentView
+        from hrm.finalization_views import get_salary_rows
         from hrm.models import EmailBatch, EmailQueue
 
         year = request.data.get('year')
@@ -2442,19 +2347,8 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        class FakeRequest:
-            def __init__(self, user, _year, _month, _legal_entity):
-                self.query_params = {'year': str(_year), 'month': str(_month)}
-                if _legal_entity:
-                    self.query_params['legal_entity'] = _legal_entity
-                self.user = user
-
         try:
-            salary_view = SalaryDepartmentView()
-            fake_req = FakeRequest(request.user, year, month, legal_entity)
-            salary_view.request = fake_req
-            salary_response = salary_view.get(fake_req)
-            salary_data = salary_response.data if hasattr(salary_response, 'data') else salary_response
+            salary_data = get_salary_rows(year, month, legal_entity=legal_entity)
         except Exception as exc:
             return Response(
                 {'detail': f'Lỗi khi lấy dữ liệu bảng lương: {str(exc)}'},
