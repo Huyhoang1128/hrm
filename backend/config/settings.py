@@ -301,6 +301,12 @@ DEFAULT_PASSWORD_PREFIX = os.environ.get('DEFAULT_PASSWORD_PREFIX', 'hrm')
 # Tiền tố mã nhân viên khi đơn vị chưa cấu hình tiền tố riêng
 EMPLOYEE_ID_FALLBACK_PREFIX = os.environ.get('EMPLOYEE_ID_FALLBACK_PREFIX', 'NV')
 
+# Cảnh báo quan trọng (hrm/important_alerts.py)
+IMPORTANT_ALERT_CONTRACT_DAYS = int(os.environ.get('IMPORTANT_ALERT_CONTRACT_DAYS', 15))
+IMPORTANT_ALERT_INSURANCE_AFTER_MONTHS = int(os.environ.get('IMPORTANT_ALERT_INSURANCE_AFTER_MONTHS', 2))
+IMPORTANT_ALERT_INSURANCE_DAYS = int(os.environ.get('IMPORTANT_ALERT_INSURANCE_DAYS', 10))
+IMPORTANT_ALERT_INSURANCE_OVERDUE_DAYS = int(os.environ.get('IMPORTANT_ALERT_INSURANCE_OVERDUE_DAYS', 30))
+
 # Redis Configuration (for Celery if re-enabled in future)
 REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 
