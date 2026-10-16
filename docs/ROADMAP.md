@@ -41,7 +41,7 @@ Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 
 | --- | --- | --- | --- |
 | 2.1 | ✅ **Tách hàm `get_salary_rows()`** khỏi `SalaryDepartmentView`, bỏ `FakeRequest` trong `salary/views.py` | M | Điều kiện để làm 2.2 và 3.1. Kết quả tính lương phải giữ nguyên. |
 | 2.2 | ✅ **Báo cáo biến động lương** giữa 2 tháng | M | Cần 2.1. |
-| 2.3 | **Xuất bảng lương nhiều tháng** + lọc Đang làm / Đã nghỉ | S–M | |
+| 2.3 | ✅ **Xuất bảng lương nhiều tháng** + lọc Đang làm / Đã nghỉ | S–M | |
 | 2.4 | **Link tự cập nhật hồ sơ** cho NV đang làm (dùng lại form onboarding) | S–M | |
 | 2.5 | **Lịch sử trạng thái NV** + trạng thái Nghỉ thai sản | M | |
 | 2.6 | **Thêm loại hợp đồng**: 6 tháng, 3 năm, thử việc 1–2 tháng | S–M | Mọi chỗ kiểm tra "thử việc / chưa chính thức" phải nhận mã mới. |
