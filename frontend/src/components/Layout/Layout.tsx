@@ -3,6 +3,7 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import NotificationDrawer from './NotificationDrawer';
 import FeedbackNotices from './FeedbackNotices';
+import ImportantAlertsGate from '../ImportantAlertsModal';
 import { NotificationDrawerProvider, useNotificationDrawer } from '@/contexts/NotificationDrawerContext';
 import { FeedbackNoticeProvider } from '@/contexts/FeedbackNoticeContext';
 
@@ -30,6 +31,9 @@ function LayoutInner({ children }: { children: ReactNode }) {
         onMarkRead={markRead}
       />
       <FeedbackNotices />
+
+      {/* Cảnh báo hợp đồng / BHXH — tự hiện 1 lần mỗi phiên cho Admin/HCNS */}
+      <ImportantAlertsGate />
     </div>
   );
 }

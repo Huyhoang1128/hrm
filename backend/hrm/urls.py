@@ -81,6 +81,7 @@ from employee.birthday_views import BirthdayWishListCreateView, BirthdayWishDeta
 from employee.import_views import EmployeeImportView, EmployeeSocialInsuranceImportView, DepartmentImportView, PositionImportView
 from employee.dependent_views import EmployeeDependentViewSet
 from .payment_document_views import PaymentDocumentViewSet
+from .important_alerts_views import ImportantAlertsView
 from .views import BulkSalaryConfigImportView
 from .meeting_room_views import (
     MeetingRoomViewSet,
@@ -142,6 +143,7 @@ urlpatterns = [
     path('employees/send-account-emails/', send_account_emails, name='send-account-emails'),
     path('employees/import/', EmployeeImportView.as_view(), name='employee-import'),
     path('departments/import/', DepartmentImportView.as_view(), name='department-import'),
+    path('important-alerts/', ImportantAlertsView.as_view(), name='important-alerts'),
     path('positions/import/', PositionImportView.as_view(), name='position-import'),
     path('employees/social-insurance/import/', EmployeeSocialInsuranceImportView.as_view(), name='employee-social-insurance-import'),
     path('employees/bulk-salary-config/', BulkSalaryConfigImportView.as_view(), name='employee-bulk-salary-config'),

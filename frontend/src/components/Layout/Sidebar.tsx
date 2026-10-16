@@ -40,6 +40,7 @@ import {
   ChatBubbleBottomCenterTextIcon,
   ExclamationTriangleIcon,
   BanknotesIcon,
+  BellAlertIcon,
 } from '@heroicons/react/24/outline';
 import { BRAND } from '@/config/brand';
 
@@ -98,6 +99,12 @@ const navigationItems: NavigationItem[] = [
         href: '/dashboard/employees',
         icon: UserIcon,
         roles: ['ADMIN', 'USER'],
+      },
+      {
+        name: 'Cảnh báo quan trọng',
+        href: '/dashboard/important-alerts',
+        icon: BellAlertIcon,
+        roles: ['ADMIN', 'HR'],
       },
       {
         name: 'Quản lý BHXH',
