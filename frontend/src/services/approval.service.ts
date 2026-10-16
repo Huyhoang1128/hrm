@@ -830,6 +830,42 @@ class ApprovalService {
       throw error;
     }
   }
+
+  // Từ chối hàng loạt giải trình chấm công
+  async bulkRejectAttendanceExplanations(ids: number[], note?: string): Promise<any> {
+    const response = await managementApi.post('/api-hrm/attendance-explanations/bulk_reject/', {
+      ids,
+      approval_note: note || 'Từ chối nhanh hàng loạt',
+    });
+    return response.data;
+  }
+
+  // Từ chối hàng loạt đơn nghỉ phép tháng
+  async bulkRejectMonthlyLeaveRequests(ids: number[], note?: string): Promise<any> {
+    const response = await managementApi.post('/api-hrm/monthly-leave-requests/bulk_reject/', {
+      ids,
+      approval_note: note || 'Từ chối nhanh hàng loạt',
+    });
+    return response.data;
+  }
+
+  // Từ chối hàng loạt đơn đăng ký
+  async bulkRejectRegistrationRequests(ids: number[], note?: string): Promise<any> {
+    const response = await managementApi.post('/api-hrm/registration-requests/bulk_reject/', {
+      ids,
+      approval_note: note || 'Từ chối nhanh hàng loạt',
+    });
+    return response.data;
+  }
+
+  // Từ chối hàng loạt đơn làm việc online
+  async bulkRejectOnlineWorkRequests(ids: number[], note?: string): Promise<any> {
+    const response = await managementApi.post('/api-hrm/online-work-requests/bulk_reject/', {
+      ids,
+      approval_note: note || 'Từ chối nhanh hàng loạt',
+    });
+    return response.data;
+  }
 }
 
 export const approvalService = new ApprovalService();
