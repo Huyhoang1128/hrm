@@ -43,6 +43,7 @@ import { nurseAccountAPI, type NurseAccountInfo } from '../utils/api/nurseAppCli
 import { CITIZEN_ID_ISSUE_PLACE_OPTIONS } from '../constants/onboarding';
 import ChangePasswordModal from '../components/Layout/ChangePasswordModal';
 import FeedbackDialog from '../components/FeedbackDialog';
+import PdfFrame from '../components/Common/PdfFrame';
 
 interface TeamMember {
   id: number;
@@ -1597,7 +1598,7 @@ const Profile: React.FC = () => {
 
             <div className="flex-1 overflow-hidden bg-gray-100">
               {viewingDoc.file_url || viewingDoc.file ? (
-                <iframe
+                <PdfFrame
                   src={viewingDoc.file_url || viewingDoc.file}
                   className="w-full h-full border-0"
                   title={viewingDoc.document_name}

@@ -26,6 +26,7 @@ import {
 import { SelectBox } from '../../components/LandingLayout/SelectBox';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useAuth } from '../../contexts/AuthContext';
+import PdfFrame from '../../components/Common/PdfFrame';
 
 const SOURCE_OPTIONS: { value: CandidateSource; label: string }[] = [
   { value: 'HR_PERSONAL', label: 'HR cá nhân' },
@@ -1136,7 +1137,7 @@ const RecruitmentCandidates: React.FC = () => {
 
                   {cvPreviewSource && cvEmbedUrl ? (
                     <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden h-[66vh]">
-                      <iframe
+                      <PdfFrame
                         src={cvEmbedUrl}
                         title="CV Preview"
                         className="w-full h-full border-0"
