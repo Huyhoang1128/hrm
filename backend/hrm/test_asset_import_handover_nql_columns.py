@@ -38,14 +38,14 @@ class HandoverColumnsReadFromRealExportTests(SimpleTestCase):
     @patch("hrm.asset_import.Employee")
     def test_full_row_reads_ma_nguoi_ban_giao(self, mock_employee):
         mock_emp = MagicMock()
-        mock_emp.full_name = "Nông Long Hưng"
+        mock_emp.full_name = "Người Quản Lý"
         mock_employee.objects.filter.return_value.first.return_value = mock_emp
 
         headers = _headers({"mã người bàn giao": 3, "tên người bàn giao": 4})
         cells = _row(headers, {
             "mã thiết bị": "MH001",
             "phân loại": "Màn hình",
-            "mã người bàn giao": "NV00538",
+            "mã người bàn giao": "NV80004",
         }, total_cols=4)
 
         payload, warnings = parse_row(cells, headers)
@@ -53,7 +53,7 @@ class HandoverColumnsReadFromRealExportTests(SimpleTestCase):
         self.assertIsNotNone(payload)
         self.assertEqual(len(payload["_handover_recipients"]), 1)
         self.assertEqual(payload["_handover_recipients"][0]["employee"], mock_emp)
-        mock_employee.objects.filter.assert_any_call(employee_id__iexact="NV00538")
+        mock_employee.objects.filter.assert_any_call(employee_id__iexact="NV80004")
 
     @patch("hrm.asset_import.Employee")
     def test_continuation_row_reads_ma_nguoi_ban_giao(self, mock_employee):
@@ -64,7 +64,7 @@ class HandoverColumnsReadFromRealExportTests(SimpleTestCase):
         headers = _headers({"mã người bàn giao": 3, "tên người bàn giao": 4})
         cells = _row(headers, {
             "mã thiết bị": "MH002",
-            "mã người bàn giao": "NV02943",
+            "mã người bàn giao": "NV80032",
         }, total_cols=4)
 
         payload, warnings = parse_row(cells, headers)
@@ -101,18 +101,18 @@ class ManagedByColumnReadFromRealExportTests(SimpleTestCase):
     @patch("hrm.asset_import.Employee")
     def test_managed_by_reads_ma_nql_kho(self, mock_employee):
         mock_emp = MagicMock()
-        mock_emp.full_name = "Trương Văn Nhân"
+        mock_emp.full_name = "Người Nhận"
         mock_employee.objects.filter.return_value.first.return_value = mock_emp
 
         headers = _headers({"mã nql (kho)": 3, "tên nql (kho)": 4})
         cells = _row(headers, {
             "mã thiết bị": "MH001",
             "phân loại": "Màn hình",
-            "mã nql (kho)": "NV02268",
+            "mã nql (kho)": "NV80012",
         }, total_cols=4)
 
         payload, warnings = parse_row(cells, headers)
 
         self.assertIsNotNone(payload)
         self.assertEqual(payload["managed_by"], mock_emp)
-        mock_employee.objects.filter.assert_any_call(employee_id__iexact="NV02268")
+        mock_employee.objects.filter.assert_any_call(employee_id__iexact="NV80012")

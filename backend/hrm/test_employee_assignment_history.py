@@ -1,6 +1,6 @@
 """
 Điều chuyển phòng ban / vị trí / ca / hình thức làm việc không làm đổi công các tháng
-trước (yêu cầu 2026-10-15, case NV02848: T9 part-time, T10 lên full-time, mở lại công
+trước (yêu cầu 2026-10-15, case NV80028: T9 part-time, T10 lên full-time, mở lại công
 T9 thấy 2 công lễ thay vì 1) — employee.EmployeeAssignmentHistory +
 employee/assignment.py + employee/signals.py.
 """
@@ -108,7 +108,7 @@ class AssignmentHistoryTests(TestCase):
         self.assertEqual(resolver.department_on(self.emp, dt.date(2026, 11, 5)), dept_c)
 
     def test_holiday_credit_follows_work_form_on_holiday(self):
-        """NV02848: lễ 01-02/09 lúc còn part-time -> 0.5/ngày dù nay đã full-time."""
+        """NV80028: lễ 01-02/09 lúc còn part-time -> 0.5/ngày dù nay đã full-time."""
         self._move_to_b_full_time()
         self.assertEqual(get_holiday_credit_for_employee(self.emp, dt.date(2026, 9, 2)), 0.5)
         self.assertEqual(get_holiday_credit_for_employee(self.emp, OCT), 1.0)

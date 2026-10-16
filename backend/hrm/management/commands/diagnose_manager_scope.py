@@ -22,7 +22,7 @@ CHỈ ĐỌC, KHÔNG sửa bất kỳ dữ liệu nào.
 
 Cách dùng:
   python manage.py diagnose_manager_scope
-  python manage.py diagnose_manager_scope --employee-code=NV02974
+  python manage.py diagnose_manager_scope --employee-code=NV80035
 """
 
 from django.core.management.base import BaseCommand
@@ -39,7 +39,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             '--employee-code', type=str, default=None,
-            help='Kiểm tra riêng 1 mã NV cụ thể, VD: NV02974',
+            help='Kiểm tra riêng 1 mã NV cụ thể, VD: NV80035',
         )
 
     def handle(self, *args, **options):

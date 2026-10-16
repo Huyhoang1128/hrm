@@ -1,4 +1,4 @@
-"""Đơn quên chấm công + máy chỉ có 1 lượt chấm nằm sai ô (case NV02831, 7/9/2026:
+"""Đơn quên chấm công + máy chỉ có 1 lượt chấm nằm sai ô (case NV80025, 7/9/2026:
 chấm 17:04 lưu ở check_in, check_out rỗng; NV khai quên check-in lúc 08:00 ->
 trước đây thiếu giờ ra nên chỉ được 0.5 công thay vì 1.0)."""
 from django.test import SimpleTestCase

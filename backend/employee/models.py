@@ -829,7 +829,7 @@ class Employee(models.Model):
 class EmployeeAssignmentHistory(models.Model):
     """Phòng ban / vị trí / Team bác sĩ / hình thức làm việc / ca cá nhân CŨ của
     nhân viên, áp cho các ngày TRƯỚC `changed_from` (yêu cầu 2026-10-15: điều
-    chuyển không được làm đổi công các tháng trước — case NV02848 T9 part-time,
+    chuyển không được làm đổi công các tháng trước — case NV80028 T9 part-time,
     T10 lên full-time, mở lại công T9 thấy 2 công lễ thay vì 1).
 
     Tự ghi khi HR đổi các thông tin trên (employee/signals.py), changed_from mặc

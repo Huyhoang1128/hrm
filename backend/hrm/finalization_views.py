@@ -440,7 +440,7 @@ def _build_daily_summary(calendar_data: list, year: int, month: int, employee: E
         weekday = cur.weekday()  # 0=Monday
         base_credit = round(day_credits.get(cur.isoformat(), 0), 2)
         # Part-time/full-time VÀO NGÀY LỄ (lịch sử điều chuyển) — đổi hình thức
-        # làm việc từ tháng sau không đổi công lễ tháng này (case NV02848).
+        # làm việc từ tháng sau không đổi công lễ tháng này (case NV80028).
         holiday_credit_unit = get_holiday_credit_for_employee(employee, cur, assignment)
         holiday_creditable = cur in holiday_map and is_holiday_creditable(employee, cur)
         holiday_credit = holiday_credit_unit if holiday_creditable else 0.0
@@ -622,7 +622,7 @@ def _split_holiday_credit(daily_summary: list, probation_end_date, unit=1.0) -> 
     daily_summary (part-time 0.5, còn lại 1.0 — theo hình thức làm việc vào ngày
     lễ); bản chốt cũ chưa lưu thì dùng `unit`: số, hoặc hàm (ngày lễ) -> số.
     Trước 2026-10-15 luôn đếm 1.0 nên NV part-time bị gấp đôi công lễ khi chốt
-    công (case NV02826 T9/2026: lịch 0.5 + 0.5 nhưng chốt ra 2 công lễ)."""
+    công (case NV80024 T9/2026: lịch 0.5 + 0.5 nhưng chốt ra 2 công lễ)."""
     thu_viec = chinh_thuc = 0.0
     for item in daily_summary or []:
         if item.get("day_type") != "L":
@@ -653,7 +653,7 @@ def _holiday_credit_to_add(rec, employee: Employee) -> tuple[Decimal, Decimal]:
 def _holiday_credit_split(rec, employee: Employee) -> tuple[Decimal, Decimal]:
     """Công lễ (thử việc, chính thức) của 1 bản chốt công — dùng ở bảng lương:
     công lễ trong thời gian thử việc được trả như công thử việc (yêu cầu
-    2026-10-03, case NV02931 T9/2026: hết thử việc 04/09, lễ 01-02/09 trước
+    2026-10-03, case NV80031 T9/2026: hết thử việc 04/09, lễ 01-02/09 trước
     đây không được tính vào lương ngày công nhánh có ngày thử việc). Bản chốt
     cũ chưa lưu tách thì tính lại từ daily_summary + ngày kết thúc thử việc."""
     if rec is None:

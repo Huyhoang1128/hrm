@@ -18,7 +18,7 @@ Bug thực tế #2 (cùng ngày, sau khi gán "Ca kinh doanh" thêm vào phòng 
 Doanh 1"): fix #1 chỉ xử lý được trường hợp 2 ca CÙNG CẤP — phòng "Kinh
 Doanh 1" không có sẵn ca ngắn nào cạnh tranh Ở ĐÚNG CÙNG CẤP (phòng ban),
 nên "Ca kinh doanh" tự động "thắng" làm mặc định ngay lập tức (không có gì
-để so sánh), làm nhân viên đi làm giờ hành chính ở đó (NV02842) bị tính
+để so sánh), làm nhân viên đi làm giờ hành chính ở đó (NV80027) bị tính
 thiếu công y hệt sự cố #1.
 
 Fix #2 (đúng gốc): thêm field ShiftConfig.detection_only — ca được đánh dấu
@@ -122,7 +122,7 @@ def _run(employee, shift_configs):
 class LoadShiftConfigsTieBreakTests(SimpleTestCase):
     def _employee(self, position_id=None, department_id=None):
         emp = MagicMock()
-        emp.employee_id = 'NV02799'
+        emp.employee_id = 'NV80022'
         emp.position = MagicMock(id=position_id) if position_id else None
         emp.department = MagicMock(id=department_id) if department_id else None
         emp.position_id = position_id
@@ -210,7 +210,7 @@ class DetectionOnlyShiftExcludedFromDefaultTests(SimpleTestCase):
 
     def _employee(self, position_id=None, department_id=None):
         emp = MagicMock()
-        emp.employee_id = 'NV02842'
+        emp.employee_id = 'NV80027'
         emp.position = MagicMock(id=position_id) if position_id else None
         emp.department = MagicMock(id=department_id) if department_id else None
         emp.position_id = position_id

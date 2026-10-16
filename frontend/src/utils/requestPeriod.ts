@@ -1,6 +1,6 @@
 // Buổi (sáng / chiều / cả ngày) của các đơn trong ngày — dùng khi gửi đơn mới để
 // chỉ ghi đè / chặn những đơn đụng buổi. Trước đây gửi Nghỉ phép tháng là huỷ
-// sạch mọi đơn chờ duyệt trong ngày, kể cả đơn ở buổi khác (NV02949 10/10/2026:
+// sạch mọi đơn chờ duyệt trong ngày, kể cả đơn ở buổi khác (NV80033 10/10/2026:
 // gửi nghỉ phép chiều làm mất đơn nghỉ không phép sáng).
 
 export type DayPeriod = 'MORNING' | 'AFTERNOON' | 'FULL_DAY';

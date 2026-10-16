@@ -63,7 +63,7 @@ def _state(employee_code):
 
 
 class DetectBestMatchingShiftMarginFixTests(SimpleTestCase):
-    """Tái hiện đúng số liệu thật của NV03098."""
+    """Tái hiện đúng số liệu thật của NV80040."""
 
     def setUp(self):
         self.personal_shift = _FakeShift("CA_SANG_8h30", _t(8, 30), _t(12, 0))
@@ -156,7 +156,7 @@ class ResolveEffectiveRulesForEventIntegrationTests(SimpleTestCase):
     """Test hrm.main_api.EmployeeState._resolve_effective_rules_for_event()
     — đúng phần nối dây current_rules_by_type vào detect_best_matching_shift()
     — mock hẳn _get_all_candidate_shifts_for_employee (DB) để chạy không cần
-    Postgres, tái hiện chính xác kịch bản NV03098 ngày 12/9."""
+    Postgres, tái hiện chính xác kịch bản NV80040 ngày 12/9."""
 
     def _candidates(self):
         return [
@@ -167,7 +167,7 @@ class ResolveEffectiveRulesForEventIntegrationTests(SimpleTestCase):
     def test_day_12_scenario_keeps_personal_shift_after_fix(self):
         """Trước fix: rule bị ghi đè sang 8h00 (ca phòng ban). Sau fix: giữ
         nguyên self.rules (ca cá nhân 8h30), không ghi đè gì."""
-        state = _state("NV03098")
+        state = _state("NV80040")
         state.rules = [_morning_rule()]
         event = Event("attendance", {
             "date": "2026-09-12", "check_in": "08:14", "check_out": "12:01",
@@ -182,7 +182,7 @@ class ResolveEffectiveRulesForEventIntegrationTests(SimpleTestCase):
     def test_day_5_scenario_unaffected_full_day_checkout(self):
         """Checkout cả ngày (17:35) không khớp ca nửa ngày nào -> không ghi
         đè gì, y hệt trước fix."""
-        state = _state("NV03098")
+        state = _state("NV80040")
         state.rules = [_morning_rule()]
         event = Event("attendance", {
             "date": "2026-09-05", "check_in": "08:14", "check_out": "17:35",
@@ -219,14 +219,14 @@ class ResolveEffectiveRulesForEventIntegrationTests(SimpleTestCase):
         self.assertEqual(overridden["conditions"]["end_time"], "21:00:00")
 
     def test_single_detection_only_candidate_still_overrides_hm02842_scenario(self):
-        """Bug thực tế (2026-09-17, NV02842, phòng Kinh Doanh 1): phòng ban chỉ
+        """Bug thực tế (2026-09-17, NV80027, phòng Kinh Doanh 1): phòng ban chỉ
         được gán DUY NHẤT 1 ca (KD-FULL, detection_only=True) -> get_all_
         candidate_shifts_for_employee() trả về đúng 1 phần tử. Guard cũ
         ("len(candidates) < 2 -> bỏ qua") khiến ngày làm đúng ca kinh doanh
         (checkin ~13h/checkout 21h) vẫn bị tính theo ca mặc định công ty
         ngắn hơn (13h-17h, 0.5 công) thay vì ca kinh doanh (8h, 1.0 công).
         Sau fix: chỉ cần candidates không rỗng là đủ để so khớp."""
-        state = _state("NV02842")
+        state = _state("NV80027")
         state.rules = [{
             "rule_name": "Ca chiều mặc định công ty",
             "rule_type": "SHIFT_RULE_AFTERNOON",

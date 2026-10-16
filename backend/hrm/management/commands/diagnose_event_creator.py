@@ -24,7 +24,7 @@ class Command(BaseCommand):
     help = "Debug: xác định ai đã tạo 1 EmployeeEvent cụ thể (đơn tăng ca/nghỉ/... bị tạo nhầm) (read-only)"
 
     def add_arguments(self, parser):
-        parser.add_argument('employee_id', type=str, help='Mã NV (employee_id) bị ảnh hưởng, vd NV00034')
+        parser.add_argument('employee_id', type=str, help='Mã NV (employee_id) bị ảnh hưởng, vd NV80001')
         parser.add_argument('attendance_date', type=str, help='Ngày của đơn, định dạng YYYY-MM-DD')
         parser.add_argument(
             '--contains', type=str, default=None,

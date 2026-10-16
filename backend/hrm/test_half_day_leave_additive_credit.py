@@ -1,7 +1,7 @@
 """
 hrm/test_half_day_leave_additive_credit.py
 ════════════════════════════════════════════
-Bug thực tế (NV NV02854, 31/8): chấm công buổi sáng (08:31-12:02, muộn 1 phút
+Bug thực tế (NV NV80029, 31/8): chấm công buổi sáng (08:31-12:02, muộn 1 phút
 nhưng vẫn được 0.5 công vì < 120 phút — xem _evaluate_afternoon_shift_rule/
 _evaluate_morning_shift_rule) + đơn "Nghỉ phép nửa ngày" (LEAVE, HALF_DAY)
 được duyệt cho buổi còn lại -> cả ngày chỉ ra 0.5 công thay vì đúng ra 1.0.
@@ -66,7 +66,7 @@ def _leave_full_day_approval_event(event_date, leave_type="ANNUAL"):
 
 class HalfDayLeaveAdditiveCreditTests(SimpleTestCase):
     def test_morning_attendance_with_late_violation_plus_afternoon_leave_reaches_full_day(self):
-        """Kịch bản bug thực tế (NV02854, 31/8): sáng đi muộn 1 phút nhưng vẫn
+        """Kịch bản bug thực tế (NV80029, 31/8): sáng đi muộn 1 phút nhưng vẫn
         được 0.5 công + nghỉ phép nửa ngày (chiều) được duyệt -> PHẢI ra 1.0
         công, không phải 0.5."""
         state = _make_state([

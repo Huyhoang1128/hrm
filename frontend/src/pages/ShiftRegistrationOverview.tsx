@@ -442,7 +442,7 @@ const ShiftRegistrationOverview: React.FC = () => {
           <p className="mt-1 text-sm text-gray-500">
             {scope.is_admin_or_hr
               ? 'Theo dõi việc đăng ký ca làm của toàn bộ nhân viên trong phạm vi áp dụng'
-              : 'Theo dõi cấp dưới trực tiếp — nhóm cần duyệt ca theo ngày (vd Điều dưỡng, Sale BS Minh Trung) có thể đăng ký/duyệt ngay ở đây, nhóm khác chỉ xem'}
+              : 'Theo dõi cấp dưới trực tiếp — nhóm cần duyệt ca theo ngày (vd Điều dưỡng, Sale) có thể đăng ký/duyệt ngay ở đây, nhóm khác chỉ xem'}
           </p>
         </div>
         {scope.is_admin_or_hr && departmentOptions.length > 1 && (

@@ -282,7 +282,7 @@ class AttendanceUploadTemplateView(APIView):
         # Create sample data for template
         sample_data = {
             'STT': [1, 2, 3],
-            'Mã nhân viên': ['NV02311', 'NV02312', 'NV02313'],
+            'Mã nhân viên': ['NV80013', 'NV80014', 'NV80015'],
             'Tên nhân viên': ['Lê Văn C', 'Nguyễn Văn A', 'Trần Thị B'],
             'Phòng Ban': ['HR', 'IT', 'Sales'],
             'Ngày': ['2025-12-16', '2025-12-17', '2025-12-18'],

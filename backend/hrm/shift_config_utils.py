@@ -492,8 +492,7 @@ def get_registered_shift_configs_for_date(employee, target_date, _scope_cache: d
     ).select_related('morning_shift', 'afternoon_shift').first()
 
     # Mô hình "mặc định Ca 1, chỉ đăng ký NGOẠI LỆ Ca 2 cần duyệt"
-    # (config.requires_manager_approval=True — vd 8 Điều dưỡng BS Ma Doãn
-    # Dương): không có đăng ký nào cho ngày này, HOẶC có nhưng chưa được
+    # (config.requires_manager_approval=True — vd 8 Điều dưỡng BS A): không có đăng ký nào cho ngày này, HOẶC có nhưng chưa được
     # quản lý trực tiếp duyệt (PENDING/REJECTED/quá hạn chưa duyệt kịp) =>
     # luôn áp dụng Ca 1 mặc định, KHÔNG rơi về cascade ca cố định (vốn không
     # có ý nghĩa cho nhóm này — xem ShiftConfig của Ca 1/Ca 2 chỉ được gán

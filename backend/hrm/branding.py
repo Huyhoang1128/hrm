@@ -42,7 +42,7 @@ def email_banner_url():
 
 
 def default_password(employee_id):
-    """<DEFAULT_PASSWORD_PREFIX>@ + 5 số cuối mã nhân viên. VD: NV02785 → hrm@02785."""
+    """<DEFAULT_PASSWORD_PREFIX>@ + 5 số cuối mã nhân viên. VD: NV80020 → hrm@80020."""
     match = re.search(r'(\d+)$', str(employee_id or ''))
     tail = match.group(1)[-5:] if match else '00001'
     return f"{_get('DEFAULT_PASSWORD_PREFIX', 'hrm')}@{tail}"

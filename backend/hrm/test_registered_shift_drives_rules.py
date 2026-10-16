@@ -5,7 +5,7 @@ Bug thực tế (phát hiện 2026-09-19): ca đã ĐĂNG KÝ ("Đăng ký ca l�
 resolve ĐÚNG nhưng KHÔNG hề ảnh hưởng tới công/phạt.
 
 Số liệu thực tế — một NV thuộc phạm vi
-ShiftRegistrationScopeConfig "Điều dưỡng BS Ma Doãn Dương":
+ShiftRegistrationScopeConfig "Điều dưỡng BS A":
   • Ngày 2026-09-09 đã đăng ký + được duyệt Ca 2
     (sáng 09:30-13:30, chiều 14:30-18:30).
   • Chấm công thực tế 09:13 → 18:32, tức là đi SỚM so với Ca 2.
@@ -47,7 +47,7 @@ class _FakeShift:
         self.working_hours = working_hours
 
 
-# Cặp ca thật của config "Điều dưỡng BS Ma Doãn Dương"
+# Cặp ca thật của config "Điều dưỡng BS A"
 CA1_MORNING = _FakeShift("Ca 1 sáng", _t(7, 30), _t(11, 30), 'MORNING')
 CA1_AFTERNOON = _FakeShift("Ca 1 chiều", _t(12, 30), _t(16, 30), 'AFTERNOON')
 CA2_MORNING = _FakeShift("Ca 2 sáng", _t(9, 30), _t(13, 30), 'MORNING')
@@ -56,13 +56,13 @@ CA2_AFTERNOON = _FakeShift("Ca 2 chiều", _t(14, 30), _t(18, 30), 'AFTERNOON')
 # Rule cascade theo phòng ban — đúng giờ đang gây ra "muộn 103 phút"
 CASCADE_RULES = [
     {
-        'rule_name': 'ShiftConfig: sale điều dưỡng minh trung doãn dương 7h30',
+        'rule_name': 'ShiftConfig: sale điều dưỡng bs b bs a 7h30',
         'rule_type': 'SHIFT_RULE_MORNING',
         'conditions': {'start_time': '07:30:00', 'end_time': '12:00:00', 'workday': 0.5},
         'priority': 50,
     },
     {
-        'rule_name': 'ShiftConfig: sale và điều dưỡng minh trung doãn dương checkout 16h30',
+        'rule_name': 'ShiftConfig: sale và điều dưỡng bs b bs a checkout 16h30',
         'rule_type': 'SHIFT_RULE_AFTERNOON',
         'conditions': {'start_time': '13:00:00', 'end_time': '16:30:00', 'workday': 0.5},
         'priority': 50,
@@ -89,7 +89,7 @@ def _attendance_event(check_in="09:13", check_out="18:32"):
 
 
 def _make_state():
-    state = EmployeeState("NV02832")
+    state = EmployeeState("NV80026")
     state.rules = list(CASCADE_RULES)
     # Nhân viên tồn tại — không chạm DB.
     state._employee_obj = object()
@@ -120,7 +120,7 @@ class RegisteredShiftDrivesRulesTests(SimpleTestCase):
     """_resolve_effective_rules_for_event() phải ưu tiên ca đã đăng ký."""
 
     def test_registered_ca2_replaces_cascade_shift_rules(self):
-        """Đúng kịch bản NV02832 ngày 9/9: đăng ký Ca 2 -> rule ca sáng/chiều
+        """Đúng kịch bản NV80026 ngày 9/9: đăng ký Ca 2 -> rule ca sáng/chiều
         phải là 09:30-13:30 và 14:30-18:30, không còn 07:30/13:00 của cascade."""
         state = _make_state()
         with _patch_registered([CA2_MORNING, CA2_AFTERNOON]):

@@ -1,7 +1,7 @@
 """
 hrm/test_incomplete_attendance_additive_credit.py
 ══════════════════════════════════════════════════
-Bug thực tế (NV NV02819, 03/9/2026): nghỉ phép nửa ngày buổi sáng (đã duyệt,
+Bug thực tế (NV NV80023, 03/9/2026): nghỉ phép nửa ngày buổi sáng (đã duyệt,
 +0.5 công) + giải trình "Quên chấm công" (INCOMPLETE_ATTENDANCE) buổi chiều
 (quên check-in 13h, check-out 17h30 -> 4.5h làm việc, dưới ngưỡng 5.5h nên
 target_credit=0.5) — cả 2 đơn đều đã được duyệt, nhưng cả ngày vẫn chỉ ra
@@ -139,7 +139,7 @@ class IncompleteAttendanceStacksWithOtherHalfDayCreditTests(SimpleTestCase):
 
 
 class IncompleteAttendanceFallsBackToRealAttendanceTests(SimpleTestCase):
-    """Bug thực tế (NV NV03078, 17/9/2026): quên check-in buổi sáng (khai
+    """Bug thực tế (NV NV80038, 17/9/2026): quên check-in buổi sáng (khai
     08:30), nộp đơn giải trình lúc 11h22 — TRƯỚC KHI chấm công ra buổi
     chiều/tối phát sinh (17:49, ghi nhận lúc ~17h50 cùng ngày). Snapshot
     actual_check_out lúc tạo đơn vì vậy là null. Đơn được duyệt xong ở cấp

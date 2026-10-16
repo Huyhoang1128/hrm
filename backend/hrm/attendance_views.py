@@ -1299,7 +1299,7 @@ class AttendanceCalendarView(APIView):
     @staticmethod
     def _find_unauthorized_absence_event(day_events: list, allowed_statuses=("APPROVED",)):
         """Đơn Nghỉ không phép của ngày có trạng thái thuộc allowed_statuses —
-        bỏ qua đơn bị từ chối/đã huỷ đứng trước trong danh sách (case NV02949
+        bỏ qua đơn bị từ chối/đã huỷ đứng trước trong danh sách (case NV80033
         10/9/2026: đơn REJECTED che mất đơn APPROVED tạo lại → ngày hiện "Nửa công")."""
         from .event_models import EmployeeEvent as EmpEvent
         return next(
@@ -1326,7 +1326,7 @@ class AttendanceCalendarView(APIView):
 
     # Ngày có vi phạm ở buổi đi làm còn lại (đi muộn/về sớm/quên chấm công/vắng)
     # được ưu tiên hiển thị hơn "Nghỉ không phép", nhưng đơn KP đã duyệt vẫn phải
-    # được đếm (case NV03077 19/9/2026: sáng đi muộn có giải trình, chiều nghỉ
+    # được đếm (case NV80037 19/9/2026: sáng đi muộn có giải trình, chiều nghỉ
     # không phép → bộ đếm bỏ sót 0.5 ngày).
     _KP_COUNTED_WITH_VIOLATION_STATUSES = ("LATE", "EARLY_LEAVE", "LATE_EARLY", "FORGOT_CC", "ABSENT")
 

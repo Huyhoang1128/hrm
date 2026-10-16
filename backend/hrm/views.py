@@ -3434,8 +3434,8 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                     # Trước đây lấy ca cố định của NGÀY 01 THÁNG, nên đúng những
                     # ngày engine trả 0 vì không vi phạm (Ca 2 đã duyệt, đổi ca
                     # giữa tháng) lại bị hiện ra số phút muộn/sớm sai — vd
-                    # NV02970 25/09/2026 Ca 2 đã duyệt hiện "muộn 102 phút" dù
-                    # phạt 0đ; NV01704 23-24/09 hiện "về sớm 24-30 phút".
+                    # NV80034 25/09/2026 Ca 2 đã duyệt hiện "muộn 102 phút" dù
+                    # phạt 0đ; NV80010 23-24/09 hiện "về sớm 24-30 phút".
                     try:
                         registered = get_registered_shift_configs_for_date(employee, cur, _reg_scope_cache)
                     except Exception:
@@ -9290,7 +9290,7 @@ def forgot_password(request):
     """
     Public endpoint: nhân viên tự yêu cầu cấp lại mật khẩu
     POST /api-hrm/forgot-password/
-    Body: { "employee_id": "NV02740" }
+    Body: { "employee_id": "NV80018" }
     """
     import secrets, string, logging
     logger = logging.getLogger(__name__)
@@ -11020,7 +11020,7 @@ class GenericRequestViewSet(viewsets.ModelViewSet):
         """Tác động phụ khi đơn được DUYỆT CUỐI (status -> APPROVED). Phải gọi ở
         MỌI đường duyệt cuối: admin_approve() và nhánh Admin bypass của
         manager_approve() — trước đây nhánh bypass bỏ sót, đơn tạm ứng APPROVED
-        nhưng không có bản ghi SalaryAdvance (case NV02790, ADV-202610-0070)."""
+        nhưng không có bản ghi SalaryAdvance (case NV80021, ADV-202610-0070)."""
         # Sync Employee.end_date khi RESIGNATION được duyệt cuối cùng.
         # Single source of truth: expected_date trên đơn đã duyệt.
         if req.request_type == 'RESIGNATION' and req.expected_date and req.employee_id:

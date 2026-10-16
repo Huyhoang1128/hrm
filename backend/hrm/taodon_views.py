@@ -520,7 +520,7 @@ class ExplanationEventCreateSerializer(drf_serializers.Serializer):
 
         # Chặn đơn giải trình vi phạm TRÙNG cùng ngày: mỗi đơn được duyệt hoàn
         # lại tiền phạt của ngày đó, nên 2 đơn trùng từng làm hoàn phạt 2 lần
-        # (NV00040 30/09/2026: 2 đơn Đi muộn cách nhau 4 phút -> tổng phạt -50.000đ).
+        # (NV80002 30/09/2026: 2 đơn Đi muộn cách nhau 4 phút -> tổng phạt -50.000đ).
         # Chỉ Đi muộn/Về sớm — quên chấm công sáng + chiều là 2 đơn hợp lệ cùng ngày.
         if explanation_type in (ExplanationType.LATE, ExplanationType.EARLY_LEAVE) and attendance_date and employee_id:
             existing_event = EmployeeEvent.objects.filter(
@@ -1710,7 +1710,7 @@ class AttendanceExplanationViewSet(BulkRejectMixin, FinalizationLockMixin, views
         for event in qs:
             # Khoá hạn duyệt Công tác/Nghỉ phép tháng — giống approve()/bulk_approve().
             # Kiểm tra TRƯỚC khi gom nhóm để đơn quá hạn không chiếm hạn mức nghỉ phép
-            # của các đơn khác trong cùng lượt. (Case NV02974: Công tác 21/9 hạn
+            # của các đơn khác trong cùng lượt. (Case NV80035: Công tác 21/9 hạn
             # 11:00 21/9, QLTT "Duyệt nhanh hàng loạt" lọt lúc 11:53 22/9.)
             approve_deadline_error = _check_explanation_approve_deadline(event, bypass=(is_admin or can_as_hr))
             if approve_deadline_error:

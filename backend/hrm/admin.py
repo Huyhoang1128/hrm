@@ -3262,7 +3262,7 @@ class ShiftRegistrationScopeConfigAdmin(admin.ModelAdmin):
             'fields': ('default_ca_label', 'registrable_ca_label'),
             'description': (
                 "Tên team này dùng để gọi 2 ca — chỉ đổi NHÃN trên giao diện, không đổi "
-                "cơ chế. VD Sale BS Minh Trung: mặc định gọi là \"Ca 2\", đăng ký gọi là \"Ca 1\"."
+                "cơ chế. VD Sale BS B: mặc định gọi là \"Ca 2\", đăng ký gọi là \"Ca 1\"."
             ),
         }),
         ('Thông tin hệ thống', {'fields': ('updated_by', 'updated_at'), 'classes': ('collapse',)}),

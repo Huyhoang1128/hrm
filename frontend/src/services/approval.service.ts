@@ -265,7 +265,7 @@ class ApprovalService {
   // lần — dùng khi duyệt từ màn "Chi tiết ngày" (AttendanceCalendar.tsx), nơi
   // chỉ thấy/duyệt được đúng 1 ngày nếu gọi approveRegistrationRequest(id) như
   // đơn 1 ngày bình thường, khiến các ngày còn lại trong đơn vẫn treo PENDING
-  // dù QLTT tin là đã duyệt xong cả đơn (case thực tế 2026-09-24, NV00643).
+  // dù QLTT tin là đã duyệt xong cả đơn (case thực tế 2026-09-24, NV80007).
   async approveRegistrationRequestGroup(requestCode: string, note?: string): Promise<any> {
     try {
       const response = await managementApi.post('/api-hrm/registration-requests/approve_group/', {
