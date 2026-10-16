@@ -2275,6 +2275,13 @@ class OnlineWorkRequestViewSet(FinalizationLockMixin, viewsets.ViewSet):
         if not approver:
             return Response({"error": "Employee profile not found"}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Cùng điều kiện quyền với approve(): chỉ quản lý trực tiếp, HCNS/người có
+        # quyền duyệt hoặc admin mới được từ chối đơn của người khác.
+        is_admin_user = request.user.is_staff or request.user.is_superuser
+        if not (event.employee.manager == approver or _is_hr(approver)
+                or _has_approve_permission(approver) or is_admin_user):
+            return Response({"error": "Bạn không có quyền từ chối đơn này"}, status=status.HTTP_403_FORBIDDEN)
+
         d = dict(event.data or {})
         d.update({
             "status": "REJECTED",
