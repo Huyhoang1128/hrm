@@ -14,6 +14,20 @@ import type {
 let mePromise: Promise<Employee> | null = null;
 
 // Employees API
+export interface EmployeeStatusLogEntry {
+  id: number;
+  employee: number;
+  employee_code: string;
+  full_name: string;
+  from_status: string | null;
+  from_status_label: string | null;
+  to_status: string;
+  to_status_label: string;
+  changed_at: string;
+  changed_by: string | null;
+  note: string;
+}
+
 export const employeesAPI = {
   list: async (params?: {
     page?: number;
@@ -116,11 +130,14 @@ export const employeesAPI = {
     await managementApi.delete(`/api-hrm/employees/${id}/`);
   },
 
-  stats: async (): Promise<{
+  /** month = 'YYYY-MM' → số liệu tại cuối tháng đó (theo nhật ký trạng thái); bỏ trống = hiện tại. */
+  stats: async (params?: { month?: string }): Promise<{
     total: number;
     active: number;
     inactive: number;
     probation: number;
+    suspended?: number;
+    maternity_leave?: number;
     department_stats: Array<{
       department_id: number;
       department_name: string;
@@ -147,7 +164,13 @@ export const employeesAPI = {
         female: number;
         other: number;
       };
-    }> = await managementApi.get('/api-hrm/employees/stats/');
+    }> = await managementApi.get('/api-hrm/employees/stats/', { params });
+    return response.data;
+  },
+
+  /** Nhật ký đổi trạng thái làm việc trong tháng (HCNS/Admin). */
+  statusLog: async (month: string): Promise<{ count: number; results: EmployeeStatusLogEntry[] }> => {
+    const response = await managementApi.get('/api-hrm/employees/status-log/', { params: { month } });
     return response.data;
   },
 

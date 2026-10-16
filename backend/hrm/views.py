@@ -4,6 +4,8 @@ import os
 from collections import defaultdict
 import re
 from users.utils import get_user_display_name
+from employee.models import EmployeeStatusHistory, TEMPORARILY_OFF_STATUSES
+from datetime import date
 
 logger = logging.getLogger(__name__)
 
@@ -410,7 +412,7 @@ class StaffOwnDataPermission(BasePermission):
         return False
 
 
-_SUSPENDED_EMPLOYMENT_STATUSES = ['SUSPENDED', 'PAUSED']
+_SUSPENDED_EMPLOYMENT_STATUSES = list(TEMPORARILY_OFF_STATUSES)
 
 
 def _working_employee_q(today):
@@ -425,6 +427,72 @@ def _probation_q(today):
     """Còn thử việc: hợp đồng thử việc HOẶC còn hạn probation_end_date
     ("Thử việc" không còn là giá trị của employment_status)."""
     return Q(contract_type='PROBATION') | Q(probation_end_date__gte=today)
+
+
+def _month_ref_date(month_param):
+    """'2026-09' → ngày cuối tháng, nhưng không vượt quá hôm nay; sai định dạng → None."""
+    import calendar
+    try:
+        year, month = (int(part) for part in str(month_param).split('-')[:2])
+        last_day = calendar.monthrange(year, month)[1]
+    except (TypeError, ValueError):
+        return None
+    return min(date(year, month, last_day), timezone.localdate())
+
+
+def _employee_status_at_annotation(ref_date):
+    """Trạng thái của NV tại ref_date, theo thứ tự ưu tiên:
+    1. "trạng thái sau" của bản ghi nhật ký mới nhất tới ngày đó;
+    2. chưa có bản ghi nào tới ngày đó → "trạng thái trước" của lần đổi sớm nhất sau ngày đó
+       (vd hôm nay mới chuyển sang Nghỉ thai sản thì các tháng trước vẫn là Đang làm việc);
+    3. không có nhật ký → trạng thái hiện tại."""
+    from django.db.models import OuterRef, Subquery
+    from django.db.models.functions import Coalesce
+    last_status = EmployeeStatusHistory.objects.filter(
+        employee=OuterRef('pk'), changed_at__lte=ref_date,
+    ).order_by('-changed_at', '-id').values('to_status')[:1]
+    status_before_next_change = EmployeeStatusHistory.objects.filter(
+        employee=OuterRef('pk'), changed_at__gt=ref_date, from_status__isnull=False,
+    ).order_by('changed_at', 'id').values('from_status')[:1]
+    return Coalesce(Subquery(last_status), Subquery(status_before_next_change), 'employment_status')
+
+
+def _employee_stats_at(ref_date):
+    """Thống kê nhân sự tại một ngày trong quá khứ (cùng khoá với stats() hiện tại).
+
+    Không dùng is_active (cờ HCNS bật/tắt theo hiện tại); xét đã vào làm và chưa
+    nghỉ tại ref_date theo start_date / end_date.
+    """
+    employees = Employee.objects.annotate(status_at=_employee_status_at_annotation(ref_date)).filter(
+        Q(start_date__isnull=True) | Q(start_date__lte=ref_date)
+    )
+    # Ngày nghỉ việc là mốc quyết định: đã qua ngày nghỉ → đã nghỉ; INACTIVE mà không có
+    # ngày nghỉ cũng tính đã nghỉ. Người nghỉ SAU mốc vẫn đang làm tại mốc (kể cả khi
+    # hiện giờ đã là INACTIVE mà chưa có nhật ký từ trước).
+    left = Q(end_date__isnull=False, end_date__lte=ref_date) | Q(status_at='INACTIVE', end_date__isnull=True)
+    not_left = ~left
+    active_qs = employees.filter(not_left).exclude(status_at__in=TEMPORARILY_OFF_STATUSES)
+    inactive = employees.filter(left).count()
+    department_stats = [
+        {'department_id': row['department'], 'department_name': row['department__name'], 'count': row['count']}
+        for row in active_qs.exclude(department__isnull=True).values('department', 'department__name')
+        .annotate(count=models.Count('id')).order_by('department__name')
+    ]
+    return {
+        'ref_date': ref_date,
+        'total': employees.count(),
+        'active': active_qs.count(),
+        'inactive': inactive,
+        'probation': active_qs.filter(_probation_q(ref_date)).count(),
+        'suspended': employees.filter(not_left, status_at__in=['SUSPENDED', 'PAUSED']).count(),
+        'maternity_leave': employees.filter(not_left, status_at='MATERNITY_LEAVE').count(),
+        'department_stats': department_stats,
+        'gender_stats': {
+            'male': active_qs.filter(gender='M').count(),
+            'female': active_qs.filter(gender='F').count(),
+            'other': active_qs.filter(gender='O').count(),
+        },
+    }
 
 
 class EmployeeViewSet(viewsets.ModelViewSet):
@@ -527,7 +595,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             from datetime import date
             today = date.today()
             suspended_statuses = _SUSPENDED_EMPLOYMENT_STATUSES
-            if status_param in suspended_statuses:
+            if status_param == 'MATERNITY_LEAVE':
+                queryset = queryset.filter(employment_status='MATERNITY_LEAVE')
+            elif status_param in suspended_statuses:
                 queryset = queryset.filter(employment_status__in=suspended_statuses)
             elif status_param == 'INACTIVE':
                 queryset = queryset.exclude(employment_status__in=suspended_statuses).filter(
@@ -548,6 +618,17 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 if end_date_to:
                     queryset = queryset.filter(end_date__lte=end_date_to)
         return queryset
+
+    def perform_create(self, serializer):
+        employee = serializer.save()
+        # Bản ghi nhật ký đầu tiên được tạo trong Employee.save(), lúc đó chưa biết người tạo.
+        EmployeeStatusHistory.objects.filter(employee=employee, changed_by__isnull=True).update(
+            changed_by=self.request.user if self.request.user.is_authenticated else None,
+        )
+
+    def perform_update(self, serializer):
+        serializer.instance._changed_by = self.request.user if self.request.user.is_authenticated else None
+        serializer.save()
     
     def get_serializer_class(self):
         """
@@ -676,9 +757,18 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     def stats(self, request):
         """
         Get employee statistics
+
+        ?month=YYYY-MM → số liệu tại cuối tháng đó (không quá hôm nay), theo trạng thái
+        trong nhật ký EmployeeStatusHistory; bỏ trống → số liệu hiện tại.
         """
+        month_param = request.query_params.get('month')
+        if month_param:
+            ref_date = _month_ref_date(month_param)
+            if ref_date is None:
+                return Response({'detail': 'month phải có dạng YYYY-MM.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(_employee_stats_at(ref_date))
         today = timezone.now().date()
-        suspended_statuses = ['SUSPENDED', 'PAUSED']
+        suspended_statuses = list(TEMPORARILY_OFF_STATUSES)
 
         active_queryset = Employee.objects.exclude(
             employment_status__in=suspended_statuses
@@ -714,11 +804,14 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         female_count = active_queryset.filter(gender='F').count()
         other_count = active_queryset.filter(gender='O').count()
         
+        not_left = models.Q(end_date__isnull=True) | models.Q(end_date__gt=today)
         return Response({
             'total': total,
             'active': active,
             'inactive': inactive,
             'probation': probation,
+            'suspended': Employee.objects.filter(not_left, employment_status__in=['SUSPENDED', 'PAUSED']).count(),
+            'maternity_leave': Employee.objects.filter(not_left, employment_status='MATERNITY_LEAVE').count(),
             'department_stats': department_stats,
             'gender_stats': {
                 'male': male_count,
@@ -727,6 +820,34 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             }
         })
     
+    @action(detail=False, methods=['get'], url_path='status-log',
+            permission_classes=[IsAuthenticated, IsAdminOrHR])
+    def status_log(self, request):
+        """Nhật ký thay đổi trạng thái nhân viên trong tháng (?month=YYYY-MM, mặc định tháng này)."""
+        month_param = request.query_params.get('month') or timezone.localdate().strftime('%Y-%m')
+        ref_date = _month_ref_date(month_param)
+        if ref_date is None:
+            return Response({'detail': 'month phải có dạng YYYY-MM.'}, status=status.HTTP_400_BAD_REQUEST)
+        year, month = (int(part) for part in month_param.split('-')[:2])
+        labels = dict(Employee._meta.get_field('employment_status').choices)
+        logs = EmployeeStatusHistory.objects.filter(
+            changed_at__gte=date(year, month, 1), changed_at__lte=ref_date,
+        ).select_related('employee', 'changed_by').order_by('-changed_at', '-id')
+        results = [{
+            'id': log.id,
+            'employee': log.employee_id,
+            'employee_code': log.employee.employee_id,
+            'full_name': log.employee.full_name,
+            'from_status': log.from_status,
+            'from_status_label': labels.get(log.from_status, log.from_status) if log.from_status else None,
+            'to_status': log.to_status,
+            'to_status_label': labels.get(log.to_status, log.to_status),
+            'changed_at': log.changed_at,
+            'changed_by': get_user_display_name(log.changed_by) if log.changed_by_id else None,
+            'note': log.note,
+        } for log in logs]
+        return Response({'count': len(results), 'results': results})
+
     @action(detail=False, methods=['get'])
     def hr_employees(self, request):
         """
@@ -795,7 +916,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         ).exclude(
             employment_status='INACTIVE',
         ).filter(
-            Q(employment_status__in=['SUSPENDED', 'PAUSED']) |
+            Q(employment_status__in=list(TEMPORARILY_OFF_STATUSES)) |
             Q(end_date__isnull=True) |
             Q(end_date__gt=target_date),
         ).order_by('employee_id')
@@ -2596,7 +2717,7 @@ class DashboardAPIView(APIView):
         def is_currently_working(employee):
             return (
                 employee.is_active
-                and employee.employment_status not in ('SUSPENDED', 'PAUSED')
+                and employee.employment_status not in TEMPORARILY_OFF_STATUSES
                 and (employee.end_date is None or employee.end_date > today)
             )
 
@@ -2990,7 +3111,7 @@ class DashboardAPIView(APIView):
             is_admin = bool(getattr(request.user, 'is_superuser', False) or getattr(request.user, 'is_staff', False))
 
         today = timezone.now().date()
-        suspended_statuses = ['SUSPENDED', 'PAUSED']
+        suspended_statuses = list(TEMPORARILY_OFF_STATUSES)
 
         active_employee_queryset = Employee.objects.exclude(
             employment_status__in=suspended_statuses

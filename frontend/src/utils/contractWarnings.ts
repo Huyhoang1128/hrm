@@ -7,7 +7,7 @@
 
 const PROBATION_TYPES = ['PROBATION'];
 const OFFICIAL_TYPES = ['ONE_YEAR', 'TWO_YEAR', 'INDEFINITE'];
-const NOT_WORKING_STATUSES = ['INACTIVE', 'PAUSED', 'SUSPENDED'];
+const NOT_WORKING_STATUSES = ['INACTIVE', 'PAUSED', 'SUSPENDED', 'MATERNITY_LEAVE'];
 
 /** "dd/mm/yyyy" -> Date (00:00) hoặc null */
 const parseDisplayDate = (v: string): Date | null => {

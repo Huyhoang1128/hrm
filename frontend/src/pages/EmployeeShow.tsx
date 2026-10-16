@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { employeesAPI, Employee, managementApi } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { formatDate } from '../utils/dateUtils';
+import { employmentStatusLabel } from '../constants/employmentStatus';
 import { WORK_LOCATION_OPTIONS } from '../constants/onboarding';
 import {
   ArrowLeftIcon,
@@ -367,11 +368,7 @@ const EmployeeShow: React.FC = () => {
             <InfoField label="Vùng/Miền" value={emp.region} />
             <InfoField label="Khối" value={emp.block} />
             <InfoField label="Đơn vị" value={emp.company_unit?.name} />
-            <InfoField label="Trạng thái" value={
-              emp.employment_status === 'PAUSED' ? 'Tạm dừng' :
-              emp.employment_status === 'INACTIVE' ? 'Đã nghỉ' :
-              'Đang làm việc'
-            } />
+            <InfoField label="Trạng thái" value={employmentStatusLabel(emp.employment_status) || 'Đang làm việc'} />
             <InfoField label="Ghi chú công việc" value={emp.employment_status_notes} full />
           </div>
         </div>

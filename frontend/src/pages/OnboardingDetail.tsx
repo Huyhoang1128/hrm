@@ -32,6 +32,7 @@ import {
   WORK_LOCATION_OPTIONS,
 } from '../constants/onboarding';
 import PdfFrame from '../components/Common/PdfFrame';
+import { employmentStatusLabel } from '../constants/employmentStatus';
 
 const EDUCATION_LEVEL_MAP: Record<string, string> = {
   MASTER: 'Thạc sĩ',
@@ -1024,11 +1025,7 @@ const OnboardingDetail: React.FC = () => {
             })()} />
             <InfoField label="Vùng/Miền" value={safeDisplay(employeeProfile?.region || onboarding.region)} />
             <InfoField label="Khối" value={safeDisplay(employeeProfile?.block || onboarding.block)} />
-            <InfoField label="Trạng thái" value={
-              employeeProfile?.employment_status === 'PAUSED' ? 'Tạm dừng' :
-              employeeProfile?.employment_status === 'INACTIVE' ? 'Đã nghỉ' :
-              'Đang làm việc'
-            } />
+            <InfoField label="Trạng thái" value={employmentStatusLabel(employeeProfile?.employment_status) || 'Đang làm việc'} />
             <InfoField label="Ghi chú công việc" value={safeDisplay((employeeProfile as any)?.employment_status_notes || onboarding.employment_status_notes)} full />
           </div>
         </div>
@@ -1537,6 +1534,7 @@ const OnboardingDetail: React.FC = () => {
               {ef('Trạng thái làm việc', 'employment_status', undefined, [
                 { value: 'ACTIVE', label: 'Đang làm việc' },
                 { value: 'PAUSED', label: 'Tạm dừng' },
+                { value: 'MATERNITY_LEAVE', label: 'Nghỉ thai sản' },
                 { value: 'INACTIVE', label: 'Đã nghỉ' },
               ])}
               {ef('Ghi chú tình trạng công việc', 'employment_status_notes', 'textarea')}

@@ -40,6 +40,7 @@ const GENDER_OPTIONS = [
 const EMPLOYMENT_STATUS_OPTIONS = [
   { label: 'Đang làm việc', value: 'ACTIVE' },
   { label: 'Tạm dừng', value: 'SUSPENDED' },
+  { label: 'Nghỉ thai sản', value: 'MATERNITY_LEAVE' },
   { label: 'Đã nghỉ', value: 'INACTIVE' },
 ];
 

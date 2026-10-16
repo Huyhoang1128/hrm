@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { employeesAPI, departmentsAPI, Employee, sendAccountEmailsAPI } from '../utils/api';
+import type { EmployeeStatusLogEntry } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { SelectBox } from '../components/LandingLayout/SelectBox';
 import Pagination from '../components/Pagination';
@@ -15,6 +16,7 @@ const getEmploymentStatusLabel = (status?: string) => {
     PROBATION: 'Thử việc',
     SUSPENDED: 'Tạm nghỉ',
     PAUSED: 'Tạm dừng',
+    MATERNITY_LEAVE: 'Nghỉ thai sản',
   };
   return (status && labels[status]) || status || '';
 };
@@ -206,10 +208,17 @@ const EmployeeList: React.FC = () => {
     active: 0,
     probation: 0,
     inactive: 0,
+    suspended: 0,
+    maternity_leave: 0,
     male: 0,
     female: 0,
     other: 0
   });
+  // '' = số liệu hiện tại; 'YYYY-MM' = số liệu tại cuối tháng đó
+  const [statsMonth, setStatsMonth] = useState('');
+  const [statusLogOpen, setStatusLogOpen] = useState(false);
+  const [statusLog, setStatusLog] = useState<EmployeeStatusLogEntry[] | null>(null);
+  const [statusLogError, setStatusLogError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [endDateFromFilter, setEndDateFromFilter] = useState('');
@@ -258,6 +267,21 @@ const EmployeeList: React.FC = () => {
     user?.is_hr === true ||
     user?.employee_profile?.is_hr === true ||
     user?.hrm_user?.is_hr === true;
+  const canViewStatusLog = isAdmin || isHR;
+  const statusLogMonth = statsMonth || (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  })();
+  const openStatusLog = async () => {
+    setStatusLogOpen(true);
+    setStatusLog(null);
+    setStatusLogError(null);
+    try {
+      setStatusLog((await employeesAPI.statusLog(statusLogMonth)).results);
+    } catch {
+      setStatusLogError('Không tải được nhật ký trạng thái.');
+    }
+  };
   const SEND_EMAIL_COOLDOWN_KEY = 'send_all_emails_cooldown_until';
   const COOLDOWN_DURATION = 120; // 2 phút (giây)
 
@@ -342,6 +366,21 @@ const EmployeeList: React.FC = () => {
 
   const fetchStats = async () => {
     try {
+      if (statsMonth) {
+        const monthStats = await employeesAPI.stats({ month: statsMonth });
+        setStats({
+          total: monthStats.total,
+          active: monthStats.active,
+          probation: monthStats.probation,
+          inactive: monthStats.inactive,
+          suspended: monthStats.suspended ?? 0,
+          maternity_leave: monthStats.maternity_leave ?? 0,
+          male: monthStats.gender_stats.male,
+          female: monthStats.gender_stats.female,
+          other: monthStats.gender_stats.other,
+        });
+        return;
+      }
       const statsData = await employeesAPI.stats();
       
       // Fetch active employees to calculate gender stats
@@ -360,6 +399,8 @@ const EmployeeList: React.FC = () => {
         active: statsData.active,
         probation: statsData.probation,
         inactive: statsData.inactive,
+        suspended: statsData.suspended ?? 0,
+        maternity_leave: statsData.maternity_leave ?? 0,
         male,
         female,
         other
@@ -379,10 +420,13 @@ const EmployeeList: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchStats();
     fetchDepartments();
     fetchExpiringContractEmployees();
   }, []);
+
+  useEffect(() => {
+    fetchStats();
+  }, [statsMonth]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Chặn scroll khi mở dialog import
   useLockBodyScroll(showImportDialog);
@@ -1254,6 +1298,8 @@ const EmployeeList: React.FC = () => {
         return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-600">Đang làm việc</span>;
       case 'SUSPENDED':
         return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-600">Tạm dừng</span>;
+      case 'MATERNITY_LEAVE':
+        return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-pink-100 text-pink-600">Nghỉ thai sản</span>;
       case 'INACTIVE':
         return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-600">Đã nghỉ</span>;
       case 'PROBATION':
@@ -1301,7 +1347,34 @@ const EmployeeList: React.FC = () => {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         {/* Statistics Section - At the top as requested */}
         <div className="mb-8">
-          <h2 className="text-sm font-bold text-gray-900 mb-4">Thống kê nhân viên</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h2 className="text-sm font-bold text-gray-900">
+              Thống kê nhân viên{statsMonth ? ` — cuối tháng ${statsMonth.slice(5)}/${statsMonth.slice(0, 4)}` : ''}
+            </h2>
+            <div className="flex items-center gap-2">
+              <input
+                type="month"
+                value={statsMonth}
+                onChange={(e) => setStatsMonth(e.target.value)}
+                title="Xem số liệu tại cuối một tháng trong quá khứ; bỏ trống = hiện tại"
+                className="rounded-md border border-gray-300 px-2 py-1 text-sm"
+              />
+              {statsMonth && (
+                <button type="button" onClick={() => setStatsMonth('')} className="text-xs text-primary-600 hover:underline">
+                  Hiện tại
+                </button>
+              )}
+              {canViewStatusLog && (
+                <button
+                  type="button"
+                  onClick={openStatusLog}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+                >
+                  Nhật ký trạng thái
+                </button>
+              )}
+            </div>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
             <div className="bg-white rounded-2xl border border-gray-100 border-l-4 border-l-primary-500 shadow-sm p-4">
               <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Tổng số</p>
@@ -1318,6 +1391,14 @@ const EmployeeList: React.FC = () => {
             <div className="bg-white rounded-2xl border border-gray-100 border-l-4 border-l-red-500 shadow-sm p-4">
               <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Đã nghỉ</p>
               <p className="text-2xl font-extrabold text-red-600 mt-1">{stats.inactive}</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 border-l-4 border-l-orange-400 shadow-sm p-4">
+              <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Tạm nghỉ</p>
+              <p className="text-2xl font-extrabold text-orange-500 mt-1">{stats.suspended}</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 border-l-4 border-l-pink-500 shadow-sm p-4">
+              <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Nghỉ thai sản</p>
+              <p className="text-2xl font-extrabold text-pink-600 mt-1">{stats.maternity_leave}</p>
             </div>
             <div className="bg-white rounded-2xl border border-gray-100 border-l-4 border-l-primary-300 shadow-sm p-4">
               <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Nam</p>
@@ -1349,6 +1430,54 @@ const EmployeeList: React.FC = () => {
             )}
           </div>
         </div>
+
+        {statusLogOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setStatusLogOpen(false)}>
+            <div className="w-full max-w-3xl max-h-[80vh] flex flex-col rounded-xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+                <h3 className="text-base font-semibold text-gray-900">
+                  Nhật ký trạng thái — tháng {statusLogMonth.slice(5)}/{statusLogMonth.slice(0, 4)}
+                </h3>
+                <button onClick={() => setStatusLogOpen(false)} className="text-sm text-gray-500 hover:text-gray-700">Đóng</button>
+              </div>
+              <div className="overflow-auto px-5 py-3">
+                {statusLogError ? (
+                  <p className="text-sm text-red-600">{statusLogError}</p>
+                ) : statusLog === null ? (
+                  <p className="text-sm text-gray-500">Đang tải...</p>
+                ) : statusLog.length === 0 ? (
+                  <p className="text-sm text-gray-500">Không có thay đổi trạng thái nào trong tháng.</p>
+                ) : (
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-gray-500">
+                        <th className="py-2 pr-3">Ngày</th>
+                        <th className="py-2 pr-3">Nhân viên</th>
+                        <th className="py-2 pr-3">Từ</th>
+                        <th className="py-2 pr-3">Sang</th>
+                        <th className="py-2">Người đổi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {statusLog.map((log) => (
+                        <tr key={log.id}>
+                          <td className="py-2 pr-3 whitespace-nowrap">{new Date(log.changed_at).toLocaleDateString('vi-VN')}</td>
+                          <td className="py-2 pr-3">
+                            <span className="font-medium text-gray-900">{log.full_name}</span>
+                            <span className="ml-1 text-xs text-gray-500 font-mono">{log.employee_code}</span>
+                          </td>
+                          <td className="py-2 pr-3 text-gray-600">{log.from_status_label || '(hồ sơ mới)'}</td>
+                          <td className="py-2 pr-3 font-medium text-gray-900">{log.to_status_label}</td>
+                          <td className="py-2 text-gray-600">{log.changed_by || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {isAdmin && showExpiringContracts && (
           <div className="mb-6 bg-amber-50 rounded-2xl border border-amber-200 border-l-4 border-l-amber-500 p-5">
@@ -1451,6 +1580,8 @@ const EmployeeList: React.FC = () => {
                 { value: 'all', label: 'Tất cả trạng thái' },
                 { value: 'ACTIVE', label: 'Đang làm việc' },
                 { value: 'PROBATION', label: 'Thử việc' },
+                { value: 'SUSPENDED', label: 'Tạm nghỉ' },
+                { value: 'MATERNITY_LEAVE', label: 'Nghỉ thai sản' },
                 { value: 'INACTIVE', label: 'Đã nghỉ' },
               ]}
               onChange={(v) => { setStatusFilter(v); setCurrentPage(1); }}
