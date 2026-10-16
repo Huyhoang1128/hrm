@@ -5268,7 +5268,16 @@ class EmployeeOnboardingFormSerializer(serializers.ModelSerializer):
             """Update onboarding process với thông tin từ nhân viên"""
             import logging
             import json
+            from .models import SELF_UPDATE_KEPT_EMPLOYEE_FIELDS, SELF_UPDATE_KEPT_ONBOARDING_FIELDS
             logger = logging.getLogger(__name__)
+
+            # Link tự cập nhật hồ sơ (NV đang làm): mọi trường HCNS quản lý giữ nguyên
+            # giá trị cũ, kể cả khi request có gửi lên.
+            self_update = bool(self.context.get('self_update'))
+            kept_onboarding = (
+                {f: getattr(instance, f) for f in SELF_UPDATE_KEPT_ONBOARDING_FIELDS if hasattr(instance, f)}
+                if self_update else {}
+            )
             
             # Extract các field mới
             facebook_link = validated_data.pop('facebook_link', '')
@@ -5391,6 +5400,8 @@ class EmployeeOnboardingFormSerializer(serializers.ModelSerializer):
             instance.work_form = work_form or None
             instance.marital_status = marital_status or None
             instance.probation_rate = probation_rate or None
+            for attr, value in kept_onboarding.items():
+                setattr(instance, attr, value)
             instance.employee_info_completed = True
             instance.employee_info_completed_at = timezone.now()
             instance.save()
@@ -5422,6 +5433,10 @@ class EmployeeOnboardingFormSerializer(serializers.ModelSerializer):
 
             if employee:
                 
+                kept_employee = (
+                    {f: getattr(employee, f) for f in SELF_UPDATE_KEPT_EMPLOYEE_FIELDS} if self_update else {}
+                )
+
                 # Map gender
                 employee_gender = {
                     'MALE': 'M',
@@ -5519,6 +5534,8 @@ class EmployeeOnboardingFormSerializer(serializers.ModelSerializer):
                     extra_info['allowance_notes'] = allowance_notes
                 
                 employee.extra_info = json.dumps(extra_info, ensure_ascii=False) if extra_info else ''
+                for attr, value in kept_employee.items():
+                    setattr(employee, attr, value)
                 # VNEID upload chuyển ra ngoài block để cover case employee=None.
                 # Xem code tiếp theo (sau if employee).
                 employee.save()
