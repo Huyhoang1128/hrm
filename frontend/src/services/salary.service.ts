@@ -67,6 +67,12 @@ export interface SalaryListResponse {
   department_id: number | null;
   legal_entity?: string | null;
   department_name: string | null;
+  employment_filter?: 'all' | 'working' | 'left';
+  working_count?: number;
+  left_count?: number;
+  /** Số người đã nghỉ nhưng VẪN còn lương phải trả của những ngày đã làm trong tháng */
+  left_payable_count?: number;
+  left_payable_amount?: number;
   total: number;
   results: SalaryRecord[];
 }
@@ -486,6 +492,8 @@ class SalaryService {
     department_id?: number;
     legal_entity?: string;
     employee_code?: string;
+    /** working = chỉ người đang làm việc | left = chỉ người đã nghỉ | bỏ trống = tất cả */
+    employment_filter?: 'working' | 'left';
   }): Promise<SalaryListResponse> {
     const response = await managementApi.get('/api-hrm/salary/department/', { params });
     return response.data;

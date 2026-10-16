@@ -122,8 +122,9 @@ class SalaryRowsTests(APITestCase):
 
     def test_get_salary_rows_matches_api_and_api_is_admin_only(self):
         from hrm.finalization_views import get_salary_rows
-        self.assertEqual(get_salary_rows(YEAR, MONTH, department_id=str(self.dept_a.id)),
-                         self._get(department_id=self.dept_a.id))
+        rows = get_salary_rows(YEAR, MONTH, department_id=str(self.dept_a.id))
+        api = self._get(department_id=self.dept_a.id)  # API có thể trả thêm khoá (vd số đếm theo bộ lọc)
+        self.assertEqual(rows, {key: api[key] for key in rows})
         self.client.force_authenticate(self.official.user)
         self.assertEqual(self.client.get(URL, {'year': YEAR, 'month': MONTH}).status_code, 403)
         self.client.force_authenticate(self.admin)
