@@ -2,6 +2,7 @@ import logging
 from hrm import branding
 import os
 from collections import defaultdict
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -9494,6 +9495,12 @@ def replace_all_placeholders(doc, placeholders):
             replace_placeholders_in_paragraph(para, placeholders)
         for para in section.footer.paragraphs:
             replace_placeholders_in_paragraph(para, placeholders)
+        # Header/footer riêng của trang đầu (template bật "Different First Page")
+        if section.different_first_page_header_footer:
+            for para in section.first_page_header.paragraphs:
+                replace_placeholders_in_paragraph(para, placeholders)
+            for para in section.first_page_footer.paragraphs:
+                replace_placeholders_in_paragraph(para, placeholders)
 # ============================================
 # CONTRACT VIEWS
 # ============================================
@@ -9636,6 +9643,97 @@ class ContractTemplateViewSet(viewsets.ModelViewSet):
             serializer.save()
 
 
+_VN_DIGITS = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín']
+
+
+def _read_three_digits_vn(n: int, full: bool) -> str:
+    h, t, o = n // 100, (n % 100) // 10, n % 10
+    parts = []
+    if h > 0 or full:
+        parts.append(f"{_VN_DIGITS[h]} trăm")
+    if t > 1:
+        parts.append(f"{_VN_DIGITS[t]} mươi")
+        if o == 1:
+            parts.append('mốt')
+        elif o == 5:
+            parts.append('lăm')
+        elif o > 0:
+            parts.append(_VN_DIGITS[o])
+    elif t == 1:
+        parts.append('mười')
+        if o == 5:
+            parts.append('lăm')
+        elif o > 0:
+            parts.append(_VN_DIGITS[o])
+    elif t == 0 and o > 0:
+        if h > 0 or full:
+            parts.append('lẻ')
+        parts.append(_VN_DIGITS[o])
+    return ' '.join(parts)
+
+
+def _parse_vnd_amount(value) -> int:
+    """Parse tiền VNĐ về int, chấp nhận chuỗi có dấu chấm/phẩy ngăn cách ("6.000.000")."""
+    if value is None or value == '':
+        return 0
+    if isinstance(value, (int, float)):
+        return int(value)
+    digits = re.sub(r'[^\d]', '', str(value))
+    return int(digits) if digits else 0
+
+
+def _amount_to_vietnamese_words(amount) -> str:
+    """Đọc số tiền (VNĐ) thành chữ, vd 30000000 -> 'Ba mươi triệu đồng'."""
+    try:
+        num = int(amount or 0)
+    except (TypeError, ValueError):
+        return ''
+    if num <= 0:
+        return ''
+    groups = []
+    n = num
+    while n > 0:
+        groups.insert(0, n % 1000)
+        n //= 1000
+    units = ['', 'nghìn', 'triệu', 'tỷ']
+    total = len(groups)
+    out = []
+    for i, g in enumerate(groups):
+        if g == 0:
+            continue
+        out.append(_read_three_digits_vn(g, len(out) > 0))
+        unit = units[total - 1 - i] if total - 1 - i < len(units) else ''
+        if unit:
+            out.append(unit)
+    result = ' '.join(out).strip()
+    if not result:
+        return ''
+    return f"{result[0].upper()}{result[1:]} đồng"
+
+
+def _month_count_to_vietnamese_words(n) -> str:
+    """Đọc số tháng thành chữ, vd 2 -> 'hai' (cho dạng "02 (hai) tháng")."""
+    try:
+        num = int(n or 0)
+    except (TypeError, ValueError):
+        return ''
+    if num <= 0:
+        return ''
+    return _read_three_digits_vn(num, False)
+
+
+def _sync_word_placeholders(placeholders: dict) -> dict:
+    """Phần "bằng chữ" luôn tính lại từ số cuối cùng (sau override của HCNS) để
+    không bao giờ lệch với phần số trên hợp đồng."""
+    placeholders['{{luong_co_ban_bang_chu}}'] = _amount_to_vietnamese_words(
+        _parse_vnd_amount(placeholders.get('{{luong_co_ban}}'))
+    )
+    placeholders['{{so_thang_thu_viec_bang_chu}}'] = _month_count_to_vietnamese_words(
+        placeholders.get('{{so_thang_thu_viec}}')
+    )
+    return placeholders
+
+
 def _format_contract_date(d) -> str:
     """Định dạng ngày cho placeholder hợp đồng: 'ngày dd tháng mm năm yyyy'."""
     if not d:
@@ -9769,21 +9867,26 @@ class EmployeeContractViewSet(viewsets.ModelViewSet):
         probation_month1, probation_month2 = self.PROBATION_RATE_MONTHS.get(
             employee.probation_rate, (None, None)
         )
+        noi_cap = (
+            'Cục cảnh sát Quản lý hành chính về Trật tự xã hội'
+            if employee.cccd_issue_place == 'POLICE_ADMIN'
+            else 'Bộ Công An'
+            if employee.cccd_issue_place == 'MINISTRY_PUBLIC_SECURITY'
+            else employee.cccd_issue_place or ''
+        )
         return {
             '{{ho_ten}}': employee.full_name or '',
+            '{{gioi_tinh}}': {'M': 'Nam', 'F': 'Nữ', 'O': 'Khác'}.get(employee.gender or '', employee.gender or ''),
             '{{ma_nhan_vien}}': employee.employee_id or '',
+            '{{mnv}}': employee.employee_id or '',
             '{{ngay_sinh}}': employee.date_of_birth.strftime('%d/%m/%Y') if employee.date_of_birth else '',
             '{{so_dien_thoai}}': employee.phone_number or '',
             '{{email}}': employee.personal_email or '',
             '{{so_cccd}}': employee.cccd_number or '',
             '{{ngay_cap_cccd}}': employee.cccd_issue_date.strftime('%d/%m/%Y') if employee.cccd_issue_date else '',
-            '{{noi_cap_cccd}}': (
-                'Cục cảnh sát Quản lý hành chính về Trật tự xã hội'
-                if employee.cccd_issue_place == 'POLICE_ADMIN'
-                else 'Bộ Công An'
-                if employee.cccd_issue_place == 'MINISTRY_PUBLIC_SECURITY'
-                else employee.cccd_issue_place or ''
-            ),
+            '{{noi_cap_cccd}}': noi_cap,
+            '{{ngay_cap}}': employee.cccd_issue_date.strftime('%d/%m/%Y') if employee.cccd_issue_date else '',
+            '{{noi_cap}}': noi_cap,
             '{{noi_sinh}}': employee.birth_place or '',
             '{{dia_chi}}': employee.permanent_residence or '',
             '{{dia_chi_hien_tai}}': employee.current_address or '',
@@ -9811,6 +9914,9 @@ class EmployeeContractViewSet(viewsets.ModelViewSet):
             '{{ngay_bat_dau_hd_dv}}': contract.start_date.strftime('%d/%m/%Y') if contract.start_date else '',
             '{{ngay_chinh_thuc}}': employee.official_start_date.strftime('%d/%m/%Y') if employee.official_start_date else '',
             '{{ngay_ket_thuc_thu_viec}}': employee.probation_end_date.strftime('%d/%m/%Y') if employee.probation_end_date else '',
+            '{{thang_thu_viec}}': str(employee.probation_months) if employee.probation_months else '',
+            '{{so_thang_thu_viec}}': str(employee.probation_months) if employee.probation_months else '',
+            '{{so_thang_thu_viec_bang_chu}}': _month_count_to_vietnamese_words(employee.probation_months),
             '{{phan_tram_luong_thu_viec}}': (
                 f"Tháng đầu {probation_month1}%, tháng sau {probation_month2}%"
                 if probation_month1 else ''
@@ -9818,6 +9924,7 @@ class EmployeeContractViewSet(viewsets.ModelViewSet):
             '{{ty_le_luong_thang_dau}}': f"{probation_month1}%" if probation_month1 else '',
             '{{ty_le_luong_thang_hai}}': f"{probation_month2}%" if probation_month2 else '',
             '{{luong_co_ban}}': f"{int(employee.basic_salary):,}" if employee.basic_salary else '',
+            '{{luong_co_ban_bang_chu}}': _amount_to_vietnamese_words(employee.basic_salary),
             '{{loai_hop_dong}}': contract.get_contract_type_display(),
             '{{loai_hop_dong_nv}}': employee.contract_type or '',
             # Nội dung/loại hình dịch vụ thuê (hợp đồng dịch vụ) — không có nguồn dữ
@@ -10240,6 +10347,7 @@ class EmployeeContractViewSet(viewsets.ModelViewSet):
         raw_overrides = request.data.get('overrides') or request.data.get('placeholders') or {}
         normalized = self._normalize_override_placeholders(raw_overrides)
         placeholders.update(normalized)
+        _sync_word_placeholders(placeholders)
 
         # Nếu HR sửa số HĐ qua placeholder {{so_hd}} hoặc request.data.contract_number
         # → sync sang field contract.contract_number trong DB. Đảm bảo _max_number_in_db
@@ -10311,6 +10419,7 @@ class EmployeeContractViewSet(viewsets.ModelViewSet):
                 placeholders.update(overrides)
                 if contract_number:
                     placeholders['{{so_hd}}'] = contract_number
+                _sync_word_placeholders(placeholders)
 
                 # 3. Generate PDF và upload
                 view_url = self._generate_and_upload_pdf(contract, placeholders)

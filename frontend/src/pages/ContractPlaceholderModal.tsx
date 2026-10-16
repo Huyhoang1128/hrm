@@ -85,6 +85,66 @@ const KNOWN_LABELS: Record<string, string> = {
 
 const getLabel = (key: string) => KNOWN_LABELS[key] || key.replace(/^\{\{|\}\}$/g, '').replace(/_/g, ' ');
 
+// {{luong_co_ban_bang_chu}} luôn được backend tính lại từ {{luong_co_ban}} lúc tạo
+// PDF (xem generate_pdf_with_override) — không cho HR sửa tay riêng field này nữa
+// vì sửa xong cũng bị ghi đè, dễ gây hiểu lầm. Ẩn khỏi danh sách field chỉnh sửa,
+// thay bằng dòng preview tính trực tiếp trên FE (xem amountToVietnameseWords).
+const DERIVED_KEYS = new Set(['{{luong_co_ban_bang_chu}}', '{{so_thang_thu_viec_bang_chu}}']);
+
+const VN_DIGITS = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
+
+const readThreeDigitsVn = (n: number, full: boolean): string => {
+  const h = Math.floor(n / 100);
+  const t = Math.floor((n % 100) / 10);
+  const o = n % 10;
+  const parts: string[] = [];
+  if (h > 0 || full) parts.push(`${VN_DIGITS[h]} trăm`);
+  if (t > 1) {
+    parts.push(`${VN_DIGITS[t]} mươi`);
+    if (o === 1) parts.push('mốt');
+    else if (o === 5) parts.push('lăm');
+    else if (o > 0) parts.push(VN_DIGITS[o]);
+  } else if (t === 1) {
+    parts.push('mười');
+    if (o === 5) parts.push('lăm');
+    else if (o > 0) parts.push(VN_DIGITS[o]);
+  } else if (t === 0 && o > 0) {
+    if (h > 0 || full) parts.push('lẻ');
+    parts.push(VN_DIGITS[o]);
+  }
+  return parts.join(' ');
+};
+
+// Đọc số tiền VNĐ thành chữ — port từ _amount_to_vietnamese_words() bên backend,
+// chỉ dùng để preview tức thời trên UI (giá trị dùng để in PDF luôn tính lại ở
+// server, xem generate_pdf_with_override).
+const amountToVietnameseWords = (raw: string): string => {
+  const digits = (raw || '').replace(/[^\d]/g, '');
+  const num = digits ? parseInt(digits, 10) : 0;
+  if (!num || num <= 0) return '';
+
+  const groups: number[] = [];
+  let n = num;
+  while (n > 0) {
+    groups.unshift(n % 1000);
+    n = Math.floor(n / 1000);
+  }
+
+  const units = ['', 'nghìn', 'triệu', 'tỷ'];
+  const total = groups.length;
+  const out: string[] = [];
+  groups.forEach((g, i) => {
+    if (g === 0) return;
+    out.push(readThreeDigitsVn(g, out.length > 0));
+    const unit = units[total - 1 - i] ?? '';
+    if (unit) out.push(unit);
+  });
+
+  const result = out.join(' ').trim();
+  if (!result) return '';
+  return `${result.charAt(0).toUpperCase()}${result.slice(1)} đồng`;
+};
+
 // ============================================
 // MAIN COMPONENT
 // ============================================
@@ -123,10 +183,12 @@ const ContractPlaceholderModal: React.FC<Props> = ({ contractId, onClose, onSucc
   const getValue = (item: PlaceholderItem) =>
     overrides[item.key] !== undefined ? overrides[item.key] : item.value;
 
-  // Trường HR cần nhập: auto_filled=false VÀ chưa có override
-  const manualItems = items.filter(i => !i.auto_filled);
+  // Trường HR cần nhập: auto_filled=false VÀ chưa có override. Loại DERIVED_KEYS
+  // (vd. luong_co_ban_bang_chu) — các field này backend luôn tự tính lại từ field
+  // gốc lúc tạo PDF nên không cho sửa tay, tránh HR tưởng sửa được mà bị bỏ qua.
+  const manualItems = items.filter(i => !i.auto_filled && !DERIVED_KEYS.has(i.key));
   const emptyCount = manualItems.filter(i => !getValue(i)).length;
-  const autoItems = items.filter(i => i.auto_filled);
+  const autoItems = items.filter(i => i.auto_filled && !DERIVED_KEYS.has(i.key));
   const changedCount = Object.keys(overrides).length;
 
   // Bước 2: generate PDF với overrides
@@ -251,6 +313,11 @@ const ContractPlaceholderModal: React.FC<Props> = ({ contractId, onClose, onSucc
                                 : ''
                             }`}
                           />
+                          {item.key === '{{luong_co_ban}}' && (
+                            <p className="mt-1 text-xs text-gray-400 italic">
+                              Bằng chữ: {amountToVietnameseWords(val) || '—'}
+                            </p>
+                          )}
                         </div>
                       );
                     })}
@@ -297,6 +364,11 @@ const ContractPlaceholderModal: React.FC<Props> = ({ contractId, onClose, onSucc
                                 isChanged ? 'border-amber-400 bg-amber-50 focus:ring-amber-500' : ''
                               }`}
                             />
+                            {item.key === '{{luong_co_ban}}' && (
+                              <p className="mt-1 text-xs text-gray-400 italic">
+                                Bằng chữ: {amountToVietnameseWords(val) || '—'}
+                              </p>
+                            )}
                           </div>
                         );
                       })}
