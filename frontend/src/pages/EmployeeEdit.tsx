@@ -22,7 +22,9 @@ import {
   PhoneIcon,
   PaperClipIcon,
   ArrowLeftIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
+import { buildContractWarnings } from '../utils/contractWarnings';
 
 // ============================================
 // CONSTANTS
@@ -1033,6 +1035,32 @@ const EmployeeEdit: React.FC = () => {
         {/* ── Lương & Hợp đồng ── */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <SectionTitle icon={<DocumentTextIcon className="h-5 w-5" />} iconBg="bg-emerald-100 text-emerald-600" title="Lương & Hợp đồng" />
+
+          {/* Cảnh báo mâu thuẫn ngày tháng / loại hợp đồng — xem buildContractWarnings() */}
+          {(() => {
+            const warnings = buildContractWarnings(formData);
+            if (!warnings.length) return null;
+            const errs = warnings.filter((x) => x.level === 'error');
+            return (
+              <div className={`mb-5 rounded-xl border p-4 ${errs.length ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
+                <div className={`flex items-center gap-2 mb-2 font-semibold text-sm ${errs.length ? 'text-red-800' : 'text-amber-800'}`}>
+                  <ExclamationTriangleIcon className="h-5 w-5 shrink-0" />
+                  Cần kiểm tra lại {warnings.length} điểm trong hồ sơ hợp đồng
+                </div>
+                <ul className="space-y-1.5">
+                  {warnings.map((x, i) => (
+                    <li key={i} className="flex gap-2 text-sm leading-relaxed">
+                      <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${x.level === 'error' ? 'bg-red-500' : 'bg-amber-500'}`} />
+                      <span className={x.level === 'error' ? 'text-red-800' : 'text-amber-800'}>{x.text}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-xs text-gray-500">
+                  Cảnh báo chỉ để rà soát, không chặn lưu. Sửa xong các ô bên dưới thì cảnh báo tự mất.
+                </p>
+              </div>
+            );
+          })()}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <Field label="Lương cơ bản (VNĐ)">
               <input type="number" name="basic_salary" value={formData.basic_salary}
