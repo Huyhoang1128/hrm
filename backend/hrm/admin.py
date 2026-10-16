@@ -25,7 +25,7 @@ from .models import (
     GenericRequest, RequestTemplate, SalaryAdvanceApprovalLock, SalaryAdvanceCreationLock,
 )
 from .event_models import EmployeeEvent, EmployeeEventAuditLog
-from .models import OnlineWorkQuotaOverride
+from .models import OnlineWorkQuotaOverride, ChildCareRegime
 
 
 class WorkFinalizationCSVUploadForm(forms.Form):
@@ -3393,3 +3393,10 @@ class OnlineWorkQuotaOverrideAdmin(admin.ModelAdmin):
     search_fields = ('employee__full_name', 'employee__employee_id', 'position__title', 'department__name')
     raw_id_fields = ('employee',)
     readonly_fields = ('updated_at',)
+
+
+@admin.register(ChildCareRegime)
+class ChildCareRegimeAdmin(admin.ModelAdmin):
+    list_display = ('employee', 'start_date', 'end_date', 'allowance_minutes', 'note', 'updated_at')
+    search_fields = ('employee__employee_id', 'employee__full_name')
+    raw_id_fields = ('employee',)

@@ -125,6 +125,9 @@ class EmployeeState:
         self.calendar_result = []  # Dùng để lưu kết quả chi tiết từng ngày, có thể dùng để hiển thị lịch chấm công
         self._approved_off_duty_dates = set()  # Lưu các ngày đã được duyệt ra trực
         self.position_code = None  # Mã vị trí của nhân viên (e.g. "NV_TELESALE")
+        # {'YYYY-MM-DD': N} — ngày NV hưởng chế độ con nhỏ, được đi muộn / về sớm thêm
+        # N phút mỗi chiều (hrm/child_care_regime.py, nạp trong replay_month).
+        self._child_care_minutes = {}
         # Mặc định: thứ 7 tuần 2/4 trong tháng chỉ làm nửa ngày (xem
         # _evaluate_afternoon_shift_rule). Phòng ban nào làm chiều thứ 7 mọi tuần thì
         # set True qua Department.saturday_afternoon_always_workday (xem replay_month).
@@ -1114,6 +1117,8 @@ class EmployeeState:
         check_out = parse_time(check_out_str) if check_out_str else None
 
         effects = {}
+        # Chế độ con nhỏ: mốc tính đi muộn / về sớm nới thêm N phút (hrm/child_care_regime.py)
+        late_from, early_before = self._child_care_bounds(event, shift_start, shift_end)
 
         # Lấy số lỗi đã có từ các rule trước đó trong cùng 1 ngày (ví dụ ca đêm trước đó nếu có)
         pending = 0
@@ -1127,10 +1132,10 @@ class EmployeeState:
             print(f"[Ca sáng] Thiếu {missing} → quen_cham_cong += 1")
 
             # Dù thiếu dữ liệu, vẫn kiểm tra vi phạm nếu còn đủ thông tin
-            if check_in and check_in > shift_start:
+            if check_in and check_in > late_from:
                 late_minutes = int(
                     (datetime.combine(datetime.today(), check_in)
-                    - datetime.combine(datetime.today(), shift_start)).total_seconds() / 60
+                    - datetime.combine(datetime.today(), late_from)).total_seconds() / 60
                 )
                 penalty = self._calc_penalty(late_minutes, pending_violations=pending)
                 if penalty == -1:
@@ -1148,9 +1153,9 @@ class EmployeeState:
                     print(f"[Ca sáng] Đi muộn {late_minutes} phút → phạt {penalty:,} VNĐ")
                     print(f"[Ca sáng] Vi phạm → di_muon_ve_som += 1")
 
-            if check_out and check_out < shift_end:
+            if check_out and check_out < early_before:
                 early_minutes = int(
-                    (datetime.combine(datetime.today(), shift_end)
+                    (datetime.combine(datetime.today(), early_before)
                     - datetime.combine(datetime.today(), check_out)).total_seconds() / 60
                 )
                 penalty = self._calc_penalty(early_minutes, pending_violations=pending)
@@ -1195,10 +1200,10 @@ class EmployeeState:
         rule_local_pending = pending
 
         # Đi muộn
-        if check_in > shift_start:
+        if check_in > late_from:
             late_minutes = int(
                 (datetime.combine(datetime.today(), check_in)
-                - datetime.combine(datetime.today(), shift_start)).total_seconds() / 60
+                - datetime.combine(datetime.today(), late_from)).total_seconds() / 60
             )
             penalty = self._calc_penalty(late_minutes, pending_violations=rule_local_pending)
             if penalty == -1:
@@ -1213,9 +1218,9 @@ class EmployeeState:
             print(f"[Ca sáng] Đi muộn {late_minutes} phút → phạt {penalty:,} VNĐ")
 
         # Về sớm
-        if check_out < shift_end:
+        if check_out < early_before:
             early_minutes = int(
-                (datetime.combine(datetime.today(), shift_end)
+                (datetime.combine(datetime.today(), early_before)
                 - datetime.combine(datetime.today(), check_out)).total_seconds() / 60
             )
             penalty = self._calc_penalty(early_minutes, pending_violations=rule_local_pending)
@@ -1233,8 +1238,8 @@ class EmployeeState:
             # Lưu ý ở đây di_muon_ve_som vẫn là số lượng sự kiện vi phạm (đi muộn và/hoặc về sớm)
             # Nếu vi phạm cả 2 trong 1 ca, ta tính là 2 lần lỗi (để cộng dồn nhân x2 chính xác)
             violation_count = 0
-            if check_in > shift_start: violation_count += 1
-            if check_out < shift_end: violation_count += 1
+            if check_in > late_from: violation_count += 1
+            if check_out < early_before: violation_count += 1
             
             violation_effects["di_muon_ve_som"] = violation_count
             violation_effects["violation_count_month"] = violation_count
@@ -1331,6 +1336,8 @@ class EmployeeState:
         check_out = parse_time(check_out_str) if check_out_str else None
 
         effects = {}
+        # Chế độ con nhỏ: mốc tính đi muộn / về sớm nới thêm N phút (hrm/child_care_regime.py)
+        late_from, early_before = self._child_care_bounds(event, shift_start, shift_end)
 
         # Lấy số lỗi đã có từ các rule trước đó trong cùng 1 ngày (ví dụ ca sáng vừa xử lý xong)
         pending = 0
@@ -1346,10 +1353,10 @@ class EmployeeState:
             # Dù thiếu dữ liệu, vẫn kiểm tra vi phạm nếu còn đủ thông tin
             if check_in:
                 effective_check_in = max(check_in, shift_start)
-                if effective_check_in > shift_start:
+                if effective_check_in > late_from:
                     late_minutes = int(
                         (datetime.combine(datetime.today(), effective_check_in)
-                         - datetime.combine(datetime.today(), shift_start)).total_seconds() / 60
+                         - datetime.combine(datetime.today(), late_from)).total_seconds() / 60
                     )
                     penalty = self._calc_penalty(late_minutes, pending_violations=pending)
                     if penalty == -1:
@@ -1366,9 +1373,9 @@ class EmployeeState:
                         print(f"[Ca chiều] Đi muộn {late_minutes} phút → phạt {penalty:,} VNĐ")
                         print(f"[Ca chiều] Vi phạm → di_muon_ve_som += 1")
 
-            if check_out and check_out < shift_end:
+            if check_out and check_out < early_before:
                 early_minutes = int(
-                    (datetime.combine(datetime.today(), shift_end)
+                    (datetime.combine(datetime.today(), early_before)
                      - datetime.combine(datetime.today(), check_out)).total_seconds() / 60
                 )
                 penalty = self._calc_penalty(early_minutes, pending_violations=pending)
@@ -1414,10 +1421,10 @@ class EmployeeState:
         rule_local_pending = pending
 
         # Đi muộn (tính từ đầu ca chiều)
-        if effective_check_in > shift_start:
+        if effective_check_in > late_from:
             late_minutes = int(
                 (datetime.combine(datetime.today(), effective_check_in)
-                 - datetime.combine(datetime.today(), shift_start)).total_seconds() / 60
+                 - datetime.combine(datetime.today(), late_from)).total_seconds() / 60
             )
             penalty = self._calc_penalty(late_minutes, pending_violations=rule_local_pending)
             if penalty == -1:
@@ -1432,9 +1439,9 @@ class EmployeeState:
             print(f"[Ca chiều] Đi muộn {late_minutes} phút → phạt {penalty:,} VNĐ")
 
         # Về sớm
-        if check_out < shift_end:
+        if check_out < early_before:
             early_minutes = int(
-                (datetime.combine(datetime.today(), shift_end)
+                (datetime.combine(datetime.today(), early_before)
                  - datetime.combine(datetime.today(), check_out)).total_seconds() / 60
             )
             penalty = self._calc_penalty(early_minutes, pending_violations=rule_local_pending)
@@ -1451,8 +1458,8 @@ class EmployeeState:
         if is_violation:
             # Lưu ý ở đây di_muon_ve_som vẫn là số lượng sự kiện vi phạm (đi muộn và/hoặc về sớm)
             violation_count = 0
-            if effective_check_in > shift_start: violation_count += 1
-            if check_out < shift_end: violation_count += 1
+            if effective_check_in > late_from: violation_count += 1
+            if check_out < early_before: violation_count += 1
 
             violation_effects["di_muon_ve_som"] = violation_count
             violation_effects["violation_count_month"] = violation_count
@@ -1470,6 +1477,28 @@ class EmployeeState:
         print(f"[Ca chiều] Tính {workday} công")
 
         return effects
+
+    def _child_care_bounds(self, event: Event, shift_start, shift_end):
+        """(mốc tính đi muộn, mốc tính về sớm) của ca trong ngày của event.
+
+        Ngày NV hưởng chế độ con nhỏ (N phút): đi muộn chỉ tính khi vào sau
+        shift_start + N, về sớm chỉ tính khi ra trước shift_end - N; số phút muộn /
+        sớm tính từ mốc mới nên phần vượt N phút tính như bình thường. Hai mốc không
+        vượt ra ngoài ca. Ngày khác, hoặc ca qua đêm → giữ nguyên (shift_start, shift_end).
+        """
+        minutes = self._child_care_minutes.get(event.data.get("date"), 0)
+        if not minutes:
+            return shift_start, shift_end
+        from datetime import datetime, timedelta
+        base = datetime(2000, 1, 1)
+        start_dt = datetime.combine(base, shift_start)
+        end_dt = datetime.combine(base, shift_end)
+        if end_dt <= start_dt:
+            return shift_start, shift_end
+        late_from = min(start_dt + timedelta(minutes=minutes), end_dt)
+        early_before = max(end_dt - timedelta(minutes=minutes), start_dt)
+        print(f"[Chế độ con nhỏ] {event.data.get('date')}: được đi muộn / về sớm tối đa {minutes} phút")
+        return late_from.time(), early_before.time()
 
     # Leave types treated as paid leave (có lương)
     _PAID_LEAVE_TYPES = frozenset({"PAID", "ANNUAL", "SICK", "MATERNITY", "PATERNITY", "MARRIAGE", "FUNERAL", "OTHER"})
@@ -2317,6 +2346,14 @@ class EmployeeState:
 
         # Khởi tạo rules với _rules_info (đã bao gồm department_id nếu có)
         state.init_rules(_rules_info or None)
+
+        # Chế độ con nhỏ: các ngày trong tháng NV đang hưởng (kèm số phút được nới).
+        if employee_obj:
+            import calendar as _cal_cc
+            from .child_care_regime import child_care_minutes_by_date
+            state._child_care_minutes = child_care_minutes_by_date(
+                employee_obj.id, date(year, month, 1), date(year, month, _cal_cc.monthrange(year, month)[1]),
+            )
 
         # Phòng ban làm chiều thứ 7 mọi tuần (kể cả tuần 2/4) → tắt guard "nửa ngày
         # thứ 7 tuần 2/4" cho nhân viên này (xem _evaluate_afternoon_shift_rule).
