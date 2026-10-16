@@ -52,7 +52,7 @@ class LonePunchTests(SimpleTestCase):
         self.assertTrue(_goi("20:58", candidates=[CA_KINH_DOANH]))
 
     def test_ưu_tiên_ca_đã_đăng_ký(self):
-        """Ca 2 Điều dưỡng BS BS A 09:30-18:30: 09:40 là vào, 18:35 là ra."""
+        """Ca 2 Điều dưỡng BS A 09:30-18:30: 09:40 là vào, 18:35 là ra."""
         ca2 = [_sc("09:30", "13:30"), _sc("14:30", "18:30")]
         self.assertFalse(_goi("09:40", registered=ca2))
         self.assertTrue(_goi("18:35", registered=ca2))

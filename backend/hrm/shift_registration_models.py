@@ -116,7 +116,7 @@ class ShiftRegistrationScopeConfig(models.Model):
     # True cho config nào cần mô hình khác hẳn — "mặc định Ca 1 cho mọi ngày
     # không đăng ký gì, chỉ đăng ký NGOẠI LỆ Ca 2 cho 1 ngày cụ thể, và đăng
     # ký đó phải được quản lý trực tiếp duyệt TRƯỚC 0h ngày áp dụng mới có
-    # hiệu lực" (case đầu tiên: 8 Điều dưỡng BS Ma BS A). Xem
+    # hiệu lực" (case đầu tiên: 8 Điều dưỡng BS A). Xem
     # get_registered_shift_configs_for_date() (shift_config_utils.py) và
     # ShiftRegistrationViewSet.register_ca2/approve_day/reject_day
     # (shift_registration_views.py) — 2 nơi duy nhất đọc field này.
@@ -135,7 +135,7 @@ class ShiftRegistrationScopeConfig(models.Model):
 
     # Tên gọi hiển thị cho 2 ô ca — ĐỘC LẬP với cơ chế (ô shift_1 luôn là ca
     # mặc định, ô shift_2 luôn là ca phải đăng ký). Cần vì mỗi team gọi khác
-    # nhau: Điều dưỡng BS BS A mặc định "Ca 1", đăng ký "Ca 2"; còn Sale
+    # nhau: Điều dưỡng BS A mặc định "Ca 1", đăng ký "Ca 2"; còn Sale
     # BS B (thông báo 02/10/2026) thì NGƯỢC LẠI — mặc định "Ca 2",
     # đăng ký "Ca 1". FE đọc 2 trường này để hiện đúng nhãn nút cho từng team.
     default_ca_label = models.CharField(

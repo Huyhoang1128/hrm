@@ -5,7 +5,7 @@ Bug thực tế (phát hiện 2026-09-19): ca đã ĐĂNG KÝ ("Đăng ký ca l�
 resolve ĐÚNG nhưng KHÔNG hề ảnh hưởng tới công/phạt.
 
 Số liệu thực tế — một NV thuộc phạm vi
-ShiftRegistrationScopeConfig "Điều dưỡng BS Ma BS A":
+ShiftRegistrationScopeConfig "Điều dưỡng BS A":
   • Ngày 2026-09-09 đã đăng ký + được duyệt Ca 2
     (sáng 09:30-13:30, chiều 14:30-18:30).
   • Chấm công thực tế 09:13 → 18:32, tức là đi SỚM so với Ca 2.
@@ -47,7 +47,7 @@ class _FakeShift:
         self.working_hours = working_hours
 
 
-# Cặp ca thật của config "Điều dưỡng BS Ma BS A"
+# Cặp ca thật của config "Điều dưỡng BS A"
 CA1_MORNING = _FakeShift("Ca 1 sáng", _t(7, 30), _t(11, 30), 'MORNING')
 CA1_AFTERNOON = _FakeShift("Ca 1 chiều", _t(12, 30), _t(16, 30), 'AFTERNOON')
 CA2_MORNING = _FakeShift("Ca 2 sáng", _t(9, 30), _t(13, 30), 'MORNING')
