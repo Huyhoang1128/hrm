@@ -39,7 +39,7 @@ Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 
 
 | # | Tính năng | Cỡ | Ghi chú |
 | --- | --- | --- | --- |
-| 2.1 | **Tách hàm `get_salary_rows()`** khỏi `SalaryDepartmentView`, bỏ `FakeRequest` trong `salary/views.py` | M | Điều kiện để làm 2.2 và 3.1. Kết quả tính lương phải giữ nguyên. |
+| 2.1 | ✅ **Tách hàm `get_salary_rows()`** khỏi `SalaryDepartmentView`, bỏ `FakeRequest` trong `salary/views.py` | M | Điều kiện để làm 2.2 và 3.1. Kết quả tính lương phải giữ nguyên. |
 | 2.2 | **Báo cáo biến động lương** giữa 2 tháng | M | Cần 2.1. |
 | 2.3 | **Xuất bảng lương nhiều tháng** + lọc Đang làm / Đã nghỉ | S–M | |
 | 2.4 | **Link tự cập nhật hồ sơ** cho NV đang làm (dùng lại form onboarding) | S–M | |
