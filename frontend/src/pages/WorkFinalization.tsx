@@ -1237,13 +1237,16 @@ const WorkFinalization: React.FC = () => {
   };
 
   const handleOpenViolationReport = async () => {
-    if (!selectedDepartment) return;
     setShowViolationModal(true);
     setLoadingViolation(true);
     setViolationReport(null);
     try {
       const res = await deptAttendanceViolationReportService.get({
-        department_id: Number(selectedDepartment),
+        // Không chọn phòng ban cụ thể (hoặc "Tất cả phòng ban") -> bỏ department_id,
+        // backend trả báo cáo gộp mọi phòng ban trong 1 lần.
+        ...(selectedDepartment && selectedDepartment !== 'all'
+          ? { department_id: Number(selectedDepartment) }
+          : {}),
         year: selectedYear,
         month: selectedMonth,
       });
@@ -1625,7 +1628,7 @@ const WorkFinalization: React.FC = () => {
           </button>
           <button
             onClick={handleOpenViolationReport}
-            disabled={!selectedDepartment || selectedDepartment === 'all' || loadingViolation}
+            disabled={loadingViolation}
             className="inline-flex items-center px-4 py-2 border border-amber-300 rounded-md shadow-sm text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ShieldExclamationIcon className="w-4 h-4 mr-2" />

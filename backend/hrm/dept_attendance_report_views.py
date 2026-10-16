@@ -18,6 +18,7 @@ from .event_models import EmployeeEvent
 from .main_api import EmployeeState
 from .attendance_views import AttendanceCalendarView
 from .employee_work_utils import is_holiday_creditable, get_holiday_credit_for_employee
+from users.utils import get_user_role
 
 logger = logging.getLogger(__name__)
 
@@ -174,12 +175,17 @@ class DeptAttendanceViolationReportView(APIView):
     GET /api-hrm/dept-attendance-violation-report/
 
     Query params:
-      - department_id (int, bắt buộc): ID phòng ban
+      - department_id (int, tuỳ chọn): ID phòng ban. Bỏ trống (hoặc "all") để
+        lấy báo cáo cho TẤT CẢ phòng ban trong 1 lần (mỗi dòng vẫn giữ đúng
+        tên phòng ban của nhân viên đó, xem "phong_ban" trong data).
       - year (int, bắt buộc): Năm
       - month (int, bắt buộc): Tháng (1-12)
 
     Trả về JSON danh sách nhân viên với tổng hợp vi phạm chấm công trong tháng
     (đi muộn, về sớm, quên chấm công) - mỗi nhân viên một dòng.
+
+    Quyền: Admin/HCNS xem mọi nhân viên; trưởng phòng chỉ xem chính mình và
+    cấp dưới trực tiếp; người khác bị từ chối.
     """
     permission_classes = [IsAuthenticated]
 
@@ -188,19 +194,19 @@ class DeptAttendanceViolationReportView(APIView):
         year = request.query_params.get("year")
         month = request.query_params.get("month")
 
+        # department_id rỗng hoặc "all" => báo cáo TẤT CẢ phòng ban.
+        if department_id in (None, "", "all"):
+            department_id = None
+
         # Validation
-        if not department_id:
-            return Response(
-                {"error": "department_id là bắt buộc"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
         if not year or not month:
             return Response(
                 {"error": "year và month là bắt buộc"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            department_id = int(department_id)
+            if department_id is not None:
+                department_id = int(department_id)
             year = int(year)
             month = int(month)
         except (ValueError, TypeError):
@@ -214,14 +220,27 @@ class DeptAttendanceViolationReportView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Lấy phòng ban
-        try:
-            department = Department.objects.get(pk=department_id)
-        except Department.DoesNotExist:
-            return Response(
-                {"error": "Phòng ban không tồn tại"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        # Trưởng phòng (không phải Admin/HCNS) chỉ xem chính mình + cấp dưới trực tiếp.
+        manager = None
+        if get_user_role(request.user) not in ("admin", "hr"):
+            manager = Employee.objects.filter(user=request.user).first()
+            if manager is None or not Employee.objects.filter(manager=manager).exists():
+                return Response(
+                    {"error": "Bạn không có quyền xem báo cáo vi phạm."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        # Lấy phòng ban (bỏ qua khi lấy báo cáo TẤT CẢ phòng ban)
+        department_name = "Tất cả phòng ban"
+        if department_id is not None:
+            try:
+                department = Department.objects.get(pk=department_id)
+            except Department.DoesNotExist:
+                return Response(
+                    {"error": "Phòng ban không tồn tại"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            department_name = department.name
 
         # Lấy nhân viên đang hoạt động trong phòng ban tại tháng báo cáo.
         # Dùng end_date thay vì is_active (field is_active do HR set tay,
@@ -229,13 +248,15 @@ class DeptAttendanceViolationReportView(APIView):
         # tháng báo cáo sẽ bị loại, NV nghỉ trong tháng vẫn hiển thị vì có
         # công/vi phạm cần tính trong tháng đó.
         first_day_of_month = date(year, month, 2)
-        employees = (
-            Employee.objects.filter(department_id=department_id)
-            .filter(
-                models.Q(end_date__isnull=True) | models.Q(end_date__gte=first_day_of_month)
-            )
-            .select_related("department", "position")
-            .order_by("employee_id")
+        employees = Employee.objects.filter(
+            models.Q(end_date__isnull=True) | models.Q(end_date__gte=first_day_of_month)
+        )
+        if department_id is not None:
+            employees = employees.filter(department_id=department_id)
+        if manager is not None:
+            employees = employees.filter(models.Q(manager=manager) | models.Q(pk=manager.pk))
+        employees = employees.select_related("department", "position").order_by(
+            "department_id", "employee_id"
         )
 
         all_rows = []
@@ -275,7 +296,7 @@ class DeptAttendanceViolationReportView(APIView):
 
         response_data = {
             "department_id": department_id,
-            "department_name": department.name,
+            "department_name": department_name,
             "year": year,
             "month": month,
             "total_employees": employees.count(),
