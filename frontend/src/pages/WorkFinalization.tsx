@@ -810,6 +810,7 @@ const WorkFinalization: React.FC = () => {
 
       const results: FinalizeAllResultItem[] = [];
       const errors: FinalizeAllErrorItem[] = [];
+      let skippedLocked = 0;
 
       for (const emp of eligibleEmployees) {
         try {
@@ -818,6 +819,11 @@ const WorkFinalization: React.FC = () => {
             year: selectedYear,
             month: selectedMonth,
           });
+          // Bản ghi đã khoá số công: backend giữ nguyên, không tính lại
+          if (finalizeRes.skipped_locked) {
+            skippedLocked += 1;
+            continue;
+          }
           results.push({
             employee_code: emp.employee_id,
             ho_va_ten: emp.full_name,
@@ -844,7 +850,8 @@ const WorkFinalization: React.FC = () => {
       setFinalizeAllResult(res);
       setSuccessMsg(
         `Đã chốt công ${res.total_processed} nhân viên tháng ${selectedMonth}/${selectedYear}` +
-        (res.total_errors > 0 ? ` (${res.total_errors} lỗi)` : '')
+        (res.total_errors > 0 ? ` (${res.total_errors} lỗi)` : '') +
+        (skippedLocked > 0 ? ` — bỏ qua ${skippedLocked} người đã khoá số công` : '')
       );
       await loadRecords();
     } catch (err: any) {
@@ -877,6 +884,7 @@ const WorkFinalization: React.FC = () => {
 
       const results: FinalizeAllResultItem[] = [];
       const errors: FinalizeAllErrorItem[] = [];
+      let skippedLocked = 0;
 
       for (const emp of eligibleEmployees) {
         try {
@@ -885,6 +893,11 @@ const WorkFinalization: React.FC = () => {
             year: selectedYear,
             month: selectedMonth,
           });
+          // Bản ghi đã khoá số công: backend giữ nguyên, không tính lại
+          if (finalizeRes.skipped_locked) {
+            skippedLocked += 1;
+            continue;
+          }
           results.push({
             employee_code: emp.employee_id,
             ho_va_ten: emp.full_name,
@@ -913,7 +926,8 @@ const WorkFinalization: React.FC = () => {
       setFinalizeDepartmentResult(res);
       setSuccessMsg(
         `Đã chốt công ${res.total_processed} nhân viên phòng ban "${deptName}" tháng ${selectedMonth}/${selectedYear}` +
-        (res.total_errors > 0 ? ` (${res.total_errors} lỗi)` : '')
+        (res.total_errors > 0 ? ` (${res.total_errors} lỗi)` : '') +
+        (skippedLocked > 0 ? ` — bỏ qua ${skippedLocked} người đã khoá số công` : '')
       );
       await loadRecords();
     } catch (err: any) {

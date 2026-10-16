@@ -209,6 +209,12 @@ const navigationItems: NavigationItem[] = [
         roles: ['ADMIN', 'HR'],
       },
       {
+        name: 'Data chốt công',
+        href: '/dashboard/work-finalization/data',
+        icon: TableCellsIcon,
+        roles: ['ADMIN', 'HR'],
+      },
+      {
         name: 'Phê duyệt chốt công',
         href: '/dashboard/work-finalization/attendance-finalization-approvals',
         icon: CheckCircleIcon,

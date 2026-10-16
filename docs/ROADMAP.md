@@ -24,7 +24,7 @@ Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 
 | 1.5 | ✅ **Mã QR tài sản** + đăng nhập chuyển hướng `/login?redirect=` | S | Cần thư viện `qrcode`. |
 | 1.6 | ✅ **Import phòng ban / vị trí từ Excel** | S | Chỉ HR/Admin. |
 | 1.7 | ✅ **Từ chối hàng loạt** trên trang Phê duyệt | S | Đặt cạnh `bulk_approve`. |
-| 1.8 | **Khoá dòng chốt công đã sửa tay** + trang "Data chốt công" | S | Để "Chốt công tất cả" không ghi đè số đã sửa tay. |
+| 1.8 | ✅ **Khoá dòng chốt công đã sửa tay** + trang "Data chốt công" | S | Để "Chốt công tất cả" không ghi đè số đã sửa tay. |
 | 1.9 | **Cảnh báo mâu thuẫn ngày / loại hợp đồng** trên form sửa NV | S | Chỉ sửa FE. |
 | 1.10 | **Xuất Excel nhân viên theo cột tuỳ chọn** | S | Mở quyền `export-all` cho Admin/HR. |
 | 1.11 | **Cảnh báo quan trọng**: HĐ sắp/đã hết hạn, đến hạn đóng BHXH, kèm popup | S–M | Các ngưỡng ngày phải cấu hình được. |
