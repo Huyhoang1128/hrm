@@ -443,6 +443,51 @@ class ParkingAllowanceOverride(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# LunchAllowanceOverride – PC ăn trưa nhập tay (ghi đè tính theo policy)
+# ---------------------------------------------------------------------------
+
+class LunchAllowanceOverride(models.Model):
+    """
+    Số tiền phụ cấp ăn trưa được HR import/nhập thủ công (đã tính sẵn) cho 1
+    nhân viên / 1 kỳ lương. Khi tồn tại bản ghi cho (employee, year, month),
+    giá trị này LUÔN được ưu tiên dùng thay cho kết quả tính theo
+    lunchAllowancePolicy (xem _calculate_lunch_allowance trong
+    hrm/finalization_views.py) — kể cả khi là 0.
+    Mỗi nhân viên chỉ có 1 bản ghi / tháng (unique_together).
+    """
+    employee = models.ForeignKey(
+        'employee.Employee', on_delete=models.CASCADE,
+        related_name='lunch_allowance_overrides', verbose_name="Nhân viên",
+    )
+    year  = models.IntegerField(verbose_name="Năm")
+    month = models.IntegerField(verbose_name="Tháng (1-12)")
+    amount = models.DecimalField(
+        max_digits=14, decimal_places=2, default=Decimal('0'),
+        verbose_name="Số tiền phụ cấp ăn trưa",
+    )
+    notes = models.TextField(blank=True, verbose_name="Ghi chú")
+    created_by = models.ForeignKey(
+        'employee.Employee', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='lunch_allowance_overrides_created',
+        verbose_name="Người tạo",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Phụ cấp ăn trưa (ghi đè thủ công)"
+        verbose_name_plural = "Phụ cấp ăn trưa (ghi đè thủ công)"
+        unique_together = ['employee', 'year', 'month']
+        indexes = [
+            models.Index(fields=['employee', 'year', 'month']),
+            models.Index(fields=['year', 'month']),
+        ]
+
+    def __str__(self):
+        return f"PC ăn trưa {self.employee.full_name} – {self.month}/{self.year}: {self.amount:,.0f}đ"
+
+
+# ---------------------------------------------------------------------------
 # OvertimeRateConfig – Đơn giá tăng ca (M2M: dept/pos/emp, có hiệu lực)
 # ---------------------------------------------------------------------------
 
