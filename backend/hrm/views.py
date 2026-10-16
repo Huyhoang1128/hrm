@@ -495,6 +495,57 @@ def _employee_stats_at(ref_date):
     }
 
 
+_EDUCATION_CODE_TO_FORM_LABEL = {
+    'MASTER': 'Thạc sĩ',
+    'BACHELOR': 'Cử nhân đại học',
+    'ASSOCIATE': 'Cử nhân cao đẳng',
+    'HIGH_SCHOOL': 'Trung cấp',
+    'OTHER': 'Khác',
+}
+
+
+def _self_update_prefill(onboarding) -> dict:
+    """Thông tin cá nhân hiện có của NV, theo tên field của form onboarding — để form
+    tự cập nhật hồ sơ điền sẵn, NV chỉ sửa chỗ sai (ô để trống sẽ ghi đè thành trống)."""
+    e = onboarding.employee
+
+    def iso(d):
+        return d.isoformat() if d else ''
+
+    return {
+        'candidate_name': e.full_name or '',
+        'candidate_phone': e.phone_number or '',
+        'date_of_birth': iso(e.date_of_birth),
+        'gender': e.gender or '',
+        'education_level': _EDUCATION_CODE_TO_FORM_LABEL.get(e.education_level or '', ''),
+        'ethnicity': e.ethnicity or '',
+        'birth_place': e.birth_place or '',
+        'nationality': e.nationality or '',
+        'facebook_link': e.facebook_link or '',
+        'citizen_id': e.cccd_number or '',
+        'citizen_id_issue_date': iso(e.cccd_issue_date),
+        'citizen_id_issue_place': e.cccd_issue_place or '',
+        'old_id_number': e.old_id_number or '',
+        'permanent_address': e.permanent_residence or '',
+        'current_address': e.current_address or '',
+        'social_insurance_number': e.social_insurance_number or '',
+        'tax_code': e.tax_code or '',
+        'marital_status': e.marital_status or '',
+        'emergency_contact_name': e.emergency_contact_name or '',
+        'emergency_contact_relationship': e.emergency_contact_relationship or '',
+        'emergency_contact_phone': e.emergency_contact_phone or '',
+        'emergency_contact_dob': iso(e.emergency_contact_dob),
+        'emergency_contact_occupation': e.emergency_contact_occupation or '',
+        'emergency_contact_address': e.emergency_contact_address or '',
+        'bank_account': e.bank_account or '',
+        'bank_name': e.bank_name or '',
+        'bank_branch': e.bank_branch or '',
+        'bank_account_holder': e.bank_account_holder or '',
+        'has_citizen_id_file': bool(onboarding.citizen_id_file),
+        'has_vneid_screenshot': bool(e.vneid_screenshot),
+    }
+
+
 class EmployeeViewSet(viewsets.ModelViewSet):
     """
     API endpoint for managing employees
@@ -1056,6 +1107,66 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(employee)
         return Response({'success': True, 'message': 'Đã vô hiệu hóa tài khoản app chấm công', 'employee': serializer.data})
     
+    @action(detail=True, methods=['post'], url_path='generate-self-update-link',
+            permission_classes=[IsAuthenticated, IsAdminOrHR])
+    def generate_self_update_link(self, request, pk=None):
+        """
+        Tạo (hoặc tạo lại) link để NV đang làm tự cập nhật thông tin cá nhân.
+        POST /api-hrm/employees/{id}/generate-self-update-link/
+
+        Dùng lại form onboarding (token có hạn): gắn sẵn `employee` lên OnboardingProcess
+        nên dữ liệu NV gửi lên cập nhật thẳng vào hồ sơ này. Khác onboarding ứng viên mới,
+        form KHÔNG đổi được các trường HCNS quản lý (lương, phụ cấp, thử việc, phòng ban,
+        vị trí, cấp bậc, hình thức / địa điểm làm việc).
+        """
+        from .models import SELF_UPDATE_CODE_PREFIX
+
+        employee = self.get_object()
+        email = employee.personal_email or (employee.user.email if employee.user_id else '')
+        if not email:
+            return Response(
+                {'success': False, 'message': 'Nhân viên chưa có email. Vui lòng cập nhật email trước khi tạo link.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        onboarding = OnboardingProcess.objects.filter(employee=employee).first()
+        if onboarding is None:
+            onboarding = OnboardingProcess.objects.create(
+                onboarding_code=f"{SELF_UPDATE_CODE_PREFIX}{employee.employee_id}-{int(timezone.now().timestamp())}",
+                candidate_name=employee.full_name,
+                candidate_email=email,
+                candidate_phone=employee.phone_number or '',
+                start_date=employee.start_date or timezone.localdate(),
+                position=employee.position,
+                department=employee.department,
+                employee=employee,
+                is_self_update=True,
+            )
+        else:
+            # Bản ghi onboarding cũ: đồng bộ snapshot theo hồ sơ HIỆN TẠI để lần submit
+            # không kéo vị trí / phòng ban cũ đã lỗi thời về.
+            onboarding.candidate_name = employee.full_name
+            onboarding.candidate_phone = employee.phone_number or ''
+            onboarding.position = employee.position
+            onboarding.department = employee.department
+            onboarding.is_self_update = True
+            onboarding.employee_info_completed = False
+            onboarding.employee_info_completed_at = None
+            onboarding.save(update_fields=[
+                'candidate_name', 'candidate_phone', 'position', 'department', 'is_self_update',
+                'employee_info_completed', 'employee_info_completed_at',
+            ])
+
+        onboarding.generate_employee_token()
+        return Response({
+            'success': True,
+            'message': 'Đã tạo link tự cập nhật hồ sơ.',
+            'data': {
+                'employee_form_url': onboarding.get_employee_form_url(),
+                'expires_at': onboarding.token_expires_at,
+            },
+        })
+
     @action(detail=True, methods=['post'])
     def reset_password(self, request, pk=None):
         """
@@ -8037,6 +8148,9 @@ class OnboardingProcessViewSet(viewsets.ModelViewSet):
             'position', 'department', 'direct_manager',
             'hr_responsible', 'employee', 'created_by'
         ).prefetch_related('tasks', 'documents', 'documents__uploaded_by', 'documents__template_source', 'documents__template_source__created_by')
+        if self.action in ('list', 'stats'):
+            from .models import SELF_UPDATE_CODE_PREFIX
+            base_qs = base_qs.exclude(onboarding_code__startswith=SELF_UPDATE_CODE_PREFIX)
 
         if user.is_superuser or user.is_staff:
             qs = base_qs
@@ -8401,9 +8515,12 @@ class OnboardingProcessViewSet(viewsets.ModelViewSet):
                 'message': 'Nhân viên đã hoàn thành việc điền thông tin. Không thể tạo lại link.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Tạo token mới
+        # Tạo token mới (token onboarding thường, không phải link tự cập nhật hồ sơ)
+        if onboarding.is_self_update:
+            onboarding.is_self_update = False
+            onboarding.save(update_fields=['is_self_update'])
         token = onboarding.generate_employee_token()
-        
+
         # Lấy URL form
         employee_form_url = onboarding.get_employee_form_url()
         
@@ -9218,20 +9335,21 @@ class EmployeeOnboardingFormViewSet(viewsets.GenericViewSet):
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             # Trả về thông tin cơ bản
-            return Response({
-                'success': True,
-                'data': {
-                    'id': onboarding.id,
-                    'onboarding_code': onboarding.onboarding_code,
-                    'candidate_name': onboarding.candidate_name,
-                    'candidate_email': onboarding.candidate_email,
-                    'candidate_phone': onboarding.candidate_phone,
-                    'start_date': onboarding.start_date,
-                    'position_name': onboarding.position.title if onboarding.position else None,
-                    'department_name': onboarding.department.name if onboarding.department else None,
-                    'token_expires_at': onboarding.token_expires_at,
-                }
-            })
+            data = {
+                'id': onboarding.id,
+                'onboarding_code': onboarding.onboarding_code,
+                'candidate_name': onboarding.candidate_name,
+                'candidate_email': onboarding.candidate_email,
+                'candidate_phone': onboarding.candidate_phone,
+                'start_date': onboarding.start_date,
+                'position_name': onboarding.position.title if onboarding.position else None,
+                'department_name': onboarding.department.name if onboarding.department else None,
+                'token_expires_at': onboarding.token_expires_at,
+                'is_self_update': onboarding.is_self_update,
+            }
+            if onboarding.is_self_update and onboarding.employee:
+                data.update(_self_update_prefill(onboarding))
+            return Response({'success': True, 'data': data})
             
         except OnboardingProcess.DoesNotExist:
             return Response({
@@ -9295,13 +9413,20 @@ class EmployeeOnboardingFormViewSet(viewsets.GenericViewSet):
             'emergency_contact_address', 'salary', 'bank_account',
             'bank_name', 'bank_account_holder',
         ]
+        # Link tự cập nhật hồ sơ (NV đang làm): bỏ hẳn các trường HCNS quản lý khỏi
+        # dữ liệu gửi lên và khỏi danh sách bắt buộc — serializer cũng giữ nguyên chúng.
+        form_data = request.data
+        if onboarding.is_self_update:
+            from .models import SELF_UPDATE_BLOCKED_FORM_FIELDS
+            REQUIRED_TEXT_FIELDS = [f for f in REQUIRED_TEXT_FIELDS if f not in SELF_UPDATE_BLOCKED_FORM_FIELDS]
+            form_data = {k: v for k, v in request.data.items() if k not in SELF_UPDATE_BLOCKED_FORM_FIELDS}
         # File fields:
         #   - citizen_id_file: lưu S3 key trên OnboardingProcess.citizen_id_file
         #   - vneid_screenshot: FileField trên Employee.vneid_screenshot
         # → re-submit case: kiểm tra giá trị hiện có trước khi đòi upload mới.
         missing = []
         for f in REQUIRED_TEXT_FIELDS:
-            raw = request.data.get(f)
+            raw = form_data.get(f)
             if raw is None or (isinstance(raw, str) and not raw.strip()):
                 missing.append(f)
 
@@ -9325,9 +9450,9 @@ class EmployeeOnboardingFormViewSet(viewsets.GenericViewSet):
         # đầy đủ: cập nhật Employee, lưu file CCCD, auto-complete tasks 1-4
         serializer = EmployeeOnboardingFormSerializer(
             onboarding,
-            data=request.data,
+            data=form_data,
             partial=True,
-            context={'request': request}
+            context={'request': request, 'self_update': onboarding.is_self_update}
         )
 
         if not serializer.is_valid():

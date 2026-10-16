@@ -97,6 +97,12 @@ export const employeesAPI = {
     return response.data;
   },
 
+  /** HCNS/Admin: tạo link để NV đang làm tự cập nhật thông tin cá nhân (dùng lại form onboarding). */
+  generateSelfUpdateLink: async (id: number): Promise<{ employee_form_url: string; expires_at: string }> => {
+    const response = await managementApi.post(`/api-hrm/employees/${id}/generate-self-update-link/`);
+    return response.data.data;
+  },
+
   me: async (): Promise<Employee> => {
     if (mePromise) return mePromise;
 
