@@ -86,6 +86,7 @@ import LeavePolicyList from './pages/LeavePolicyList';
 import LeavePolicyCreate from './pages/LeavePolicyCreate';
 import { EmployeeOnboardingForm } from "./pages/EmployeeOnboardingForm";
 import WorkFinalization from './pages/WorkFinalization';
+import WorkFinalizationData from './pages/WorkFinalizationData';
 import WorkFinalizationApprovals from './pages/WorkFinalizationApprovals';
 import AttendanceFinalizationApprovals from './pages/AttendanceFinalizationApprovals';
 import ContractTemplates from './pages/ContractTemplates';
@@ -1076,6 +1077,16 @@ function App() {
             }
           />
           {/* Work Finalization Route */}
+          <Route
+            path="/dashboard/work-finalization/data"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'HR']}>
+                <Layout>
+                  <WorkFinalizationData />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/dashboard/work-finalization"
             element={
