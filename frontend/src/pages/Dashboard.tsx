@@ -38,6 +38,7 @@ import HRStats from '../components/HRStats';
 import { AnimatedNum } from '../components/AnimatedNum';
 import { DonutCenter } from '../components/DonutCenter';
 import { ProgressBar } from '../components/ProgressBar';
+import { formatNumber, formatVND } from '../utils/formatUtils';
 
 interface RecruitmentEmployee {
   id: number;
@@ -290,10 +291,6 @@ const CHART_COLORS = [
   '#ec4899', '#06b6d4', '#f97316', '#84cc16',
 ];
 
-const formatNumber = (n: number) =>
-  n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-
-const formatCurrency = (n: number) => `${formatNumber(n)} VNĐ`;
 const formatPercent = (n: number) => `${Number.isFinite(n) ? n.toFixed(1) : '0.0'}%`;
 const formatMonths = (n: number) => `${Number.isFinite(n) ? n.toFixed(1) : '0.0'} tháng`;
 
@@ -873,7 +870,7 @@ const Dashboard = () => {
             <StatCard name="Tài sản đang dùng" rawValue={stats.asset_stats.in_use} formatter={formatNumber}
               subtext={`${formatNumber(stats.asset_stats.total)} tổng tài sản`}
               icon={ComputerDesktopIcon} iconBg="bg-emerald-100 text-emerald-600" trend={stats.trends.asset_growth} />
-            <StatCard name="Giá trị tài sản" rawValue={stats.asset_stats.total_value} formatter={formatCurrency}
+            <StatCard name="Giá trị tài sản" rawValue={stats.asset_stats.total_value} formatter={formatVND}
               subtext={`${formatNumber(stats.asset_stats.current_assignments)} đang gán`}
               icon={CurrencyDollarIcon} iconBg="bg-violet-100 text-violet-600" trend={null} />
           </div>
@@ -1435,7 +1432,7 @@ const Dashboard = () => {
             <StatCard
               name="Căn cứ đóng BHXH"
               rawValue={socialInsuranceStats.summary.contribution_level_total}
-              formatter={formatCurrency}
+              formatter={formatVND}
               subtext="Tổng mức đóng của nhân sự đang tham gia"
               icon={CurrencyDollarIcon}
               iconBg="bg-violet-100 text-violet-600"
@@ -1444,7 +1441,7 @@ const Dashboard = () => {
             <StatCard
               name="Mức đóng bình quân"
               rawValue={socialInsuranceStats.summary.contribution_level_average}
-              formatter={formatCurrency}
+              formatter={formatVND}
               subtext="Bình quân trên nhân sự đang tham gia"
               icon={CurrencyDollarIcon}
               iconBg="bg-cyan-100 text-cyan-600"
@@ -1538,7 +1535,7 @@ const Dashboard = () => {
                       <td className="py-2.5 px-3 text-right text-rose-600">{formatNumber(department.missing_household_code)}</td>
                       <td className="py-2.5 px-3 text-right text-red-600">{formatNumber(department.missing_contribution)}</td>
                       <td className="py-2.5 pl-3 text-right font-semibold text-gray-900">
-                        {formatCurrency(department.contribution_level_total)}
+                        {formatVND(department.contribution_level_total)}
                       </td>
                     </tr>
                   )) : (
@@ -1718,7 +1715,7 @@ const Dashboard = () => {
             <StatCard name="Đang bảo trì" rawValue={stats.asset_stats.under_maintenance} formatter={formatNumber}
               subtext={`${formatNumber(stats.asset_stats.upcoming_maintenance)} sắp bảo trì`}
               icon={WrenchScrewdriverIcon} iconBg="bg-red-100 text-red-500" trend={null} />
-            <StatCard name="Giá trị tài sản" rawValue={stats.asset_stats.total_value} formatter={formatCurrency}
+            <StatCard name="Giá trị tài sản" rawValue={stats.asset_stats.total_value} formatter={formatVND}
               subtext={`${formatNumber(stats.asset_stats.current_assignments)} đang gán`}
               icon={CurrencyDollarIcon} iconBg="bg-violet-100 text-violet-600" trend={null} />
           </div>
