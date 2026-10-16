@@ -4,6 +4,7 @@ import type {
   Asset,
   AssetAssignmentHistory,
   AssetMaintenance,
+  AssetInventoryCheck,
   AssetStats,
 } from './types';
 
@@ -33,6 +34,13 @@ export const assetsAPI = {
       previous: string | null;
       results: Asset[];
     }> = await managementApi.get('/api-hrm/assets/', { params });
+    return response.data;
+  },
+
+  // Các "Phân loại" đang dùng (kèm số tài sản, nhiều nhất trước) + loại chuẩn
+  // chưa dùng — gợi ý khi gõ ô Phân loại để HCNS gõ thống nhất.
+  typeOptions: async (): Promise<Array<{ value: string; label: string; count: number }>> => {
+    const response = await managementApi.get('/api-hrm/assets/type_options/');
     return response.data;
   },
 
@@ -124,6 +132,15 @@ export const assetsAPI = {
     return response.data;
   },
 
+  // File mẫu để nhập Excel hàng loạt (header + dropdown + 2 dòng ví dụ),
+  // không phụ thuộc dữ liệu thật — dùng cho nút "Tải file mẫu".
+  exportTemplate: async (): Promise<Blob> => {
+    const response = await managementApi.get('/api-hrm/assets/export_template/', {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
   bulkImportExcel: async (file: File): Promise<{
     sheet: string;
     data_rows: number;
@@ -200,6 +217,56 @@ export const assetsAPI = {
       previous: string | null;
       results: AssetMaintenance[];
     }> = await managementApi.get(`/api-hrm/assets/${id}/maintenance_history/`, { params });
+    return response.data;
+  },
+
+  inventoryHistory: async (id: number, params?: {
+    page?: number;
+    page_size?: number;
+  }): Promise<{
+    count: number;
+    next: string | null;
+    previous: string | null;
+    results: AssetInventoryCheck[];
+  }> => {
+    const response: AxiosResponse<{
+      count: number;
+      next: string | null;
+      previous: string | null;
+      results: AssetInventoryCheck[];
+    }> = await managementApi.get(`/api-hrm/assets/${id}/inventory_history/`, { params });
+    return response.data;
+  },
+
+  // Upload ảnh tài sản (hiện tại / mới mua) — endpoint riêng, luôn upload thẳng lên
+  // Cloudfly S3, giống ChangeAvatarView (Employee.avatar), thay vì gộp vào payload
+  // JSON của create/update.
+  uploadImage: async (id: number, imageType: 'current' | 'purchase', file: File): Promise<{
+    success: boolean;
+    current_image_url: string | null;
+    purchase_image_url: string | null;
+  }> => {
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('image_type', imageType);
+    const response = await managementApi.post(`/api-hrm/assets/${id}/upload_image/`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  clearImage: async (id: number, imageType: 'current' | 'purchase'): Promise<void> => {
+    await managementApi.post(`/api-hrm/assets/${id}/clear_image/`, { image_type: imageType });
+  },
+
+  // Ảnh QR (PNG) generate on-the-fly, encode URL mở thẳng trang chi tiết tài
+  // sản trong HRM. Endpoint yêu cầu đăng nhập (Bearer token) nên phải fetch
+  // qua managementApi (blob) rồi tạo object URL — không dùng <img src> thẳng
+  // vào URL API được vì trình duyệt không tự đính kèm Authorization header.
+  getQrCode: async (id: number): Promise<Blob> => {
+    const response = await managementApi.get(`/api-hrm/assets/${id}/qr_code/`, {
+      responseType: 'blob',
+    });
     return response.data;
   },
 };
@@ -328,5 +395,49 @@ export const assetMaintenanceAPI = {
   assetMaintenanceSummary: async (): Promise<any> => {
     const response: AxiosResponse<any> = await managementApi.get('/api-hrm/asset-maintenance/asset_maintenance_summary/');
     return response.data;
+  },
+};
+
+// Asset Inventory Check API (Lịch sử kiểm kê)
+export const assetInventoryChecksAPI = {
+  list: async (params?: {
+    page?: number;
+    page_size?: number;
+    asset?: number;
+    result?: string;
+    checked_by?: number;
+    search?: string;
+  }): Promise<{
+    count: number;
+    next: string | null;
+    previous: string | null;
+    results: AssetInventoryCheck[];
+  }> => {
+    const response: AxiosResponse<{
+      count: number;
+      next: string | null;
+      previous: string | null;
+      results: AssetInventoryCheck[];
+    }> = await managementApi.get('/api-hrm/asset-inventory-checks/', { params });
+    return response.data;
+  },
+
+  getById: async (id: number): Promise<AssetInventoryCheck> => {
+    const response: AxiosResponse<AssetInventoryCheck> = await managementApi.get(`/api-hrm/asset-inventory-checks/${id}/`);
+    return response.data;
+  },
+
+  create: async (data: Partial<AssetInventoryCheck> & { asset_id: number }): Promise<AssetInventoryCheck> => {
+    const response: AxiosResponse<AssetInventoryCheck> = await managementApi.post('/api-hrm/asset-inventory-checks/', data);
+    return response.data;
+  },
+
+  update: async (id: number, data: Partial<AssetInventoryCheck>): Promise<AssetInventoryCheck> => {
+    const response: AxiosResponse<AssetInventoryCheck> = await managementApi.put(`/api-hrm/asset-inventory-checks/${id}/`, data);
+    return response.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await managementApi.delete(`/api-hrm/asset-inventory-checks/${id}/`);
   },
 };

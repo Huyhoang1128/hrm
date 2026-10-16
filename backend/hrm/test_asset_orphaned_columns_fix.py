@@ -40,15 +40,6 @@ class AssetOrphanedColumnsFixTests(SimpleTestCase):
             field = Asset._meta.get_field(name)
             self.assertTrue(field.null, f"{name} phải nullable (khớp DB thật)")
 
-    def test_asset_serializer_does_not_expose_the_orphaned_fields(self):
-        """4 field này chưa phục vụ tính năng gì (frontend không
-        có UI khấu hao/hình ảnh tài sản) — chỉ cần Django biết để tự điền default,
-        KHÔNG cần lộ ra API. Giữ nguyên serializer là đúng ý đồ fix (không mở rộng
-        tính năng ngoài phạm vi yêu cầu)."""
-        exposed = set(AssetSerializer.Meta.fields)
-        for name in ('current_image', 'depreciation_method', 'depreciation_period_months', 'purchase_image'):
-            self.assertNotIn(name, exposed)
-
     def test_asset_create_with_only_required_fields_gets_default_depreciation_method(self):
         """Mô phỏng đúng lỗi thực tế: gọi Asset(**validated_data) với validated_data
         KHÔNG hề chứa depreciation_method (giống hệt AssetSerializer.create(), vốn

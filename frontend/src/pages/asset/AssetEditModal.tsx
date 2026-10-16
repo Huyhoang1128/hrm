@@ -4,6 +4,8 @@ import { ArrowPathIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { assetsAPI, departmentsAPI, employeesAPI, Asset, positionsAPI, companyUnitsAPI } from '../../utils/api';
 import { SelectBox, SelectOption } from '../../components/LandingLayout/SelectBox';
 import FeedbackDialog from '../../components/FeedbackDialog';
+import AssetTypeInput from './AssetTypeInput';
+import { isMultiHolderType, normalizeAssetType } from './assetTypes';
 
 interface AssetEditModalProps {
   isOpen: boolean;
@@ -12,20 +14,9 @@ interface AssetEditModalProps {
   asset: Asset | null;
 }
 
-const ASSET_TYPES: SelectOption<string>[] = [
-  { value: 'LAPTOP', label: 'Laptop' },
-  { value: 'DESKTOP', label: 'Máy tính để bàn' },
-  { value: 'MONITOR', label: 'Màn hình' },
-  { value: 'SIM', label: 'Sim' },
-  { value: 'PHONE', label: 'Điện thoại' },
-  { value: 'TABLET', label: 'Máy tính bảng' },
-  { value: 'PRINTER', label: 'Máy in' },
-  { value: 'SCANNER', label: 'Máy scan' },
-  { value: 'NETWORK', label: 'Thiết bị mạng' },
-  { value: 'SERVER', label: 'Máy chủ' },
-  { value: 'FURNITURE', label: 'Nội thất' },
-  { value: 'VEHICLE', label: 'Phương tiện' },
-  { value: 'OTHER', label: 'Khác' },
+
+const DEPRECIATION_METHODS: SelectOption<string>[] = [
+  { value: 'STRAIGHT_LINE', label: 'Đường thẳng' },
 ];
 
 const ASSET_CONDITIONS: SelectOption<string>[] = [
@@ -116,7 +107,25 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
     cancellation_report_date: '',
     // OTHER specific fields
     other_type_name: '',
+    dimensions: '',
+    usage_area: '',
+    usage_department: '',
+    facility_code: '',
+    purchase_price: '',
+    depreciation_period_months: '',
+    depreciation_method: 'STRAIGHT_LINE',
   });
+  // Mã loại chuẩn (SIM, DESKTOP...) suy ra từ ô Phân loại gõ tự do
+  const typeCode = normalizeAssetType(formData.asset_type);
+  // Ảnh: URL ảnh hiện có + file mới chọn + cờ xoá ảnh
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
+  const [purchaseImageUrl, setPurchaseImageUrl] = useState<string | null>(null);
+  const [currentImageFile, setCurrentImageFile] = useState<File | null>(null);
+  const [purchaseImageFile, setPurchaseImageFile] = useState<File | null>(null);
+  const [clearCurrentImage, setClearCurrentImage] = useState(false);
+  const [clearPurchaseImage, setClearPurchaseImage] = useState(false);
+  // Giá trị hiện tại/Mức khấu hao — server tính động, chỉ hiển thị tham khảo
+  const [computedDepreciation, setComputedDepreciation] = useState<{ monthly: number | null; current: number | null }>({ monthly: null, current: null });
 
   /**
    * Khởi chạy khi Modal được mở, gán dữ liệu từ prop asset vào form
@@ -133,9 +142,19 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
           const recipientName = fullAsset.assigned_to_name || fullAsset.pending_assignment?.assigned_to_name || '';
           setHandoverEmployeeId(recipientId);
           setHandoverEmployeeName(recipientName);
+          setCurrentImageUrl(fullAsset.current_image_url || null);
+          setPurchaseImageUrl(fullAsset.purchase_image_url || null);
+          setCurrentImageFile(null);
+          setPurchaseImageFile(null);
+          setClearCurrentImage(false);
+          setClearPurchaseImage(false);
+          setComputedDepreciation({
+            monthly: fullAsset.monthly_depreciation ?? null,
+            current: fullAsset.current_value ?? null,
+          });
           setFormData({
             name: fullAsset.name || '',
-            asset_type: fullAsset.asset_type || 'LAPTOP',
+            asset_type: fullAsset.asset_type_display || fullAsset.asset_type || 'Laptop',
             model: fullAsset.model || '',
             status: fullAsset.status || 'NEW',
             condition: fullAsset.condition || 'EXCELLENT',
@@ -162,6 +181,13 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
             sim_company: (specs as any).sim_company ? String((specs as any).sim_company) : '',
             cancellation_report_date: (specs as any).cancellation_report_date || '',
             other_type_name: (specs as any).type_name || '',
+            dimensions: fullAsset.dimensions || '',
+            usage_area: fullAsset.usage_area || '',
+            usage_department: fullAsset.usage_department ? String(fullAsset.usage_department) : '',
+            facility_code: fullAsset.facility_code || '',
+            purchase_price: fullAsset.purchase_price != null ? String(fullAsset.purchase_price) : '',
+            depreciation_period_months: fullAsset.depreciation_period_months != null ? String(fullAsset.depreciation_period_months) : '',
+            depreciation_method: fullAsset.depreciation_method || 'STRAIGHT_LINE',
           });
         })
         .catch((error) => {
@@ -173,7 +199,7 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
           setHandoverEmployeeName(recipientName);
           setFormData({
             name: asset.name || '',
-            asset_type: asset.asset_type || 'LAPTOP',
+            asset_type: asset.asset_type_display || asset.asset_type || 'Laptop',
             model: asset.model || '',
             status: asset.status || 'NEW',
             condition: asset.condition || 'EXCELLENT',
@@ -199,6 +225,13 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
             sim_company: (specs as any).sim_company ? String((specs as any).sim_company) : '',
             cancellation_report_date: (specs as any).cancellation_report_date || '',
             other_type_name: (specs as any).type_name || '',
+            dimensions: (asset as any).dimensions || '',
+            usage_area: (asset as any).usage_area || '',
+            usage_department: (asset as any).usage_department ? String((asset as any).usage_department) : '',
+            facility_code: (asset as any).facility_code || '',
+            purchase_price: (asset as any).purchase_price != null ? String((asset as any).purchase_price) : '',
+            depreciation_period_months: (asset as any).depreciation_period_months != null ? String((asset as any).depreciation_period_months) : '',
+            depreciation_method: (asset as any).depreciation_method || 'STRAIGHT_LINE',
           });
         })
         .finally(() => {
@@ -294,7 +327,7 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
   const isFormValid = () => {
     let isValid = formData.name && formData.name.trim() !== '';
     
-    if (formData.asset_type === 'SIM') {
+    if (typeCode === 'SIM') {
       const phone = (formData as any).phone_number || '';
       isValid = isValid && /^\d{10}$/.test(phone.trim());
     }
@@ -342,19 +375,22 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
     
     setLoading(true);
     try {
-      const { cpu, mainboard, ram, storage, vga, power_supply, monitor_quantity, phone_number, network_provider, doctor, region, position_id, sim_type, sim_company, cancellation_report_date, other_type_name, warranty_period, ...baseData } = formData;
+      const { cpu, mainboard, ram, storage, vga, power_supply, monitor_quantity, phone_number, network_provider, doctor, region, position_id, sim_type, sim_company, cancellation_report_date, other_type_name, warranty_period, purchase_price, depreciation_period_months, depreciation_method, usage_department, ...baseData } = formData;
 
       let specifications = {};
-      if (formData.asset_type === 'DESKTOP') {
+      if (typeCode === 'DESKTOP') {
         specifications = { cpu, mainboard, ram, storage, vga, power_supply };
-      } else if (formData.asset_type === 'MONITOR') {
+      } else if (typeCode === 'MONITOR') {
         specifications = { quantity: parseInt(monitor_quantity) || 0 };
-      } else if (formData.asset_type === 'SIM') {
+      } else if (typeCode === 'SIM') {
         const positionTitle = positions.find(p => p.value === formData.position_id)?.label || '';
         const simCompanyName = companyUnits.find(c => c.value === sim_company)?.label || '';
         specifications = { phone_number, network_provider, doctor, region, position_id, position_title: positionTitle, sim_type, sim_company, sim_company_name: simCompanyName, cancellation_report_date };
-      } else if (formData.asset_type === 'OTHER') {
+      } else if (typeCode === 'OTHER') {
         specifications = { type_name: other_type_name, quantity: parseInt(monitor_quantity) || 0 };
+      } else if (isMultiHolderType(typeCode)) {
+        // Phân loại gõ tự do: giống "Khác" — có Số lượng
+        specifications = { quantity: parseInt(monitor_quantity) || 0 };
       }
 
       const payload = {
@@ -363,6 +399,10 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
         warranty_period: warranty_period ? parseInt(warranty_period) : null,
         department_id: formData.department ? parseInt(formData.department) : null,
         managed_by_id: formData.managed_by ? parseInt(formData.managed_by) : null,
+        purchase_price: purchase_price ? parseFloat(purchase_price) : null,
+        depreciation_period_months: depreciation_period_months ? parseInt(depreciation_period_months) : null,
+        depreciation_method,
+        usage_department_id: usage_department ? parseInt(usage_department) : 0,
         specifications
       };
       
@@ -370,6 +410,22 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
       console.log('Payload:', JSON.stringify(payload, null, 2));
       
       const response = await assetsAPI.update(asset.id, payload as any);
+
+      // Ảnh: thay ảnh mới hoặc xoá ảnh cũ
+      try {
+        if (currentImageFile) {
+          await assetsAPI.uploadImage(asset.id, 'current', currentImageFile);
+        } else if (clearCurrentImage) {
+          await assetsAPI.clearImage(asset.id, 'current');
+        }
+        if (purchaseImageFile) {
+          await assetsAPI.uploadImage(asset.id, 'purchase', purchaseImageFile);
+        } else if (clearPurchaseImage) {
+          await assetsAPI.clearImage(asset.id, 'purchase');
+        }
+      } catch (imgError) {
+        console.error('Error uploading asset images:', imgError);
+      }
       
       console.log('--- Phản hồi từ Server ---');
       console.log('Data:', response);
@@ -441,12 +497,12 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
                         </div>
 
                         {/* Phân loại asset */}
-                        <SelectBox
-                          label="Phân loại"
-                          value={formData.asset_type}
-                          options={ASSET_TYPES}
-                          onChange={(val) => handleSelectChange('asset_type', val)}
-                        />
+                        <div>
+                          <label htmlFor="asset_type" className="block text-sm font-medium text-gray-700">
+                            Phân loại
+                          </label>
+                          <AssetTypeInput value={formData.asset_type} onChange={handleChange} />
+                        </div>
 
                         {/* Tình trạng (Vật lý) — SIM dùng chung choices với asset khác */}
                         <SelectBox
@@ -457,7 +513,7 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
                         />
 
                         {/* Trạng thái — chỉ hiện ở outer grid khi KHÔNG phải SIM (SIM có trạng thái riêng trong SIM section) */}
-                        {formData.asset_type !== 'SIM' && (
+                        {typeCode !== 'SIM' && (
                           <SelectBox
                             label="Trạng thái (Vận hành)"
                             value={formData.status}
@@ -467,7 +523,7 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
                         )}
 
                         {/* Desktop Specific Fields (CPU, MAIN, RAM, Ổ CỨNG, VGA, NGUỒN) */}
-                        {formData.asset_type === 'DESKTOP' && (
+                        {typeCode === 'DESKTOP' && (
                           <div className="sm:col-span-2 grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2 bg-primary-50/50 p-4 rounded-xl border border-primary-100 mb-4">
                             <div className="sm:col-span-2">
                               <h4 className="text-sm font-semibold text-primary-900 flex items-center gap-2">
@@ -515,7 +571,7 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
                         )}
 
                         {/* MONITOR Specific Fields (Số lượng) */}
-                        {['MONITOR', 'OTHER'].includes(formData.asset_type) && (
+                        {isMultiHolderType(typeCode) && (
                           <div className="sm:col-span-2 bg-violet-50/60 p-4 rounded-xl border border-violet-100 mb-4">
                             <h4 className="text-xs font-semibold uppercase tracking-wide text-violet-500 mb-3 flex items-center gap-1.5">
                               <div className="w-1.5 h-1.5 bg-violet-500 rounded-full"></div>
@@ -534,7 +590,7 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
                         )}
 
                         {/* SIM Specific Fields (Số điện thoại, Nhà mạng) */}
-                        {formData.asset_type === 'SIM' && (
+                        {typeCode === 'SIM' && (
                           <div className="sm:col-span-2 grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2 bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 mb-4">
                             <div className="sm:col-span-2">
                               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -630,7 +686,7 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
                         )}
 
                         {/* OTHER Specific Fields (Tên loại chi tiết) */}
-                        {formData.asset_type === 'OTHER' && (
+                        {typeCode === 'OTHER' && (
                           <div className="sm:col-span-2 grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2 bg-gray-50/50 p-4 rounded-xl border border-gray-200 mb-4">
                             <div className="sm:col-span-2">
                               <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-1">
@@ -654,7 +710,7 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
 
 
                         {/* Model */}
-                        {!['SIM', 'FURNITURE'].includes(formData.asset_type) && (
+                        {!['SIM', 'FURNITURE'].includes(typeCode) && (
                           <div>
                             <label htmlFor="model" className="block text-sm font-medium text-gray-700">Model</label>
                             <input type="text" name="model" id="model" value={formData.model} onChange={handleChange} className="input-field mt-1" />
@@ -696,6 +752,110 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
                         {formData.department && (
                           <SelectBox label="Người quản lý (Kho)" value={formData.managed_by} options={employees} onChange={(val) => handleSelectChange('managed_by', val)} placeholder="-- Chọn người quản lý --" />
                         )}
+
+                        {/* Thông tin sử dụng thực tế — khác Phòng ban quản lý (kho) ở trên */}
+                        <div className="sm:col-span-2 grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2 bg-sky-50/60 p-4 rounded-xl border border-sky-100">
+                          <div className="sm:col-span-2">
+                            <h4 className="text-[11px] font-semibold text-sky-600 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                              <div className="w-1.5 h-1.5 bg-sky-500 rounded-full"></div>
+                              Thông tin sử dụng thực tế
+                            </h4>
+                          </div>
+                          <div>
+                            <label htmlFor="dimensions" className="block text-sm font-medium text-gray-700">Kích thước</label>
+                            <input type="text" name="dimensions" id="dimensions" value={formData.dimensions} onChange={handleChange} className="input-field mt-1" placeholder="VD: 120x60x75cm" />
+                          </div>
+                          <div>
+                            <label htmlFor="usage_area" className="block text-sm font-medium text-gray-700">Khu vực sử dụng</label>
+                            <input type="text" name="usage_area" id="usage_area" value={formData.usage_area} onChange={handleChange} className="input-field mt-1" placeholder="VD: Tầng 2 - Phòng khám" />
+                          </div>
+                          <SelectBox
+                            label="Phòng ban sử dụng"
+                            value={formData.usage_department}
+                            options={departments}
+                            onChange={(val) => handleSelectChange('usage_department', val)}
+                            placeholder="-- Chọn phòng ban sử dụng --"
+                            searchable
+                          />
+                          <div>
+                            <label htmlFor="facility_code" className="block text-sm font-medium text-gray-700">Mã cơ sở</label>
+                            <input type="text" name="facility_code" id="facility_code" value={formData.facility_code} onChange={handleChange} className="input-field mt-1" placeholder="VD: CS01" />
+                          </div>
+                        </div>
+
+                        {/* Khấu hao tài sản */}
+                        <div className="sm:col-span-2 bg-amber-50/60 p-4 rounded-xl border border-amber-100">
+                          <h4 className="text-[11px] font-semibold text-amber-600 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                            <div className="w-1.5 h-1.5 bg-amber-500 rounded-full"></div>
+                            Khấu hao tài sản
+                          </h4>
+                          <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+                            <div>
+                              <label htmlFor="purchase_price" className="block text-sm font-medium text-gray-700">Giá trị khi mua</label>
+                              <input type="number" name="purchase_price" id="purchase_price" min="0" step="1000"
+                                value={formData.purchase_price} onChange={handleChange}
+                                className="input-field mt-1" placeholder="VD: 24000000" />
+                            </div>
+                            <div>
+                              <label htmlFor="depreciation_period_months" className="block text-sm font-medium text-gray-700">Thời gian khấu hao (tháng)</label>
+                              <input type="number" name="depreciation_period_months" id="depreciation_period_months" min="0" step="1"
+                                value={formData.depreciation_period_months} onChange={handleChange}
+                                className="input-field mt-1" placeholder="VD: 36" />
+                            </div>
+                            <SelectBox
+                              label="Phương pháp khấu hao"
+                              value={formData.depreciation_method}
+                              options={DEPRECIATION_METHODS}
+                              onChange={(val) => handleSelectChange('depreciation_method', val)}
+                            />
+                            {(computedDepreciation.monthly != null || computedDepreciation.current != null) && (
+                              <div className="flex flex-col justify-center text-xs text-gray-500 gap-0.5">
+                                {computedDepreciation.monthly != null && (
+                                  <span>Mức khấu hao/tháng: <span className="font-medium text-gray-700">{Number(computedDepreciation.monthly).toLocaleString('vi-VN')} đ</span></span>
+                                )}
+                                {computedDepreciation.current != null && (
+                                  <span>Giá trị hiện tại: <span className="font-medium text-gray-700">{Number(computedDepreciation.current).toLocaleString('vi-VN')} đ</span></span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Hình ảnh tài sản */}
+                        <div className="sm:col-span-2 bg-gray-50/60 p-4 rounded-xl border border-gray-200">
+                          <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                            <div className="w-1.5 h-1.5 bg-gray-500 rounded-full"></div>
+                            Hình ảnh tài sản
+                          </h4>
+                          <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+                            <div>
+                              <label htmlFor="purchase_image" className="block text-sm font-medium text-gray-700">Hình ảnh tài sản mới mua</label>
+                              {purchaseImageUrl && !clearPurchaseImage && !purchaseImageFile && (
+                                <div className="mt-1 flex items-center gap-2">
+                                  <img src={purchaseImageUrl} alt="Ảnh mới mua" className="h-14 w-14 object-cover rounded-lg border border-gray-200" />
+                                  <button type="button" onClick={() => setClearPurchaseImage(true)} className="text-xs text-red-600 hover:underline">Xoá ảnh</button>
+                                </div>
+                              )}
+                              <input type="file" accept="image/*" name="purchase_image" id="purchase_image"
+                                onChange={(e) => { setPurchaseImageFile(e.target.files?.[0] || null); setClearPurchaseImage(false); }}
+                                className="input-field mt-1 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100" />
+                              {purchaseImageFile && <p className="mt-1 text-xs text-gray-500 truncate">{purchaseImageFile.name}</p>}
+                            </div>
+                            <div>
+                              <label htmlFor="current_image" className="block text-sm font-medium text-gray-700">Hình ảnh tài sản hiện tại</label>
+                              {currentImageUrl && !clearCurrentImage && !currentImageFile && (
+                                <div className="mt-1 flex items-center gap-2">
+                                  <img src={currentImageUrl} alt="Ảnh hiện tại" className="h-14 w-14 object-cover rounded-lg border border-gray-200" />
+                                  <button type="button" onClick={() => setClearCurrentImage(true)} className="text-xs text-red-600 hover:underline">Xoá ảnh</button>
+                                </div>
+                              )}
+                              <input type="file" accept="image/*" name="current_image" id="current_image"
+                                onChange={(e) => { setCurrentImageFile(e.target.files?.[0] || null); setClearCurrentImage(false); }}
+                                className="input-field mt-1 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100" />
+                              {currentImageFile && <p className="mt-1 text-xs text-gray-500 truncate">{currentImageFile.name}</p>}
+                            </div>
+                          </div>
+                        </div>
 
                         {/* Mô tả / Ghi chú */}
                         <div className="sm:col-span-2">

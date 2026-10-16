@@ -1,4 +1,5 @@
 import React, { useState, useEffect, Fragment, useCallback } from 'react';
+import { assetTypeOptionsFrom, isMultiHolderType } from './assetTypes';
 import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import { XMarkIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { Asset, assetsAPI, employeesAPI } from '../../utils/api';
@@ -12,25 +13,6 @@ interface AssetBulkAssignModalProps {
 }
 
 type ResultItem = { asset: Asset; status: 'success' | 'error'; message?: string };
-
-const MULTI_HOLDER_TYPES = ['MONITOR', 'OTHER'];
-
-const ASSET_TYPE_OPTIONS: SelectOption<string>[] = [
-  { value: 'all', label: 'Tất cả loại' },
-  { value: 'LAPTOP', label: 'Laptop' },
-  { value: 'DESKTOP', label: 'Máy tính bàn' },
-  { value: 'MONITOR', label: 'Màn hình' },
-  { value: 'PHONE', label: 'Điện thoại' },
-  { value: 'TABLET', label: 'Máy tính bảng' },
-  { value: 'PRINTER', label: 'Máy in' },
-  { value: 'SCANNER', label: 'Máy quét' },
-  { value: 'NETWORK', label: 'Thiết bị mạng' },
-  { value: 'SERVER', label: 'Máy chủ' },
-  { value: 'SIM', label: 'SIM / USB 4G' },
-  { value: 'FURNITURE', label: 'Nội thất' },
-  { value: 'VEHICLE', label: 'Phương tiện' },
-  { value: 'OTHER', label: 'Khác' },
-];
 
 export default function AssetBulkAssignModal({ isOpen, onClose, onSuccess, assets }: AssetBulkAssignModalProps) {
   const [loading, setLoading] = useState(false);
@@ -75,7 +57,7 @@ export default function AssetBulkAssignModal({ isOpen, onClose, onSuccess, asset
   const assignableAssets = assets.filter((a) => {
     if (a.condition === 'BROKEN' || a.condition === 'POOR') return false;
     if (a.pending_assignment) return false;
-    const isMulti = MULTI_HOLDER_TYPES.includes(a.asset_type) && (a.total_quantity ?? 1) > 1;
+    const isMulti = isMultiHolderType(a.asset_type) && (a.total_quantity ?? 1) > 1;
     if (isMulti) return (a.remaining_quantity ?? 0) > 0;
     return !a.assigned_to_name;
   });
@@ -85,7 +67,7 @@ export default function AssetBulkAssignModal({ isOpen, onClose, onSuccess, asset
   const visibleBlocked = filterType === 'all' ? blockedAssets : blockedAssets.filter((a) => a.asset_type === filterType);
 
   const getBlockReason = (a: Asset) => {
-    const isMulti = MULTI_HOLDER_TYPES.includes(a.asset_type) && (a.total_quantity ?? 1) > 1;
+    const isMulti = isMultiHolderType(a.asset_type) && (a.total_quantity ?? 1) > 1;
     if (isMulti && (a.remaining_quantity ?? 0) === 0) return 'Hết số lượng khả dụng';
     if (a.assigned_to_name && !isMulti) return 'Đang sử dụng — cần thu hồi trước';
     if (a.pending_assignment) return 'Đang chờ xác nhận';
@@ -101,7 +83,7 @@ export default function AssetBulkAssignModal({ isOpen, onClose, onSuccess, asset
           employee_id: parseInt(formData.employee_id),
           assigned_date: formData.assigned_date,
           notes: formData.notes,
-          ...(MULTI_HOLDER_TYPES.includes(asset.asset_type) && (asset.total_quantity ?? 1) > 1
+          ...(isMultiHolderType(asset.asset_type) && (asset.total_quantity ?? 1) > 1
             ? { quantity: quantities[asset.id] ?? 1 }
             : {}),
         })
@@ -171,7 +153,7 @@ export default function AssetBulkAssignModal({ isOpen, onClose, onSuccess, asset
                             <SelectBox
                               label=""
                               value={filterType}
-                              options={ASSET_TYPE_OPTIONS}
+                              options={[{ value: 'all', label: 'Tất cả loại' }, ...assetTypeOptionsFrom(assets)]}
                               onChange={setFilterType}
                               placeholder="Phân loại"
                             />
@@ -179,7 +161,7 @@ export default function AssetBulkAssignModal({ isOpen, onClose, onSuccess, asset
                         </div>
                         <div className="max-h-44 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
                           {visibleAssignable.map((a) => {
-                            const isMulti = MULTI_HOLDER_TYPES.includes(a.asset_type) && (a.total_quantity ?? 1) > 1;
+                            const isMulti = isMultiHolderType(a.asset_type) && (a.total_quantity ?? 1) > 1;
                             return (
                               <div key={a.id} className="px-3 py-2 flex items-center gap-2 bg-white">
                                 <CheckCircleIcon className="h-4 w-4 text-emerald-500 flex-shrink-0" />
