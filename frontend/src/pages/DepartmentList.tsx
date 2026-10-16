@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { departmentsAPI, Department } from '../utils/api';
 import ConfirmDialog from '../components/ConfirmDialog';
+import ImportFileDialog from '../components/ImportFileDialog';
 
 // ── Dialog xem chi tiết phòng ban ──
 const DepartmentDetailDialog: React.FC<{
@@ -108,6 +109,7 @@ const DepartmentList: React.FC = () => {
   const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [viewDepartment, setViewDepartment] = useState<Department | null>(null);
+  const [showImportDialog, setShowImportDialog] = useState(false);
 
   const fetchDepartments = async (search = '') => {
     try {
@@ -157,6 +159,40 @@ const DepartmentList: React.FC = () => {
     return parent ? parent.name : `ID: ${parentId}`;
   };
 
+  const handleDownloadTemplate = async () => {
+    const ExcelJS = (await import('exceljs')).default;
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Template phòng ban');
+
+    sheet.columns = [
+      { header: 'Mã phòng ban', key: 'code', width: 16 },
+      { header: 'Tên phòng ban', key: 'name', width: 28 },
+      { header: 'Phòng ban cha (mã)', key: 'parent', width: 20 },
+      { header: 'Trưởng phòng (mã NV)', key: 'manager', width: 20 },
+      { header: 'Mô tả', key: 'description', width: 32 },
+    ];
+
+    const headerRow = sheet.getRow(1);
+    headerRow.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+      cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    });
+    headerRow.height = 26;
+
+    sheet.addRow({ code: 'PB01', name: 'Phòng Nhân sự', parent: '', manager: '', description: 'Quản lý nhân sự, tuyển dụng' });
+    sheet.addRow({ code: 'PB02', name: 'Bộ phận Tuyển dụng', parent: 'PB01', manager: '', description: '' });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'template-import-phong-ban.xlsx';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const tableHeaders = ['Mã phòng ban', 'Tên phòng ban', 'Phòng ban cha', 'Mô tả', 'Thao tác'];
 
   return (
@@ -201,12 +237,23 @@ const DepartmentList: React.FC = () => {
             <h2 className="text-sm font-bold text-gray-900">Danh sách phòng ban</h2>
             <p className="text-xs text-gray-400 mt-0.5">Tổng số: {departments.length} phòng ban</p>
           </div>
-          <button
-            className="btn-primary"
-            onClick={() => navigate('/dashboard/departments/create')}
-          >
-            + Thêm phòng ban
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              className="bg-amber-500 text-white px-4 py-2 rounded-xl hover:bg-amber-600 transition-colors flex items-center"
+              onClick={() => setShowImportDialog(true)}
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Nhập từ file
+            </button>
+            <button
+              className="btn-primary"
+              onClick={() => navigate('/dashboard/departments/create')}
+            >
+              + Thêm phòng ban
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -317,6 +364,16 @@ const DepartmentList: React.FC = () => {
         loading={deleting}
         onConfirm={handleDeleteConfirm}
         onClose={() => setDepartmentToDelete(null)}
+      />
+
+      <ImportFileDialog
+        open={showImportDialog}
+        title="Nhập danh sách phòng ban từ file"
+        helperText="Mã phòng ban là bắt buộc và dùng để nhận diện — phòng ban đã tồn tại sẽ được cập nhật, chưa có sẽ được tạo mới."
+        onDownloadTemplate={handleDownloadTemplate}
+        onImport={(file) => departmentsAPI.importFile(file)}
+        onImported={() => fetchDepartments(searchTerm)}
+        onClose={() => setShowImportDialog(false)}
       />
     </div>
   );
