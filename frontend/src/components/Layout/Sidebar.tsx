@@ -290,6 +290,12 @@ const navigationItems: NavigationItem[] = [
         roles: ['ADMIN'],
       },
       {
+        name: 'Biến động lương',
+        href: '/dashboard/salary-management/comparison',
+        icon: PresentationChartLineIcon,
+        roles: ['ADMIN'],
+      },
+      {
         name: 'Dự đoán thưởng',
         href: '/dashboard/salary-management/bonus',
         icon: GiftIcon,
