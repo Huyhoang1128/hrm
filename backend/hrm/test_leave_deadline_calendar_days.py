@@ -3,7 +3,7 @@ leave_deadline() đếm theo NGÀY LỊCH (chốt 2026-10-04): Chủ nhật cũn
 ngày, giờ chốt 17h30 thứ 2 - thứ 7, Chủ nhật tới 23h59.
 
 Ví dụ HCNS: nghỉ 2-3 ngày bắt đầu thứ 2 phải báo trước 2 ngày -> chậm nhất thứ
-7. Ca thực tế: NV00968 muốn nghỉ cả ngày thứ 2 05/10/2026, tạo đơn sáng Chủ
+7. Ca thực tế: NV80008 muốn nghỉ cả ngày thứ 2 05/10/2026, tạo đơn sáng Chủ
 nhật 04/10 bị chặn "quá hạn 17:30 03/10" vì bản 28/09 đếm ngày làm việc (bỏ
 qua Chủ nhật) — đúng ra hạn là 23h59 Chủ nhật 04/10.
 

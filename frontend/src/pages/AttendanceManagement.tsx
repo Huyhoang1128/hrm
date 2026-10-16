@@ -105,11 +105,11 @@ const AttendanceManagement: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
   // NV thuộc nhóm "đăng ký Ca 2 theo ngày, cần quản lý trực tiếp duyệt
-  // trước 0h" (vd Điều dưỡng BS Ma Doãn Dương) — chỉ nhóm này mới thấy lý
+  // trước 0h" (vd Điều dưỡng BS A) — chỉ nhóm này mới thấy lý
   // do "Đăng ký Ca 2" trong Đơn đăng ký. Kiểm tra 1 lần khi vào trang.
   const [ca2InScope, setCa2InScope] = useState(false);
-  // Tên ca PHẢI ĐĂNG KÝ của team mình ("Ca 2" với Điều dưỡng BS Doãn Dương,
-  // "Ca 1" với Sale BS Minh Trung) — lấy từ scope-status.
+  // Tên ca PHẢI ĐĂNG KÝ của team mình ("Ca 2" với Điều dưỡng BS A,
+  // "Ca 1" với Sale BS B) — lấy từ scope-status.
   const [ca2RegLabel, setCa2RegLabel] = useState('Ca 2');
   const [attendanceDetails, setAttendanceDetails] = useState<
     AttendanceRecord[]
@@ -504,8 +504,7 @@ const AttendanceManagement: React.FC = () => {
       { id: 'live', label: 'Live', icon: 'video' },
       { id: 'off_duty', label: 'Vào/Ra trực', icon: 'briefcase' },
       // Chỉ nhóm dùng mô hình "mặc định Ca 1, đăng ký Ca 2 theo ngày cần
-      // quản lý trực tiếp duyệt trước 0h" (ca2InScope, vd Điều dưỡng BS Ma
-      // Doãn Dương) mới thấy lý do này — khác hẳn các lý do trên (không tạo
+      // quản lý trực tiếp duyệt trước 0h" (ca2InScope, vd Điều dưỡng BS A) mới thấy lý do này — khác hẳn các lý do trên (không tạo
       // EmployeeEvent, xem nhánh submit riêng bên dưới).
       ...(ca2InScope ? [{ id: 'ca2' as const, label: `Đăng ký ${ca2RegLabel}`, icon: 'clock' }] : []),
     ];
@@ -5022,7 +5021,7 @@ const AttendanceManagement: React.FC = () => {
                                   { value: '08:00', label: '8h00', desc: 'Sáng' },
                                   { value: '08:30', label: '8h30', desc: 'Sáng' },
                                   { value: '09:00', label: '9h00', desc: 'Sáng' },
-                                  // Giờ bắt đầu Ca 2 (Điều dưỡng BS Ma Doãn Dương, 09:30-13:30/
+                                  // Giờ bắt đầu Ca 2 (Điều dưỡng BS A, 09:30-13:30/
                                   // 14:30-18:30) — thêm 2026-09-18 cùng đợt với giờ check-out
                                   // 18h30, cho đủ cặp giờ vào/ra của Ca 2 trong form này.
                                   { value: '09:30', label: '9h30', desc: 'Sáng' },
@@ -5062,7 +5061,7 @@ const AttendanceManagement: React.FC = () => {
                                   { value: '16:30', label: '16h30', desc: 'Chiều' },
                                   { value: '17:00', label: '17h00', desc: 'Chiều' },
                                   { value: '17:30', label: '17h30', desc: 'Chiều' },
-                                  // Giờ kết thúc Ca 2 chiều (Điều dưỡng BS Ma Doãn Dương,
+                                  // Giờ kết thúc Ca 2 chiều (Điều dưỡng BS A,
                                   // 14:30-18:30) — thêm 2026-09-18 vì thiếu mốc này khiến
                                   // NV làm Ca 2 quên chấm công không chọn được đúng giờ về.
                                   { value: '18:30', label: '18h30', desc: 'Chiều' },

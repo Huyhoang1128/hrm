@@ -34,7 +34,7 @@ class HandoverColumnAliasTests(SimpleTestCase):
         cells = _row(headers, {
             "mã thiết bị": "LAPTOP-001",
             "phân loại": "Laptop",
-            "mã người bàn giao": "NV00580",
+            "mã người bàn giao": "NV80005",
         }, total_cols=4)
 
         payload, warnings = parse_row(cells, headers)
@@ -42,7 +42,7 @@ class HandoverColumnAliasTests(SimpleTestCase):
         self.assertIsNotNone(payload)
         self.assertEqual(len(payload["_handover_recipients"]), 1)
         self.assertEqual(payload["_handover_recipients"][0]["employee"], mock_emp)
-        mock_employee.objects.filter.assert_any_call(employee_id__iexact="NV00580")
+        mock_employee.objects.filter.assert_any_call(employee_id__iexact="NV80005")
 
     @patch("hrm.asset_import.Employee")
     def test_continuation_row_reads_ma_nguoi_ban_giao(self, mock_employee):
@@ -53,7 +53,7 @@ class HandoverColumnAliasTests(SimpleTestCase):
         headers = _headers({"mã người bàn giao": 3, "tên người bàn giao": 4})
         cells = _row(headers, {
             "mã thiết bị": "LAPTOP-001",
-            "mã người bàn giao": "NV00581",
+            "mã người bàn giao": "NV80006",
         }, total_cols=4)
 
         payload, warnings = parse_row(cells, headers)

@@ -1,5 +1,5 @@
 """Số ngày nghỉ không phép: đơn nửa ngày (HALF_DAY) phải tính 0.5, không phải 1
-(case thực tế NV03065 tháng 9/2026: 19/9 cả ngày + 24/9 nửa ngày = 1.5, hiển thị sai thành 2)."""
+(case thực tế NV80036 tháng 9/2026: 19/9 cả ngày + 24/9 nửa ngày = 1.5, hiển thị sai thành 2)."""
 from types import SimpleNamespace
 
 from django.test import SimpleTestCase
@@ -41,7 +41,7 @@ class UnauthorizedAbsenceAmountTests(SimpleTestCase):
 
 class UnauthorizedAbsenceDaysCounterTests(SimpleTestCase):
     """Bộ đếm tháng không được bỏ sót đơn KP đã duyệt chỉ vì ngày đó hiển thị
-    trạng thái khác (case NV03077 19/9/2026: sáng đi muộn có giải trình, chiều
+    trạng thái khác (case NV80037 19/9/2026: sáng đi muộn có giải trình, chiều
     nghỉ không phép → đếm 1 thay vì 1.5)."""
     UA = EmployeeEvent.EventType.UNAUTHORIZED_ABSENCE
     days = staticmethod(AttendanceCalendarView._unauthorized_absence_days)
@@ -72,7 +72,7 @@ class UnauthorizedAbsenceDaysCounterTests(SimpleTestCase):
         self.assertEqual(self.days("UNAUTHORIZED_ABSENCE", [self._half("PENDING")], include_pending=True), 0.5)
 
     def test_rejected_request_does_not_hide_approved_one(self):
-        # Case NV02949 10/9/2026: đơn REJECTED đứng trước đơn APPROVED tạo lại.
+        # Case NV80033 10/9/2026: đơn REJECTED đứng trước đơn APPROVED tạo lại.
         events = [self._full("REJECTED"), self._half()]
         status, badge = AttendanceCalendarView._day_status_from_events_data({}, {}, events, {}, None)
         self.assertEqual(status, "UNAUTHORIZED_ABSENCE")

@@ -22,7 +22,7 @@ bằng giá trị rỗng) — chạy lại nhiều lần trên cùng 1 bản ghi
 Usage:
     python manage.py backfill_onboarding_employee_sync --dry-run
     python manage.py backfill_onboarding_employee_sync
-    python manage.py backfill_onboarding_employee_sync --employee-id NV00085
+    python manage.py backfill_onboarding_employee_sync --employee-id NV80003
     python manage.py backfill_onboarding_employee_sync --onboarding-id 54
 """
 

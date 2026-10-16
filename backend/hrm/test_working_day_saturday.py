@@ -34,7 +34,7 @@ def _make_employee(saturday_flag=False, dept_saturday_flag=False, has_department
         saturday_afternoon_always_workday=dept_saturday_flag,
     ) if has_department else None
     return types.SimpleNamespace(
-        employee_id="NV02790",
+        employee_id="NV80021",
         department=dept,
         saturday_afternoon_always_workday=saturday_flag,
         position=None,
@@ -86,7 +86,7 @@ class SaturdayAlwaysWorkingDayTests(SimpleTestCase):
 
 
 class UnauthorizedAbsenceDeadlineSaturdayRegressionTests(SimpleTestCase):
-    """Tái hiện đúng case NV02790: nghỉ không phép 24-25/9 (last_absence=25,
+    """Tái hiện đúng case NV80021: nghỉ không phép 24-25/9 (last_absence=25,
     Thứ 6) — hạn phải rơi vào Thứ 7 26/9, không phải Thứ 2 28/9."""
 
     @patch("hrm.models.HolidayConfig.objects.filter", return_value=[])

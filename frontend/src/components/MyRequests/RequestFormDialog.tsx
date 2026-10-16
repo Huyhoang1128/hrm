@@ -247,7 +247,7 @@ const RequestFormDialog: React.FC<Props> = ({
             )}
           </div>
 
-          {/* 2026-09-25: case thực tế NV02757 tạo "Đơn công tác"/"Đơn nghỉ phép" qua
+          {/* 2026-09-25: case thực tế NV80019 tạo "Đơn công tác"/"Đơn nghỉ phép" qua
               "Đơn khác" — đơn loại này KHÔNG tích hợp với hệ thống chấm công, dù được
               duyệt cũng không có tác dụng gì với bảng công/lương, khiến NV tưởng đã
               xin phép thành công nhưng thực ra không. Cảnh báo ngay khi chọn "Đơn khác"

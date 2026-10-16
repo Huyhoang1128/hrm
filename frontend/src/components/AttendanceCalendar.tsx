@@ -1003,7 +1003,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
     // ngày 1 bản ghi, cùng data.request_code) — màn "Chi tiết ngày" chỉ hiện
     // đúng ngày đang xem nên duyệt/từ chối ở đây PHẢI áp dụng cho cả nhóm qua
     // request_code, nếu không các ngày khác trong cùng đơn vẫn treo PENDING dù
-    // QLTT tin là đã duyệt xong cả đơn (case thực tế 2026-09-24, NV00643 xin
+    // QLTT tin là đã duyệt xong cả đơn (case thực tế 2026-09-24, NV80007 xin
     // nghỉ 4 ngày liên tiếp, duyệt ở đây chỉ xong đúng 1/4 ngày).
     const regType = String(reg?.data?.registration_type || '').toUpperCase();
     const requestCode = reg?.data?.request_code;

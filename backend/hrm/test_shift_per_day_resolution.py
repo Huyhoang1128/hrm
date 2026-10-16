@@ -46,7 +46,7 @@ def _shift(code, start, end, shift_type, working_hours=4.0):
 def _state(rules):
     """EmployeeState giả — chỉ cần đúng 3 thuộc tính hàm đang xét dùng tới."""
     return types.SimpleNamespace(
-        employee_code="NV01704", rules=rules, _shift_by_date_cache={},
+        employee_code="NV80010", rules=rules, _shift_by_date_cache={},
     )
 
 
@@ -64,7 +64,7 @@ RULES_8H = [_rule("SHIFT_RULE_MORNING", "08:00:00", "12:00:00"),
 
 class ShiftPerDayTests(SimpleTestCase):
     def test_ca_ngày_này_khác_ca_đầu_tháng_thì_ghi_đè(self):
-        """Đúng case NV01704: đầu tháng 08:00-17:00, ngày 23/09 thật ra là
+        """Đúng case NV80010: đầu tháng 08:00-17:00, ngày 23/09 thật ra là
         07:30-16:30 -> phải dùng 16:30 để tính về sớm, không phải 17:00."""
         with patch("hrm.main_api._load_shift_configs_for_employee", return_value=CA_730):
             ket_qua = GOI(_state(list(RULES_8H)), NGAY)

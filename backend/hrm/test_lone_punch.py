@@ -3,7 +3,7 @@ lone_punch_is_checkout(): ngày chỉ có ĐÚNG 1 lần chấm — là giờ ra
 
 File xuất từ hệ thống chấm công luôn xếp lần chấm đầu tiên của ngày vào cột
 "Vào", nên người quên chấm lúc đến, chỉ chấm lúc về (vd 17:04) bị lưu thành giờ
-VÀO 17:04 (tháng 9/2026: 113 ngày, 86 nhân viên — vd NV02831 ngày 07/09).
+VÀO 17:04 (tháng 9/2026: 113 ngày, 86 nhân viên — vd NV80025 ngày 07/09).
 """
 import datetime as dt
 import types
@@ -22,7 +22,7 @@ def _sc(start, end, detection_only=False):
     )
 
 
-EMP = types.SimpleNamespace(employee_id="NV02831")
+EMP = types.SimpleNamespace(employee_id="NV80025")
 NGAY = dt.date(2026, 9, 7)
 CA_HC = [_sc("08:00", "12:00"), _sc("13:00", "16:30")]
 CA_KINH_DOANH = _sc("13:00", "21:00", detection_only=True)
@@ -37,7 +37,7 @@ def _goi(punch, registered=None, cascade=CA_HC, candidates=()):
 
 class LonePunchTests(SimpleTestCase):
     def test_chấm_lúc_về_là_giờ_ra(self):
-        """Đúng case NV02831 07/09: chỉ có 17:04 -> giờ RA, không phải giờ vào."""
+        """Đúng case NV80025 07/09: chỉ có 17:04 -> giờ RA, không phải giờ vào."""
         self.assertTrue(_goi("17:04"))
         self.assertTrue(_goi("16:36"))
 
@@ -52,7 +52,7 @@ class LonePunchTests(SimpleTestCase):
         self.assertTrue(_goi("20:58", candidates=[CA_KINH_DOANH]))
 
     def test_ưu_tiên_ca_đã_đăng_ký(self):
-        """Ca 2 Điều dưỡng BS Doãn Dương 09:30-18:30: 09:40 là vào, 18:35 là ra."""
+        """Ca 2 Điều dưỡng BS A 09:30-18:30: 09:40 là vào, 18:35 là ra."""
         ca2 = [_sc("09:30", "13:30"), _sc("14:30", "18:30")]
         self.assertFalse(_goi("09:40", registered=ca2))
         self.assertTrue(_goi("18:35", registered=ca2))

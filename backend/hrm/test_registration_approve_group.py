@@ -1,13 +1,13 @@
 """
 hrm/test_registration_approve_group.py
 ═══════════════════════════════════════
-Bug thực tế (2026-09-24, vị trí Sale viện / NV00643): đơn Nghỉ không phép
+Bug thực tế (2026-09-24, vị trí Sale viện / NV80007): đơn Nghỉ không phép
 NHIỀU NGÀY lưu thành nhiều EmployeeEvent riêng (1 bản ghi/ngày, cùng
 data['request_code'] — xem RegistrationRequestCreateSerializer.create()).
 approve()/reject()/bulk_approve() trước đây chỉ xử lý ĐÚNG 1 event theo
 pk/id được truyền — QLTT bấm "Phê duyệt" cho 1 ngày (hoặc dòng đại diện),
 các ngày còn lại trong CÙNG đơn vẫn treo PENDING dù QLTT tin là đã duyệt
-xong cả đơn (case thực tế: NV00643 xin nghỉ 4 ngày liên tiếp, QLTT duyệt
+xong cả đơn (case thực tế: NV80007 xin nghỉ 4 ngày liên tiếp, QLTT duyệt
 ngày đầu rồi tưởng cả đơn đã xong, nhưng 3/4 ngày vẫn "chờ QLTT duyệt").
 
 Fix: approve_group()/reject_group() — action MỚI nhận request_code, lặp

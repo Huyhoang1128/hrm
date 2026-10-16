@@ -28,7 +28,7 @@ def is_holiday_creditable(employee: Employee, holiday_date: date) -> bool:
 def get_holiday_credit_for_employee(employee: Employee, on_date: date = None, assignment=None) -> float:
     """Công lễ 1 ngày: part-time 0.5, còn lại 1.0. Có on_date thì xét hình thức
     làm việc VÀO NGÀY ĐÓ (lịch sử điều chuyển, employee/assignment.py) — case
-    NV02848: T9 part-time, T10 lên full-time thì lễ 01-02/09 vẫn 0.5/ngày."""
+    NV80028: T9 part-time, T10 lên full-time thì lễ 01-02/09 vẫn 0.5/ngày."""
     if on_date is not None and employee is not None:
         from employee.assignment import AssignmentResolver
         employee = (assignment or AssignmentResolver()).employee_on(employee, on_date)

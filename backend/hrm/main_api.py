@@ -423,7 +423,7 @@ class EmployeeState:
         Trước đây bước này CHỈ ghi `event_data['shift_start_time']` trong
         replay_month — mà không nơi nào đọc lại — nên ca đăng ký hoàn toàn
         không ảnh hưởng tới công/phạt: nhân viên đăng ký Ca 2 (9h30) vẫn bị
-        tính đi muộn theo ca cascade 7h30 (sự cố thực tế: NV02832 ngày
+        tính đi muộn theo ca cascade 7h30 (sự cố thực tế: NV80026 ngày
         2026-09-09, muộn 103' + phạt 200.000đ dù đã duyệt Ca 2).
 
         Trả về:
@@ -504,7 +504,7 @@ class EmployeeState:
         Nhân viên đổi ca GIỮA THÁNG vì thế bị tính sai toàn bộ phần sau mốc
         đổi — hệ thống không biểu diễn được việc đổi ca giữa tháng.
 
-        Sự cố thực tế (NV01704, 2026-09): ca 01-21/09 là 08:00-17:00, từ 22/09
+        Sự cố thực tế (NV80010, 2026-09): ca 01-21/09 là 08:00-17:00, từ 22/09
         đổi sang 07:30-16:30. Engine chỉ thấy ca đầu tháng nên các ngày 23-29/09
         ra về đúng giờ 16:30 vẫn bị tính VỀ SỚM 30 phút + phạt 100.000đ/ngày.
 
@@ -650,7 +650,7 @@ class EmployeeState:
         # là ca công ty ở cấp khác hẳn, nên vẫn CẦN so khớp ca duy nhất này
         # với giờ chấm công thực tế. Nếu bỏ qua (như guard "< 2" cũ), NV làm
         # đúng ca kinh doanh vẫn bị tính theo ca mặc định ngắn hơn -> thiếu
-        # công (sự cố thực tế NV02842, phòng Kinh Doanh 1, 2026-09-17).
+        # công (sự cố thực tế NV80027, phòng Kinh Doanh 1, 2026-09-17).
         # An toàn vì detect_best_matching_shift() vẫn đòi khớp trong dung sai
         # ±60' cả 2 đầu, và bước so sánh "detected == current" ngay dưới đây
         # tự động no-op khi ca duy nhất đó vốn đã là ca mặc định đang dùng.
@@ -1857,7 +1857,7 @@ class EmployeeState:
 
             # Đơn Đi muộn/Về sớm TRÙNG (cùng ngày, cùng loại) đã được duyệt trước
             # đó -> bỏ qua hẳn: không hoàn phạt lần 2, không trừ thêm lượt giải
-            # trình (NV00040 30/09/2026: 2 đơn Đi muộn trùng được duyệt -> phạt
+            # trình (NV80002 30/09/2026: 2 đơn Đi muộn trùng được duyệt -> phạt
             # 50.000đ bị hoàn 2 lần, tổng phạt -50.000đ). KHÔNG áp cho quên chấm
             # công: quên CC sáng + chiều là 2 đơn hợp lệ cùng loại cùng ngày.
             if explanation_type in ("LATE", "EARLY_LEAVE") and event_date:
@@ -2044,11 +2044,11 @@ class EmployeeState:
                     # được ghi đè lên CẢ check_in lẫn check_out (xem attendance import),
                     # lấy nhầm phía sẽ hiểu sai bản chất (vd quên check-in nhưng lại bị
                     # hiểu thành có check-in thật, mất luôn giờ check-out thật).
-                    # Bug thực tế: NV NV03078, 17/9/2026.
+                    # Bug thực tế: NV NV80038, 17/9/2026.
                     # Có bản ghi chỉ có ĐÚNG 1 lượt chấm nằm ở ô check_in (check_out
                     # rỗng) — nếu NV khai quên check-in mà lượt chấm đó MUỘN hơn giờ
                     # vào đã khai thì nó chính là giờ ra (và ngược lại cho quên
-                    # check-out). Bug thực tế: NV NV02831, 7/9/2026 (chấm 17:04 lưu ở
+                    # check-out). Bug thực tế: NV NV80025, 7/9/2026 (chấm 17:04 lưu ở
                     # check_in, khai vào 08:00 -> thiếu giờ ra -> chỉ được 0.5 công).
                     def _lone_punch(_entry):
                         ci, co = _entry.get("check_in"), _entry.get("check_out")
@@ -2168,7 +2168,7 @@ class EmployeeState:
                 # bù với buổi còn lại thay vì so target_credit với existing_credit của CẢ NGÀY.
                 # Bug thực tế: NV nghỉ phép nửa ngày sáng (0.5) + quên chấm công chiều được giải
                 # trình ra 0.5 công (làm 4.5h, dưới ngưỡng 5.5h) -> needed=max(0, 0.5-0.5)=0,
-                # cả ngày chỉ còn 0.5 công thay vì đúng ra 1.0 (NV02819, 03/9/2026).
+                # cả ngày chỉ còn 0.5 công thay vì đúng ra 1.0 (NV80023, 03/9/2026).
                 is_partial_credit_type = is_half_day_expected or explanation_type == "INCOMPLETE_ATTENDANCE"
                 if is_additive_half_day_type and is_partial_credit_type and day_violations == 0:
                     needed = max(0.0, min(1.0, existing_credit + target_credit) - existing_credit)
@@ -2536,7 +2536,7 @@ class EmployeeState:
 
         # Event duyệt giải trình được xếp theo NGÀY HR DUYỆT (để tính quota đúng thứ
         # tự), nên nếu để nó trừ lỗi luôn thì các ngày vi phạm nằm giữa ngày vi phạm
-        # và ngày duyệt vẫn bị đếm lỗi đó -> x2 sai (case NV03082 T9/2026: quên chấm
+        # và ngày duyệt vẫn bị đếm lỗi đó -> x2 sai (case NV80039 T9/2026: quên chấm
         # công 3/9 có đơn "làm ngày đầu" duyệt 18/9 -> 18/9 bị tính lỗi thứ 7).
         # Tách phần trừ lỗi ra 1 event riêng (không lưu DB) xếp tại ngày vi phạm.
         # BUSINESS_TRIP vốn đã xếp theo ngày vi phạm nên không cần.

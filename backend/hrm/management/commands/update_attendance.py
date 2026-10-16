@@ -31,7 +31,7 @@ Chế độ CẢ THÁNG:
     python manage.py update_attendance --month 09-2026
 
     # Giới hạn trong 1 nhân viên
-    python manage.py update_attendance --month 09-2026 --employee NV02832
+    python manage.py update_attendance --month 09-2026 --employee NV80026
 
 Chế độ này CHỈ đụng vào bản ghi thiếu giờ vào HOẶC giờ ra, và CHỈ điền đúng
 phần đang thiếu — phần đã có giữ nguyên tuyệt đối, kể cả khi nằm ngoài khoảng
@@ -39,25 +39,25 @@ giờ hành chính (giờ chấm công thật không bị lệnh này sửa).
 
 Ví dụ:
     # Không truyền giờ -> tự sinh ngẫu nhiên giờ hành chính hợp lệ
-    python manage.py update_attendance NV02832 09-09-2026
+    python manage.py update_attendance NV80026 09-09-2026
     # -> vd 08:17 → 17:46
 
     # Xem trước, không ghi gì
-    python manage.py update_attendance NV02832 09-09-2026 --dry-run
+    python manage.py update_attendance NV80026 09-09-2026 --dry-run
 
     # Chỉ định chính xác
-    python manage.py update_attendance NV02832 09-09-2026 \
+    python manage.py update_attendance NV80026 09-09-2026 \
         --check-in 09:13 --check-out 18:32
 
     # Chỉ định giờ ra, giờ vào để hệ thống tự sinh
-    python manage.py update_attendance NV02832 09-09-2026 --check-out 18:32
+    python manage.py update_attendance NV80026 09-09-2026 --check-out 18:32
 
     # Xoá hẳn giờ ra (đánh dấu quên chấm công ra)
-    python manage.py update_attendance NV02832 09-09-2026 --clear-check-out
+    python manage.py update_attendance NV80026 09-09-2026 --clear-check-out
 
     # Bỏ qua ngày cụ thể (ngày lễ, ngày đã chốt công...) — dùng cho cả 2 chế độ
     python manage.py update_attendance --month 09-2026 --skip-dates 02-09-2026,12-09-2026
-    python manage.py update_attendance NV02832 02-09-2026 --skip-dates 02-09-2026
+    python manage.py update_attendance NV80026 02-09-2026 --skip-dates 02-09-2026
     # -> lệnh thứ 2 không ghi gì vì chính ngày đó bị loại trừ
 
 Quy ước giá trị giờ khi KHÔNG truyền --check-in / --check-out:
@@ -115,7 +115,7 @@ def _random_time(start, end):
 
 # Mốc chia buổi để đoán 1 lần quẹt lẻ là giờ VÀO hay giờ RA. Máy chấm công
 # nhiều khi chỉ ghi nhận 1 lần quẹt/ngày và luôn đổ vào cột giờ vào, kể cả khi
-# thực tế đó là lần quẹt lúc tan làm (vd NV02725 tháng 9/2026: hàng loạt ngày
+# thực tế đó là lần quẹt lúc tan làm (vd NV80017 tháng 9/2026: hàng loạt ngày
 # có check_in=17:4x, check_out rỗng).
 MIDDAY_SPLIT = dt_time(12, 0)
 
@@ -273,7 +273,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('employee_id', type=str, nargs='?', default=None,
-                            help="Mã nhân viên, vd NV02832 (chế độ 1 ngày)")
+                            help="Mã nhân viên, vd NV80026 (chế độ 1 ngày)")
         parser.add_argument('date', type=str, nargs='?', default=None,
                             help="Ngày chấm công d-m-y, vd 09-09-2026 (chế độ 1 ngày)")
         parser.add_argument('--month', dest='month', type=str, default=None,

@@ -183,7 +183,7 @@ class PenaltyMultiplierWithApprovedExplanationsTests(TestCase):
 
 
 class LateExplanationGraceAppliesEquallyToEarlyLeaveTests(SimpleTestCase):
-    """Bug thực tế (NV NV02910, 11/9/2026): về sớm 66 phút, giải trình được
+    """Bug thực tế (NV NV80030, 11/9/2026): về sớm 66 phút, giải trình được
     duyệt -> phạt về 0đ, dù đã qua mốc hiệu lực 2026-09-10 ("chỉ ân hạn 30
     phút đầu, phần vượt vẫn bị phạt"). Nguyên nhân: nhánh ân hạn 30 phút chỉ
     được viết cho explanation_type == "LATE", EARLY_LEAVE bị bỏ sót nên vẫn
@@ -242,7 +242,7 @@ def _approval(explanation_type, event_date, **extra):
 
 
 class CounterReleasedAtViolationDateTests(SimpleTestCase):
-    """Case NV03082 T9/2026: quên chấm công 3/9 có đơn "làm ngày đầu" duyệt 18/9 ->
+    """Case NV80039 T9/2026: quên chấm công 3/9 có đơn "làm ngày đầu" duyệt 18/9 ->
     phần trừ lỗi phải có hiệu lực ngay tại 3/9 (event counter_release_only), event
     duyệt gốc ở 18/9 không trừ lần nữa."""
 
@@ -289,7 +289,7 @@ class CounterReleasedAtViolationDateTests(SimpleTestCase):
 
 class MultiplierCountsOnlyLateEarlyTests(SimpleTestCase):
     """Mốc x2 (lỗi thứ 7) chỉ đếm đi muộn/về sớm, KHÔNG đếm quên chấm công
-    (xác nhận 01/10/2026; case NV02497: 5 lần muộn + 1 quên CC -> lần muộn thứ 6
+    (xác nhận 01/10/2026; case NV80016: 5 lần muộn + 1 quên CC -> lần muộn thứ 6
     bị x2 sai)."""
 
     def _calc(self, di_muon, quen_cc, pending=0):

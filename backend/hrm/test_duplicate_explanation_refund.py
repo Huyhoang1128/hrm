@@ -1,7 +1,7 @@
 """
 Đơn giải trình vi phạm trùng cùng ngày không được hoàn phạt 2 lần.
 
-Case thật NV00040 30/09/2026: nhân viên tạo 2 đơn Đi muộn cách nhau 4 phút,
+Case thật NV80002 30/09/2026: nhân viên tạo 2 đơn Đi muộn cách nhau 4 phút,
 cả 2 đều được QLTT + HCNS duyệt -> phạt 50.000đ bị hoàn 2 lần, tổng phạt
 tháng = -50.000đ. Sửa 2 lớp:
   - Tạo đơn: chặn đơn Đi muộn/Về sớm cùng loại cùng ngày khi đã có đơn chờ/đã duyệt.

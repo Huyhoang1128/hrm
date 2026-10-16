@@ -177,7 +177,7 @@ class ManagedByColumnReadFromRealExportTests(SimpleTestCase):
 
     @patch("hrm.asset_import.Employee")
     def test_managed_by_reads_ma_nql_kho(self, mock_employee):
-        mock_emp = MagicMock(full_name="Trương Văn Nhân")
+        mock_emp = MagicMock(full_name="Người Nhận")
         mock_employee.objects.filter.return_value.first.return_value = mock_emp
 
         headers = {
@@ -187,11 +187,11 @@ class ManagedByColumnReadFromRealExportTests(SimpleTestCase):
         cells = _row(headers, {
             "mã thiết bị": "MH001",
             "phân loại": "Màn hình",
-            "mã nql (kho)": "NV02268",
+            "mã nql (kho)": "NV80012",
         }, total_cols=4)
 
         payload, warnings = parse_row(cells, headers)
 
         self.assertIsNotNone(payload)
         self.assertEqual(payload["managed_by"], mock_emp)
-        mock_employee.objects.filter.assert_any_call(employee_id__iexact="NV02268")
+        mock_employee.objects.filter.assert_any_call(employee_id__iexact="NV80012")

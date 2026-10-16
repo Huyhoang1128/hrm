@@ -5,14 +5,14 @@
  *   npm run test:run -- src/__tests__/request-period.test.ts
  *
  * Gửi đơn mới chỉ được ghi đè / bị chặn bởi đơn ĐỤNG BUỔI. Trước đây gửi Nghỉ
- * phép tháng huỷ sạch mọi đơn chờ duyệt trong ngày: NV02949 10/10/2026 tạo
+ * phép tháng huỷ sạch mọi đơn chờ duyệt trong ngày: NV80033 10/10/2026 tạo
  * KP-202610-A1B2C3D4 (nghỉ không phép sáng) rồi NPM-202610-E5F6A7B8 (nghỉ phép
  * chiều) — đơn sáng bị huỷ 0,4 giây trước khi đơn chiều được tạo.
  */
 import { describe, it, expect } from 'vitest';
 import { requestPeriod, shiftToPeriod, periodsOverlap } from '../utils/requestPeriod';
 
-// Dạng dữ liệu thật của 2 đơn NV02949 ngày 10/10/2026.
+// Dạng dữ liệu thật của 2 đơn NV80033 ngày 10/10/2026.
 const kpMorning = {
   event_type: 'unauthorized_absence',
   status: 'PENDING',
@@ -63,7 +63,7 @@ describe('requestPeriod', () => {
 });
 
 describe('periodsOverlap', () => {
-  it('NV02949: gửi nghỉ phép chiều không đụng đơn nghỉ không phép sáng', () => {
+  it('NV80033: gửi nghỉ phép chiều không đụng đơn nghỉ không phép sáng', () => {
     expect(periodsOverlap(shiftToPeriod('afternoon'), requestPeriod(kpMorning))).toBe(false);
   });
 

@@ -1112,7 +1112,7 @@ class RegistrationRequestViewSet(BulkRejectMixin, FinalizationLockMixin, viewset
         cancel_group()/update_group(): mỗi ngày trong nhóm là 1 bản ghi
         riêng, nên approve() từng đơn (pk) CHỈ duyệt đúng 1 ngày được bấm,
         các ngày còn lại trong nhóm vẫn treo "chờ QLTT duyệt" dù QLTT đã bấm
-        duyệt (báo thực tế 2026-09-24: NV00643 xin nghỉ 30/9-3/10, QLTT
+        duyệt (báo thực tế 2026-09-24: NV80007 xin nghỉ 30/9-3/10, QLTT
         duyệt xong tưởng cả đơn đã xong nhưng 3 ngày sau vẫn PENDING).
         Logic từng bước duyệt y hệt approve() ở trên, chỉ khác là lặp qua
         TẤT CẢ các ngày cùng request_code — ngày nào không đủ điều kiện
