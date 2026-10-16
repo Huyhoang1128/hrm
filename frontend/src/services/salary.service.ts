@@ -237,6 +237,18 @@ export interface BulkImportParkingAllowanceResponse {
   errors:  { employee_code: string; error: string }[];
 }
 
+// PC ăn trưa nhập tay dùng chung dạng dữ liệu với PC gửi xe.
+export type LunchAllowanceOverrideRecord = ParkingAllowanceOverrideRecord;
+export type BulkImportLunchAllowanceRecord = BulkImportParkingAllowanceRecord;
+export type BulkImportLunchAllowanceResponse = BulkImportParkingAllowanceResponse;
+
+/** Kết quả tạo bản ghi cho những nhân viên chưa có trong kỳ. */
+export interface FillMissingAllowanceResponse {
+  created_count: number;
+  skipped_existing_count: number;
+  errors: { employee_code: string; error: string }[];
+}
+
 export interface SalaryAdjustmentRecord {
   id: number;
   employee: number;
@@ -733,6 +745,50 @@ class SalaryService {
     records: BulkImportParkingAllowanceRecord[];
   }): Promise<BulkImportParkingAllowanceResponse> {
     const response = await managementApi.post('/api/v1/salary/parking-allowance-overrides/bulk-import/', params);
+    return response.data;
+  }
+
+  async fillRemainingParkingAllowanceZero(params: { year: number; month: number }): Promise<FillMissingAllowanceResponse> {
+    const response = await managementApi.post('/api/v1/salary/parking-allowance-overrides/fill-remaining-zero/', params);
+    return response.data;
+  }
+
+  async listLunchAllowanceOverrides(params: { year: number; month: number }): Promise<LunchAllowanceOverrideRecord[]> {
+    const response = await managementApi.get('/api/v1/salary/lunch-allowance-overrides/', { params: { ...params, page_size: 500 } });
+    return response.data.results ?? response.data;
+  }
+
+  async createLunchAllowanceOverride(data: {
+    employee: number;
+    year: number;
+    month: number;
+    amount: number;
+    notes?: string;
+  }): Promise<LunchAllowanceOverrideRecord> {
+    const response = await managementApi.post('/api/v1/salary/lunch-allowance-overrides/', data);
+    return response.data;
+  }
+
+  async updateLunchAllowanceOverride(id: number, data: { amount: number; notes?: string }): Promise<LunchAllowanceOverrideRecord> {
+    const response = await managementApi.patch(`/api/v1/salary/lunch-allowance-overrides/${id}/`, data);
+    return response.data;
+  }
+
+  async deleteLunchAllowanceOverride(id: number): Promise<void> {
+    await managementApi.delete(`/api/v1/salary/lunch-allowance-overrides/${id}/`);
+  }
+
+  async bulkImportLunchAllowanceOverrides(params: {
+    year: number;
+    month: number;
+    records: BulkImportLunchAllowanceRecord[];
+  }): Promise<BulkImportLunchAllowanceResponse> {
+    const response = await managementApi.post('/api/v1/salary/lunch-allowance-overrides/bulk-import/', params);
+    return response.data;
+  }
+
+  async syncCurrentLunchAllowances(params: { year: number; month: number }): Promise<FillMissingAllowanceResponse> {
+    const response = await managementApi.post('/api/v1/salary/lunch-allowance-overrides/sync-current/', params);
     return response.data;
   }
 
