@@ -31,6 +31,7 @@ import {
   PROBATION_RATE_OPTIONS, ETHNICITY_OPTIONS, NATIONALITY_OPTIONS, GENDER_OPTIONS, MARITAL_STATUS_OPTIONS,
   WORK_LOCATION_OPTIONS,
 } from '../constants/onboarding';
+import PdfFrame from '../components/Common/PdfFrame';
 
 const EDUCATION_LEVEL_MAP: Record<string, string> = {
   MASTER: 'Thạc sĩ',
@@ -2176,7 +2177,7 @@ const OnboardingDetail: React.FC = () => {
                   className="max-w-full max-h-full object-contain"
                 />
               ) : (
-                <iframe
+                <PdfFrame
                   src={previewFile.url}
                   title={previewFile.label}
                   className="w-full h-full min-h-[70vh]"

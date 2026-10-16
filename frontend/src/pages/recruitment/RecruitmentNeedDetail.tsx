@@ -23,6 +23,7 @@ import {
 import { SelectBox } from '../../components/LandingLayout/SelectBox';
 import { departmentsAPI } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
+import PdfFrame from '../../components/Common/PdfFrame';
 
 interface Department {
   id: number;
@@ -1465,7 +1466,7 @@ const RecruitmentNeedDetail: React.FC = () => {
               </div>
 
               <div className="flex-1 overflow-auto bg-gray-100">
-                <iframe
+                <PdfFrame
                   src={selectedCvUrl}
                   className="w-full h-full"
                   title={`CV - ${selectedCandidateName}`}
