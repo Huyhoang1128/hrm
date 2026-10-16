@@ -32,7 +32,7 @@ Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 
 | 1.13 | ✅ **Placeholder hợp đồng mở rộng**: số tiền bằng chữ, ngày ký, giới tính… | S | Giữ tương thích các placeholder cũ. |
 | 1.14 | ✅ Loại tài liệu **Phụ lục hợp đồng** | S | |
 | 1.15 | ✅ **Dữ liệu lương**: ghi đè tiền ăn trưa, gửi xe "điền 0 cho phần còn lại", phân trang + dòng tổng | S | |
-| 1.16 | Cải tiến nhỏ: báo cáo vi phạm cho mọi phòng ban, lọc "sắp hết thử việc", hiển thị Họ Tên đúng thứ tự, xem PDF trên Android, nhãn ca rõ hơn, `DateInput`, `formatVND` | S | |
+| 1.16 | ✅ Cải tiến nhỏ: báo cáo vi phạm cho mọi phòng ban, lọc "sắp hết thử việc", hiển thị Họ Tên đúng thứ tự, xem PDF trên Android, nhãn ca rõ hơn, `DateInput`, `formatVND` | S | Bỏ phần nhãn ca: đăng ký ca (Ca 1/Ca 2) đã hiện đủ giờ sáng/chiều. Báo cáo vi phạm giới hạn quyền xem theo vai trò. |
 | 1.17 | CI chặn migration có nhiều nhánh lá | S | |
 
 ## Giai đoạn 2: mở rộng tính năng lõi
