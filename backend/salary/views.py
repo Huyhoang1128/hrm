@@ -49,6 +49,9 @@ from .serializers import (
     TaxBracketConfigSerializer,
     TaxBracketSerializer,
 )
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def _render_payslip_body_html(body: str) -> str:
@@ -2553,6 +2556,111 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
         record.status = 'PENDING'
         record.save(update_fields=['status', 'updated_at'])
         return Response(MonthlySalaryRecordSerializer(record).data)
+
+    @action(detail=False, methods=['post'], url_path='bonus-prediction')
+    def bonus_prediction(self, request):
+        """
+        Dự đoán chi phí thưởng cho toàn công ty hoặc phòng ban.
+        
+        Request body:
+        {
+            "scheme": "fixed_3m_basic" | "prorated" | "custom",
+            "fixed_amount": number (for custom scheme),
+            "bonus_months": number (default: 1),
+            "fiscal_year": number (optional, default: năm hiện tại),
+            "department_id": number (optional),
+            "legal_entity": string (optional)
+        }
+        
+        Response:
+        {
+            "scheme": string,
+            "fixed_amount": number,
+            "bonus_months": number,
+            "total_employee_count": number,
+            "total_bonus": number,
+            "employees": [...],
+            "departments": [...]
+        }
+        """
+        from decimal import Decimal
+        from .bonus_calculator import BonusCalculator, BonusScheme
+        
+        scheme = request.data.get('scheme', BonusScheme.SCHEME_FIXED_3M_BASIC)
+        fixed_amount = request.data.get('fixed_amount')
+        bonus_months = request.data.get('bonus_months', 1)
+        fiscal_year = request.data.get('fiscal_year')
+        department_id = request.data.get('department_id')
+        legal_entity = (request.data.get('legal_entity') or '').strip()
+        under_one_year_amount = request.data.get('under_one_year_amount')
+        
+        # Validate
+        if scheme not in [BonusScheme.SCHEME_FIXED_3M_BASIC, BonusScheme.SCHEME_PRORATED, BonusScheme.SCHEME_CUSTOM]:
+            return Response(
+                {'detail': f'Phương án thưởng không hợp lệ: {scheme}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        try:
+            bonus_months = int(bonus_months)
+            if bonus_months < 1:
+                raise ValueError('Số tháng thưởng phải >= 1')
+        except (TypeError, ValueError) as e:
+            return Response(
+                {'detail': f'Số tháng thưởng không hợp lệ: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if fiscal_year is not None:
+            try:
+                fiscal_year = int(fiscal_year)
+            except (TypeError, ValueError):
+                return Response(
+                    {'detail': 'fiscal_year phải là số nguyên.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        
+        if scheme == BonusScheme.SCHEME_CUSTOM:
+            if not fixed_amount or fixed_amount <= 0:
+                return Response(
+                    {'detail': 'Phương án custom cần cung cấp fixed_amount > 0'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            fixed_amount = Decimal(str(fixed_amount))
+        else:
+            fixed_amount = None
+        
+        if under_one_year_amount in (None, ''):
+            from .bonus_calculator import DEFAULT_UNDER_ONE_YEAR_AMOUNT
+            under_one_year_amount = DEFAULT_UNDER_ONE_YEAR_AMOUNT
+        else:
+            try:
+                under_one_year_amount = Decimal(str(under_one_year_amount))
+                if under_one_year_amount < 0:
+                    raise ValueError
+            except (ValueError, ArithmeticError):
+                return Response({'detail': 'under_one_year_amount không hợp lệ.'},
+                                status=status.HTTP_400_BAD_REQUEST)
+
+        calculator = BonusCalculator()
+        
+        try:
+            result = calculator.predict_company_bonus(
+                scheme=scheme,
+                fixed_amount=fixed_amount,
+                bonus_months=bonus_months,
+                department_id=department_id,
+                legal_entity=legal_entity or None,
+                fiscal_year=fiscal_year,
+                under_one_year_amount=under_one_year_amount,
+            )
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as exc:
+            logger.exception('bonus prediction failed')
+            return Response(
+                {'detail': 'Lỗi tính dự đoán thưởng.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 # ---------------------------------------------------------------------------
