@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import API_BASE_URL, { managementApi } from '../utils/api';
+import { API_BASE_URL, managementApi } from '../utils/api';
 import { formatDate } from '../utils/dateUtils';
 import ContractSection from './ContractSection';
 import {
