@@ -142,7 +142,7 @@ const TemplateFormDialog: React.FC<DialogProps> = ({ open, editing, companyUnits
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
           <h3 className="text-lg font-semibold text-gray-900">
             {editing ? 'Chỉnh sửa template' : 'Thêm template mới'}
           </h3>
@@ -151,7 +151,7 @@ const TemplateFormDialog: React.FC<DialogProps> = ({ open, editing, companyUnits
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded">
               {error}
@@ -239,7 +239,7 @@ const TemplateFormDialog: React.FC<DialogProps> = ({ open, editing, companyUnits
           </label>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex justify-end gap-2">
+        <div className="px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex justify-end gap-2">
           <button
             onClick={onClose}
             disabled={submitting}
@@ -393,14 +393,14 @@ const RequestTemplates: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Template đơn từ</h1>
           <p className="text-gray-900 text-sm">Tổng: {totalCount} template</p>
         </div>
         <button
           onClick={openCreate}
-          className="btn-primary flex items-center gap-2"
+          className="btn-primary flex items-center gap-2 whitespace-nowrap"
         >
           <PlusIcon className="w-4 h-4" />
           Thêm template
@@ -408,7 +408,7 @@ const RequestTemplates: React.FC = () => {
       </div>
 
       <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-wrap items-end gap-3 mb-4">
-        <div className="w-52">
+        <div className="w-full sm:w-52">
           <SelectBox<GenericRequestType | ''>
             label="Loại đơn"
             value={filterType}
@@ -416,7 +416,7 @@ const RequestTemplates: React.FC = () => {
             onChange={(v) => { setFilterType(v); setCurrentPage(1); }}
           />
         </div>
-        <div className="w-64">
+        <div className="w-full sm:w-64">
           <SelectBox<number | ''>
             label="Đơn vị"
             value={filterUnit}
@@ -428,7 +428,7 @@ const RequestTemplates: React.FC = () => {
             searchable
           />
         </div>
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <label className="block text-sm font-medium mb-1 text-gray-700">Tìm kiếm</label>
           <div className="relative">
             <input
@@ -436,7 +436,7 @@ const RequestTemplates: React.FC = () => {
               value={filterSearch}
               onChange={(e) => { setFilterSearch(e.target.value); setCurrentPage(1); }}
               placeholder="Tên hoặc mô tả..."
-              className="input-field pl-8 w-52"
+              className="input-field pl-8 w-full sm:w-52"
             />
             <svg className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -463,7 +463,7 @@ const RequestTemplates: React.FC = () => {
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -587,13 +587,13 @@ const RequestTemplates: React.FC = () => {
       {detailTemplate && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
               <h3 className="text-lg font-semibold text-gray-900">Chi tiết template</h3>
               <button onClick={() => setDetailTemplate(null)} className="text-gray-400 hover:text-gray-600">
                 <XMarkIcon className="w-6 h-6" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
               <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
                 <div className="sm:col-span-3">
                   <dt className="text-gray-500 font-medium">Tên template</dt>
@@ -649,7 +649,7 @@ const RequestTemplates: React.FC = () => {
                 </div>
               </dl>
             </div>
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex justify-end gap-2">
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex flex-wrap justify-end gap-2">
               {detailTemplate.file_url && (
                 <a
                   href={detailTemplate.file_url}

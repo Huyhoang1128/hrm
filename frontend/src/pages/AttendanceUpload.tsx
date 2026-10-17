@@ -561,7 +561,7 @@ const AttendanceUpload: React.FC = () => {
               {/* Drop zone */}
               <div
                 className={cx(
-                  'min-h-[280px] rounded-2xl border-2 border-dashed transition-colors cursor-pointer flex flex-col items-center justify-center p-8',
+                  'min-h-[220px] sm:min-h-[280px] rounded-2xl border-2 border-dashed transition-colors cursor-pointer flex flex-col items-center justify-center p-5 sm:p-8',
                   dragOver
                     ? 'border-primary-400 bg-primary-50'
                     : selectedFile
@@ -678,7 +678,7 @@ const AttendanceUpload: React.FC = () => {
                 <p className="text-xs text-gray-600">Định dạng file Excel / CSV hợp lệ</p>
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {fileSchema.map(([col, desc], i) => (
                 <div key={i} className="p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-primary-200 hover:bg-white transition-colors">
                   <p className="text-xs font-medium text-primary-600 mb-1">[{col}]</p>
@@ -691,7 +691,7 @@ const AttendanceUpload: React.FC = () => {
 
         {/* ── Right Column: Sidebar ── */}
         <div className="lg:col-span-4">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col min-h-[400px] sticky top-6">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col min-h-[260px] sm:min-h-[400px] sticky top-6">
             <div className="px-5 py-4 border-b border-gray-100">
               <h2 className="text-sm font-bold text-gray-900">Lịch sử upload</h2>
               <p className="text-xs text-gray-400 mt-0.5">Theo dõi hoạt động</p>
@@ -748,11 +748,11 @@ const AttendanceUpload: React.FC = () => {
 
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-7xl max-h-[90vh] overflow-hidden flex flex-col">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="flex items-center justify-between gap-2 px-4 sm:px-6 py-4 border-b border-gray-100">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 text-sm text-gray-500">
                 <button
                   onClick={handleBack}
-                  className="hover:text-primary-600 transition-colors flex items-center gap-1"
+                  className="whitespace-nowrap hover:text-primary-600 transition-colors flex items-center gap-1"
                 >
                   <HomeIcon className="w-4 h-4" />
                   Trang chủ
@@ -762,7 +762,7 @@ const AttendanceUpload: React.FC = () => {
                     <ChevronRightIcon className="w-3.5 h-3.5 text-gray-300" />
                     <button
                       onClick={handleBackToDepartments}
-                      className="hover:text-primary-600 transition-colors"
+                      className="whitespace-nowrap hover:text-primary-600 transition-colors"
                     >
                       Phòng ban
                     </button>
@@ -773,7 +773,7 @@ const AttendanceUpload: React.FC = () => {
                     <ChevronRightIcon className="w-3.5 h-3.5 text-gray-300" />
                     <button
                       onClick={handleBackToEmployees}
-                      className="hover:text-primary-600 transition-colors"
+                      className="whitespace-nowrap hover:text-primary-600 transition-colors"
                     >
                       Nhân viên
                     </button>
@@ -789,7 +789,7 @@ const AttendanceUpload: React.FC = () => {
             </div>
 
             {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+            <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6 space-y-6">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div>
                   <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">
@@ -880,7 +880,7 @@ const AttendanceUpload: React.FC = () => {
                     <StatCard label="Số ngày tính" value={22} color="primary" />
                   </div>
 
-                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1 sm:p-5">
                     <AttendanceCalendar
                       onDateClick={handleDateClick}
                       employeeId={selectedEmployee ? parseInt(selectedEmployee) : undefined}
@@ -892,7 +892,7 @@ const AttendanceUpload: React.FC = () => {
 
             {/* Modal Footer */}
             {selectedEmployee && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
                 <button
                   onClick={handleBackToEmployees}
                   className="flex items-center gap-2 text-sm font-semibold text-gray-900"

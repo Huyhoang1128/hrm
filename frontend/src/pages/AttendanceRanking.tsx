@@ -127,7 +127,7 @@ const AttendanceRanking: React.FC = () => {
       {/* Filter bar */}
       <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
         <div className="flex flex-wrap gap-4 items-end">
-          <div className="w-24">
+          <div className="w-28 sm:w-24">
             <SelectBox<number>
               label="Năm"
               value={year}
@@ -240,11 +240,11 @@ const AttendanceRanking: React.FC = () => {
 
       {/* Rankings table */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
           <h2 className="text-sm font-bold text-gray-900">
             {rankType === 'early' ? '🌅 Bảng xếp hạng đi sớm' : '✅ Bảng xếp hạng đúng giờ'} — {MONTH_NAMES[month - 1]} {year}
           </h2>
-          <span className="text-xs text-gray-400">{rankings.length} nhân viên</span>
+          <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">{rankings.length} nhân viên</span>
         </div>
 
         {error && (
@@ -321,7 +321,7 @@ const AttendanceRanking: React.FC = () => {
                           {getRankDisplay(rank)}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 min-w-[160px] sm:min-w-0">
                         <div className="text-sm font-medium text-gray-900">{entry.full_name}</div>
                         <div className="text-xs text-gray-400">{entry.employee_code}</div>
                       </td>

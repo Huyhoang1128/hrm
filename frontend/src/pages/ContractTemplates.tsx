@@ -256,14 +256,14 @@ export default function ContractTemplates() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Template hợp đồng</h1>
           <p className="text-sm text-gray-900 mt-1">Quản lý các mẫu hợp đồng dùng để tạo PDF tự động</p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="btn-primary flex items-center gap-2"
+          className="btn-primary flex items-center gap-2 whitespace-nowrap"
         >
           <PlusIcon className="w-4 h-4" />
           Thêm template
@@ -404,7 +404,7 @@ export default function ContractTemplates() {
       {detailTemplate && createPortal(
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9997] p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 flex-shrink-0">
+            <div className="flex justify-between items-center px-4 sm:px-6 py-4 border-b border-gray-100 flex-shrink-0">
               <div className="flex items-center gap-3">
                 <div className="h-9 w-9 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center">
                   <DocumentTextIcon className="h-5 w-5" />
@@ -415,7 +415,7 @@ export default function ContractTemplates() {
                 <XMarkIcon className="w-5 h-5 text-gray-400 hover:text-gray-600" />
               </button>
             </div>
-            <div className="p-6 space-y-3 overflow-y-auto">
+            <div className="p-4 sm:p-6 space-y-3 overflow-y-auto">
               {([
                 ['Tên template', detailTemplate.name],
                 ['Loại hợp đồng', detailTemplate.contract_type_display],
@@ -428,13 +428,13 @@ export default function ContractTemplates() {
                 ['Cập nhật', formatDate(detailTemplate.updated_at)],
               ] as [string, string][]).map(([label, value]) => (
                 <div key={label} className="flex gap-3 text-sm">
-                  <span className="w-36 flex-shrink-0 text-gray-500">{label}</span>
-                  <span className="text-gray-900 font-medium">{value}</span>
+                  <span className="w-28 sm:w-36 flex-shrink-0 text-gray-500">{label}</span>
+                  <span className="text-gray-900 font-medium min-w-0 break-words">{value}</span>
                 </div>
               ))}
               {detailTemplate.file && (
                 <div className="flex gap-3 text-sm">
-                  <span className="w-36 flex-shrink-0 text-gray-500">File</span>
+                  <span className="w-28 sm:w-36 flex-shrink-0 text-gray-500">File</span>
                   <a
                     href={detailTemplate.file_url || detailTemplate.file}
                     download
@@ -443,7 +443,7 @@ export default function ContractTemplates() {
                 </div>
               )}
             </div>
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
               <button
                 onClick={() => setDetailTemplate(null)}
                 className="btn-secondary w-full"
@@ -458,7 +458,7 @@ export default function ContractTemplates() {
       {editTemplate && createPortal(
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9997] p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 flex-shrink-0">
+            <div className="flex justify-between items-center px-4 sm:px-6 py-4 border-b border-gray-100 flex-shrink-0">
               <div className="flex items-center gap-3">
                 <div className="h-9 w-9 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center">
                   <PencilSquareIcon className="h-5 w-5" />
@@ -469,7 +469,7 @@ export default function ContractTemplates() {
                 <XMarkIcon className="w-5 h-5 text-gray-400 hover:text-gray-600" />
               </button>
             </div>
-            <div className="p-6 space-y-4 overflow-y-auto">
+            <div className="p-4 sm:p-6 space-y-4 overflow-y-auto">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tên template <span className="text-red-500">*</span></label>
                 <input
@@ -534,7 +534,7 @@ export default function ContractTemplates() {
                 </select>
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex gap-3 flex-shrink-0">
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex gap-3 flex-shrink-0">
               <button
                 onClick={() => setEditTemplate(null)}
                 className="btn-secondary flex-1"
@@ -556,7 +556,7 @@ export default function ContractTemplates() {
       {showAddModal && createPortal(
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9997] p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 flex-shrink-0">
+            <div className="flex justify-between items-center px-4 sm:px-6 py-4 border-b border-gray-100 flex-shrink-0">
               <div className="flex items-center gap-3">
                 <div className="h-9 w-9 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center">
                   <PlusIcon className="h-5 w-5" />
@@ -567,7 +567,7 @@ export default function ContractTemplates() {
                 <XMarkIcon className="w-5 h-5 text-gray-400 hover:text-gray-600" />
               </button>
             </div>
-            <div className="p-6 space-y-4 overflow-y-auto">
+            <div className="p-4 sm:p-6 space-y-4 overflow-y-auto">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tên template <span className="text-red-500">*</span></label>
                 <input
@@ -633,7 +633,7 @@ export default function ContractTemplates() {
                 </select>
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex gap-3 flex-shrink-0">
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex gap-3 flex-shrink-0">
               <button
                 onClick={() => setShowAddModal(false)}
                 className="btn-secondary flex-1"

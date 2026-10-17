@@ -157,7 +157,7 @@ const PositionEmployees: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
         {/* Filter */}
         <div className="mb-5 bg-gray-50 p-4 rounded-2xl border border-gray-100">
           <div className="flex justify-between items-center mb-3">
@@ -210,13 +210,13 @@ const PositionEmployees: React.FC = () => {
         </div>
 
         {/* List header */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4">
           <div>
             <h2 className="text-sm font-bold text-gray-900">Danh sách nhân viên</h2>
             <p className="text-xs text-gray-400 mt-0.5">Tổng số: {employees.length} nhân viên</p>
           </div>
           <button
-            className="btn-primary flex items-center gap-1.5"
+            className="btn-primary flex items-center gap-1.5 self-start sm:self-auto whitespace-nowrap"
             onClick={() => setShowAddModal(true)}
           >
             <UserPlusIcon className="w-4 h-4" />
@@ -241,7 +241,7 @@ const PositionEmployees: React.FC = () => {
             </button>
           </div>
         ) : (
-          <div className="border border-gray-100 rounded-2xl overflow-hidden">
+          <div className="border border-gray-100 rounded-2xl overflow-x-auto">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-100">
                 <thead className="bg-gray-50">
@@ -268,7 +268,7 @@ const PositionEmployees: React.FC = () => {
                     employees.map((emp) => (
                       <tr key={emp.id} className="hover:bg-gray-50 transition-colors">
                         <td className="table-cell font-medium">{emp.employee_id}</td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap sm:whitespace-normal">
                           <div className="text-sm font-medium text-gray-900">{emp.full_name}</div>
                           {emp.personal_email && (
                             <div className="text-xs text-gray-400">{emp.personal_email}</div>
@@ -305,11 +305,11 @@ const PositionEmployees: React.FC = () => {
           onClick={() => setShowAddModal(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col"
+            className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
               <div className="flex items-center gap-3">
                 <div className="h-9 w-9 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center">
                   <UserPlusIcon className="h-5 w-5" />
@@ -328,7 +328,7 @@ const PositionEmployees: React.FC = () => {
             </div>
 
             {/* Body */}
-            <div className="px-6 py-4">
+            <div className="px-4 sm:px-6 py-4">
               <label className="block text-xs font-medium text-gray-500 mb-1">
                 Tìm kiếm nhân viên theo mã hoặc tên
               </label>
@@ -360,7 +360,7 @@ const PositionEmployees: React.FC = () => {
                 ) : (
                   <ul className="divide-y divide-gray-100">
                     {addSearchResults.map((emp) => (
-                      <li key={emp.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
+                      <li key={emp.id} className="flex flex-col gap-2 sm:gap-0 sm:flex-row sm:items-center sm:justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
                         <div>
                           <div className="text-sm font-medium text-gray-900">{emp.full_name}</div>
                           <div className="text-xs text-gray-400">
@@ -372,7 +372,7 @@ const PositionEmployees: React.FC = () => {
                         <button
                           onClick={() => handleAssignEmployee(emp)}
                           disabled={assigningId === emp.id}
-                          className="btn-primary ml-4 disabled:opacity-60"
+                          className="btn-primary self-start sm:self-auto sm:ml-4 whitespace-nowrap disabled:opacity-60"
                         >
                           {assigningId === emp.id ? 'Đang gán...' : 'Gán vào vị trí'}
                         </button>
@@ -384,7 +384,7 @@ const PositionEmployees: React.FC = () => {
             </div>
 
             {/* Footer */}
-            <div className="flex justify-end px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+            <div className="flex justify-end px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
               <button onClick={() => setShowAddModal(false)} className="btn-secondary">
                 Đóng
               </button>

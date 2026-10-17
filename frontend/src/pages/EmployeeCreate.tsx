@@ -228,7 +228,7 @@ const EmployeeCreate: React.FC = () => {
   };
 
   return (
-    <div className="p-4 md:p-6">
+    <div className="py-4 md:p-6">
       {/* Header */}
       <div className="mb-6">
         <button

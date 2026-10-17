@@ -327,7 +327,7 @@ const AnnouncementList: React.FC = () => {
     <div className="space-y-5">
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center">
           <div>
             <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Bảng thông báo</h1>
@@ -335,7 +335,7 @@ const AnnouncementList: React.FC = () => {
           </div>
         </div>
         {canManage && (
-          <button onClick={openCreate} className="btn-primary flex items-center gap-2">
+          <button onClick={openCreate} className="btn-primary flex items-center gap-2 self-start sm:self-auto whitespace-nowrap">
             <PlusIcon className="h-4 w-4" />
             Đăng thông báo
           </button>
@@ -343,7 +343,7 @@ const AnnouncementList: React.FC = () => {
       </div>
 
       {/* ── Bộ lọc ── */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">Tìm kiếm</label>
@@ -396,7 +396,7 @@ const AnnouncementList: React.FC = () => {
             return (
               <div
                 key={item.id}
-                className={`rounded-2xl border border-gray-100 shadow-sm border-l-4 ${borderColor} p-5 transition-all ${expired ? 'bg-gray-50' : 'bg-white'}`}
+                className={`rounded-2xl border border-gray-100 shadow-sm border-l-4 ${borderColor} p-4 sm:p-5 transition-all ${expired ? 'bg-gray-50' : 'bg-white'}`}
               >
                 {/* Card header — buttons luôn full opacity */}
                 <div className="flex items-start justify-between gap-3">
@@ -476,9 +476,9 @@ const AnnouncementList: React.FC = () => {
                             key={att.id}
                             type="button"
                             onClick={() => setAttachmentPreview(att)}
-                            className="inline-flex items-center gap-1.5 text-xs text-primary-600 hover:underline"
+                            className="inline-flex items-center gap-1.5 text-xs text-primary-600 hover:underline max-w-full text-left [overflow-wrap:anywhere]"
                           >
-                            <PaperClipIcon className="h-3.5 w-3.5" />
+                            <PaperClipIcon className="h-3.5 w-3.5 flex-shrink-0" />
                             {att.file_name}
                           </button>
                         ))}
@@ -509,7 +509,7 @@ const AnnouncementList: React.FC = () => {
             <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => setDetailItem(null)} />
             <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl">
               {/* Header */}
-              <div className={`flex items-start justify-between gap-3 px-6 py-5 border-b-4 ${PRIORITY_BORDER[detailItem.priority] || 'border-gray-300'} border border-gray-100 rounded-t-2xl`}>
+              <div className={`flex items-start justify-between gap-3 px-4 sm:px-6 py-5 border-b-4 ${PRIORITY_BORDER[detailItem.priority] || 'border-gray-300'} border border-gray-100 rounded-t-2xl`}>
                 <div className="flex items-start gap-3 flex-1 min-w-0">
                   <div className="h-9 w-9 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
                     <MegaphoneIcon className="h-5 w-5" />
@@ -537,7 +537,7 @@ const AnnouncementList: React.FC = () => {
               </div>
 
               {/* Body */}
-              <div className="px-6 py-5 max-h-[60vh] overflow-y-auto space-y-4">
+              <div className="px-4 sm:px-6 py-5 max-h-[60vh] overflow-y-auto space-y-4">
                 {/* Metadata */}
                 <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm space-y-2">
                   <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-gray-700">
@@ -615,7 +615,7 @@ const AnnouncementList: React.FC = () => {
                           key={att.id}
                           type="button"
                           onClick={() => setAttachmentPreview(att)}
-                          className="inline-flex items-center gap-2 px-3 py-2 bg-primary-50 text-primary-600 border border-primary-200 rounded-xl text-xs font-medium hover:bg-primary-100 transition-colors"
+                          className="inline-flex items-center gap-2 px-3 py-2 bg-primary-50 text-primary-600 border border-primary-200 rounded-xl text-xs font-medium hover:bg-primary-100 transition-colors max-w-full text-left [overflow-wrap:anywhere]"
                         >
                           <PaperClipIcon className="h-3.5 w-3.5 flex-shrink-0" />
                           {att.file_name}
@@ -627,7 +627,7 @@ const AnnouncementList: React.FC = () => {
               </div>
 
               {/* Footer */}
-              <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-100">
+              <div className="flex justify-end gap-2 px-4 sm:px-6 py-4 border-t border-gray-100">
                 {canManage && (
                   <button
                     onClick={() => { setDetailItem(null); openEdit(detailItem); }}
@@ -656,7 +656,7 @@ const AnnouncementList: React.FC = () => {
             <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={closeModal} />
             <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl">
               {/* Modal header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
                 <div className="flex items-center gap-3">
                   <div className="h-9 w-9 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center flex-shrink-0">
                     <MegaphoneIcon className="h-5 w-5" />
@@ -676,7 +676,7 @@ const AnnouncementList: React.FC = () => {
               </div>
 
               {/* Modal body */}
-              <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 max-h-[80vh] overflow-y-auto">
 
                 {/* Title */}
                 <div>

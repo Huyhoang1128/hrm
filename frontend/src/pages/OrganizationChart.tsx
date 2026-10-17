@@ -542,7 +542,7 @@ const OrganizationChart: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 selection:bg-indigo-100 overflow-x-hidden p-6 md:p-10 lg:p-12 relative">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-900 selection:bg-indigo-100 overflow-x-clip sm:overflow-x-hidden p-3 sm:p-6 md:p-10 lg:p-12 relative">
       {/* Background blobs */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
         <div className="absolute top-[-10%] left-[-5%] w-[40%] h-[40%] bg-indigo-50/50 blur-[120px] rounded-full" />
@@ -550,7 +550,7 @@ const OrganizationChart: React.FC = () => {
       </div>
 
       {/* Page Header - Tối ưu Responsive & Premium UI */}
-      <div className="mb-12 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+      <div className="mb-8 sm:mb-12 flex flex-col lg:flex-row lg:items-center justify-between gap-6 sm:gap-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
           {/* Premium Icon Container with Glow Effect */}
           <div className="relative group cursor-pointer" onClick={() => window.location.reload()}>
@@ -615,9 +615,9 @@ const OrganizationChart: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-12">
+      <div className="grid grid-cols-1 gap-8 sm:gap-12">
         {/* Main View Container */}
-        <div className="bg-white/40 backdrop-blur-xl rounded-[2.5rem] border border-white p-8 md:p-12 shadow-2xl shadow-slate-200/40">
+        <div className="bg-white/40 backdrop-blur-xl rounded-[1.75rem] sm:rounded-[2.5rem] border border-white p-4 sm:p-8 md:p-12 shadow-2xl shadow-slate-200/40">
           {treeData.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <div className="w-24 h-24 rounded-3xl bg-slate-50 flex items-center justify-center mb-8">
@@ -632,7 +632,7 @@ const OrganizationChart: React.FC = () => {
               <div className="flex items-center justify-between mb-2 px-2">
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Cấu trúc hiển thị</span>
+                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest whitespace-nowrap">Cấu trúc hiển thị</span>
                 </div>
                 <div className="flex bg-white/50 backdrop-blur-sm p-1 rounded-xl border border-slate-100 shadow-sm">
                   <button

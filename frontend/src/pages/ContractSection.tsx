@@ -205,7 +205,7 @@ const ContractSection: React.FC<Props> = ({ onboardingId, employeeId, employeePr
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="btn-primary flex items-center gap-2 text-sm"
+          className="btn-primary flex items-center gap-2 text-sm whitespace-nowrap shrink-0"
         >
           <PlusIcon className="h-4 w-4" />
           Thêm hợp đồng
@@ -224,8 +224,8 @@ const ContractSection: React.FC<Props> = ({ onboardingId, employeeId, employeePr
       ) : (
         <div className="space-y-3">
           {contracts.map(contract => (
-            <div key={contract.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-              <div className="flex justify-between items-start gap-4">
+            <div key={contract.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start sm:gap-4">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <h4 className="text-sm font-bold text-gray-900">
@@ -260,7 +260,7 @@ const ContractSection: React.FC<Props> = ({ onboardingId, employeeId, employeePr
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-2 flex-wrap justify-end shrink-0">
+                <div className="flex gap-2 flex-wrap sm:justify-end shrink-0">
 
                   {/* Tạo PDF — mở modal placeholder thay vì generate trực tiếp */}
                   {contract.template && !contract.generated_file && (
@@ -326,7 +326,7 @@ const ContractSection: React.FC<Props> = ({ onboardingId, employeeId, employeePr
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+            <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <div className="h-9 w-9 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center">
                   <DocumentTextIcon className="h-5 w-5" />
@@ -342,7 +342,7 @@ const ContractSection: React.FC<Props> = ({ onboardingId, employeeId, employeePr
             </div>
 
             {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
               {/* Template card list */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">
@@ -389,7 +389,7 @@ const ContractSection: React.FC<Props> = ({ onboardingId, employeeId, employeePr
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Ngày bắt đầu</label>
                   <input
@@ -422,7 +422,7 @@ const ContractSection: React.FC<Props> = ({ onboardingId, employeeId, employeePr
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex gap-3">
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex gap-3">
               <button
                 onClick={() => setShowAddModal(false)}
                 className="btn-secondary flex-1 text-sm"

@@ -466,9 +466,9 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
               leaveFrom="opacity-100 translate-y-0 sm:scale-100"
               leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
             >
-              <DialogPanel className="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
+              <DialogPanel className="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl transition-all w-full sm:my-8 sm:w-full sm:max-w-2xl">
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
                   <DialogTitle as="h3" className="text-base font-bold text-gray-900">
                     Chỉnh sửa tài sản
                   </DialogTitle>
@@ -480,7 +480,7 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
                     <XMarkIcon className="h-5 w-5" />
                   </button>
                 </div>
-                <div className="px-6 py-5">
+                <div className="px-4 sm:px-6 py-5">
                   <div className="w-full">
                     <form onSubmit={handleSubmit} className="space-y-4">
                       <div className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
@@ -868,7 +868,7 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
                   </div>
                 </div>
                 {/* Footer */}
-                <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+                <div className="flex items-center justify-end gap-2 px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
                   <button type="button" className="btn-secondary" onClick={onClose}>Hủy</button>
                   <button
                     type="submit"

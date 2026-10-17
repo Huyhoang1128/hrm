@@ -77,11 +77,11 @@ const PdfPreviewModal: React.FC<Props> = ({ open, title, loader, downloadFilenam
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-5xl h-[92vh] flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-50">
-          <h3 className="text-base font-semibold text-gray-900 truncate">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b bg-gray-50">
+          <h3 className="text-base font-semibold text-gray-900 truncate min-w-0">
             {title || 'Xem trước PDF'}
           </h3>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {pdfUrl && !loading && (
               <button
                 onClick={handleDownload}

@@ -310,14 +310,14 @@ interface PositionOption {
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Nhu cầu tuyển dụng</h1>
           <p className="text-gray-900 mt-1 text-sm">Quản lý yêu cầu tuyển dụng từ phòng ban</p>
         </div>
         <button
           onClick={openCreate}
-          className="btn-primary flex items-center gap-2"
+          className="btn-primary flex items-center gap-2 whitespace-nowrap"
         >
           <PlusIcon className="h-4 w-4" />
           Thêm nhu cầu
@@ -533,8 +533,8 @@ interface PositionOption {
       {/* Create/Edit Modal */}
       {showModal && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
               <h2 className="text-base font-bold text-gray-900">
                 {editingId ? 'Cập nhật nhu cầu' : 'Thêm nhu cầu tuyển dụng'}
               </h2>
@@ -545,7 +545,7 @@ interface PositionOption {
                 <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
+            <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Vị trí tuyển dụng <span className="text-red-500">*</span>
@@ -587,7 +587,7 @@ interface PositionOption {
                   />
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng</label>
                   <input

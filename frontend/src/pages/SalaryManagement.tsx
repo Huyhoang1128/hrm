@@ -114,8 +114,9 @@ const TaxTooltip: React.FC<TaxTooltipProps> = ({ taxDetail }) => {
     if (!showDetail || !popupRef.current || !btnRef.current) return;
     const btn = btnRef.current.getBoundingClientRect();
     const popH = popupRef.current.offsetHeight;
-    const POPUP_W = 384;
     const MARGIN = 8;
+    // Điện thoại hẹp hơn 384px + lề: thu popup lại cho vừa màn hình.
+    const POPUP_W = Math.min(384, window.innerWidth - MARGIN * 2);
     const left = Math.max(MARGIN, Math.min(btn.right - POPUP_W, window.innerWidth - POPUP_W - MARGIN));
     const spaceBelow = window.innerHeight - btn.bottom - MARGIN;
     const spaceAbove = btn.top - MARGIN;
@@ -578,8 +579,8 @@ const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header — sticky */}
-        <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-indigo-50 rounded-t-xl print:hidden">
-          <div>
+        <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 sm:px-6 py-4 border-b border-gray-200 bg-indigo-50 rounded-t-xl print:hidden">
+          <div className="min-w-0">
             <h2 className="text-base font-bold text-indigo-800 uppercase tracking-wide">
               Phiếu thanh toán lương {monthLabel}
             </h2>
@@ -611,13 +612,13 @@ const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose
         </div>
 
         {/* Payslip body */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-gray-100">
                 <th className="border border-gray-300 px-3 py-2 text-center text-xs font-semibold text-gray-600 w-10">STT</th>
                 <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold text-gray-600">DANH MỤC</th>
-                <th className="border border-gray-300 px-3 py-2 text-right text-xs font-semibold text-gray-600 w-36">TIỀN LƯƠNG</th>
+                <th className="border border-gray-300 px-3 py-2 text-right text-xs font-semibold text-gray-600 w-28 sm:w-36">TIỀN LƯƠNG</th>
               </tr>
             </thead>
             <tbody>
@@ -2007,7 +2008,7 @@ const SectionCard: React.FC<{
   title: string;
   children: React.ReactNode;
 }> = ({ title, children }) => (
-  <div className="rounded-lg border border-gray-200 p-4 space-y-3 bg-gray-50/40">
+  <div className="rounded-lg border border-gray-200 p-3 sm:p-4 space-y-3 bg-gray-50/40">
     <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
     {children}
   </div>
@@ -2127,9 +2128,9 @@ const EditSalaryModal: React.FC<EditModalProps> = ({ employee, onClose, onSave, 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl mx-4 max-h-[90vh] overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <div>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-200">
+          <div className="min-w-0">
             <h2 className="text-lg font-semibold text-gray-900">Cấu hình tính lương theo nhân viên</h2>
             <p className="text-sm text-gray-500">{employee.full_name} · {employee.employee_id}</p>
           </div>
@@ -2138,7 +2139,7 @@ const EditSalaryModal: React.FC<EditModalProps> = ({ employee, onClose, onSave, 
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-5 overflow-y-auto max-h-[calc(90vh-72px)] space-y-4">
+        <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-5 overflow-y-auto max-h-[calc(90vh-72px)] flex-1 min-h-0 space-y-4">
           {validationError && (
             <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {validationError}
@@ -4210,7 +4211,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
+                  <table className="min-w-[760px] sm:min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -4323,7 +4324,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
               <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
                   <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Tháng:</label>
-                  <div className="w-32">
+                  <div className="flex-1 sm:flex-initial sm:w-32">
                     <SelectBox<number>
                       label=""
                       value={selectedMonth}
@@ -4334,7 +4335,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Năm:</label>
-                  <div className="w-24">
+                  <div className="flex-1 sm:flex-initial sm:w-24">
                     <SelectBox<number>
                       label=""
                       value={selectedYear}
@@ -4345,7 +4346,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <FunnelIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                  <div className="w-48">
+                  <div className="flex-1 sm:flex-initial sm:w-48">
                     <SelectBox<string>
                       label=""
                       value={deptFilterView}
@@ -4362,7 +4363,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <FunnelIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                  <div className="w-56">
+                  <div className="flex-1 sm:flex-initial sm:w-56">
                     <SelectBox<string>
                       label=""
                       value={legalEntityFilterView}
@@ -4593,7 +4594,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <table className="min-w-[1180px] sm:min-w-full divide-y divide-gray-200 text-sm">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50">
@@ -4795,7 +4796,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                   {deptPayslipBatch && (
                     <div className="mt-3 border border-gray-200 rounded-lg overflow-hidden">
                       {/* Header */}
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 py-2 bg-gray-50 border-b border-gray-200">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 py-2 bg-gray-50 border-b border-gray-200 flex-wrap">
                         <div className="flex items-center gap-3">
                           <span className="text-sm font-semibold text-gray-700">Báo cáo gửi email phiếu lương</span>
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -4906,10 +4907,10 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
       {showCompanyPayslipConfirm && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl mx-4 overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-100">
+            <div className="px-4 sm:px-6 py-5 border-b border-gray-100">
               <h3 className="text-base font-semibold text-gray-900">Xác nhận gửi email phiếu lương – Toàn công ty</h3>
             </div>
-            <div className="px-6 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
+            <div className="px-4 sm:px-6 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
               <p className="text-sm text-gray-600">
                 Hệ thống sẽ xếp hàng gửi email phiếu lương{' '}
                 <strong>Tháng {String(selectedMonth).padStart(2, '0')}/{selectedYear}</strong> cho toàn bộ nhân sự công ty
@@ -5011,7 +5012,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                 </>
               )}
             </div>
-            <div className="px-6 py-4 flex justify-end gap-3 border-t border-gray-100 bg-gray-50">
+            <div className="px-4 sm:px-6 py-4 flex justify-end gap-3 border-t border-gray-100 bg-gray-50">
               <button
                 onClick={() => setShowCompanyPayslipConfirm(false)}
                 className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -5036,10 +5037,10 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
       {showDeptPayslipConfirm && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl mx-4 overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-100">
+            <div className="px-4 sm:px-6 py-5 border-b border-gray-100">
               <h3 className="text-base font-semibold text-gray-900">Xác nhận gửi email phiếu lương</h3>
             </div>
-            <div className="px-6 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
+            <div className="px-4 sm:px-6 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
               <p className="text-sm text-gray-600">
                 Hệ thống sẽ xếp hàng gửi email phiếu lương{' '}
                 <strong>Tháng {String(selectedMonth).padStart(2, '0')}/{selectedYear}</strong> cho toàn bộ nhân sự phòng ban{' '}
@@ -5141,7 +5142,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                 </>
               )}
             </div>
-            <div className="px-6 py-4 flex justify-end gap-3 border-t border-gray-100 bg-gray-50">
+            <div className="px-4 sm:px-6 py-4 flex justify-end gap-3 border-t border-gray-100 bg-gray-50">
               <button
                 onClick={() => setShowDeptPayslipConfirm(false)}
                 className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -5167,7 +5168,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50" onClick={handleCloseImportDialog}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-200">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Nhập cấu hình lương</h2>
                 <p className="text-sm text-gray-500 mt-0.5">Cập nhật hàng loạt cấu hình tính lương từ file Excel</p>
@@ -5178,7 +5179,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
             </div>
 
             {/* Body */}
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
               {/* Toast messages */}
               {scImportMsg.ok && (
                 <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm">
@@ -5229,7 +5230,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                   {/* Company Batch status report */}
                   {companyPayslipBatch && (
                     <div className="mt-3 border border-purple-200 rounded-lg overflow-hidden">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 py-2 bg-purple-50 border-b border-purple-200">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 py-2 bg-purple-50 border-b border-purple-200 flex-wrap">
                         <div className="flex items-center gap-3">
                           <span className="text-sm font-semibold text-purple-800">Báo cáo gửi email – Toàn công ty</span>
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -5419,7 +5420,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
               <button onClick={handleCloseImportDialog} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
                 Đóng
               </button>
@@ -5442,8 +5443,8 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
       {showPayrollPreviewModal && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50" onClick={() => setShowPayrollPreviewModal(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[95vw] max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <div>
+            <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-200">
+              <div className="min-w-0">
                 <h2 className="text-lg font-semibold text-gray-900">Xem trước bảng lương chi tiết</h2>
                 <p className="text-sm text-gray-500 mt-0.5">Tháng {String(selectedMonth).padStart(2, '0')}.{selectedYear} · {payrollDetailRows.length} nhân viên</p>
               </div>
@@ -5451,7 +5452,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                 <button
                   onClick={handleExportPayrollExcel}
                   disabled={exportingPayroll || payrollDetailRows.length === 0}
-                  className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md hover:bg-emerald-100 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md hover:bg-emerald-100 disabled:opacity-50 whitespace-nowrap"
                 >
                   {exportingPayroll ? <ArrowPathIcon className="h-4 w-4 animate-spin" /> : <ArrowDownTrayIcon className="h-4 w-4" />}
                   {exportingPayroll ? 'Đang tải...' : 'Tải Excel'}
@@ -5467,8 +5468,8 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase sticky left-0 z-20 bg-gray-50 min-w-[120px]">Mã NV</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase sticky left-[120px] z-20 bg-gray-50 min-w-[220px]">Họ tên</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase sticky left-[340px] z-20 bg-gray-50 min-w-[180px]">Phòng ban</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase sm:sticky left-[120px] z-20 bg-gray-50 min-w-[220px]">Họ tên</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase sm:sticky left-[340px] z-20 bg-gray-50 min-w-[180px]">Phòng ban</th>
                     <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Năm</th>
                     <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Tháng</th>
                     <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Lương CB</th>
@@ -5510,8 +5511,8 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                   {payrollDetailRows.map((row, idx) => (
                     <tr key={row.ma_nv} className={`group ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'} hover:!bg-indigo-100`}>
                       <td className={`px-3 py-2 font-mono text-gray-700 sticky left-0 z-10 group-hover:!bg-indigo-100 min-w-[120px] ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'}`}>{row.ma_nv}</td>
-                      <td className={`px-3 py-2 text-gray-900 sticky left-[120px] z-10 group-hover:!bg-indigo-100 min-w-[220px] ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'}`}>{row.ho_va_ten}</td>
-                      <td className={`px-3 py-2 text-gray-700 sticky left-[340px] z-10 group-hover:!bg-indigo-100 min-w-[180px] ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'}`}>{row.phong_ban || '—'}</td>
+                      <td className={`px-3 py-2 text-gray-900 sm:sticky left-[120px] z-10 group-hover:!bg-indigo-100 min-w-[220px] ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'}`}>{row.ho_va_ten}</td>
+                      <td className={`px-3 py-2 text-gray-700 sm:sticky left-[340px] z-10 group-hover:!bg-indigo-100 min-w-[180px] ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'}`}>{row.phong_ban || '—'}</td>
                       <td className="px-3 py-2 text-right text-gray-700">{row.year}</td>
                       <td className="px-3 py-2 text-right text-gray-700">{row.month}</td>
                       <td className="px-3 py-2 text-right text-gray-700">{formatCurrency(row.luong_co_ban)}</td>
@@ -5560,9 +5561,9 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
       {/* ── Modal tổng lương công ty ── */}
       {showTotalSalaryModal && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50" onClick={() => setShowTotalSalaryModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-200">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">
                   {totalSalaryScope === 'legal_entity' ? 'Báo cáo tổng lương pháp nhân' : 'Báo cáo tổng lương công ty'}
@@ -5586,7 +5587,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
             </div>
 
             {/* Content */}
-            <div className="px-6 py-6 space-y-4">
+            <div className="px-4 sm:px-6 py-4 sm:py-6 space-y-4">
               {loadingTotalSalary ? (
                 <div className="flex items-center justify-center py-12">
                   <ArrowPathIcon className="h-6 w-6 text-primary-400 animate-spin" />
@@ -5605,21 +5606,21 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                     const totalMustPay = totalTransferToEmployees + totalTaxTncn;
                     return (
                       <>
-                        <div className="rounded-lg bg-indigo-50 border border-indigo-200 p-6 text-center">
+                        <div className="rounded-lg bg-indigo-50 border border-indigo-200 p-4 sm:p-6 text-center">
                           <p className="text-sm text-indigo-600 font-medium mb-2">TỔNG PHẢI CHUYỂN CHO NHÂN VIÊN</p>
-                          <p className="text-4xl font-bold text-indigo-900">{formatCurrency(totalTransferToEmployees)}</p>
+                          <p className="text-2xl sm:text-4xl font-bold text-indigo-900">{formatCurrency(totalTransferToEmployees)}</p>
                           <p className="text-sm text-indigo-500 mt-2">= Tổng số tiền công ty chuyển vào tài khoản nhân viên</p>
                         </div>
 
-                        <div className="rounded-lg bg-amber-50 border border-amber-200 p-6 text-center">
+                        <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 sm:p-6 text-center">
                           <p className="text-sm text-amber-700 font-medium mb-2">TỔNG THUẾ TNCN PHẢI NỘP</p>
-                          <p className="text-3xl font-bold text-amber-900">{formatCurrency(totalTaxTncn)}</p>
+                          <p className="text-xl sm:text-3xl font-bold text-amber-900">{formatCurrency(totalTaxTncn)}</p>
                           <p className="text-sm text-amber-600 mt-2">= Tổng trường Thuế thu nhập cá nhân</p>
                         </div>
 
-                        <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-6 text-center">
+                        <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 sm:p-6 text-center">
                           <p className="text-sm text-emerald-700 font-medium mb-2">TỔNG PHẢI CHI TRẢ (NHÂN VIÊN + CƠ QUAN THUẾ)</p>
-                          <p className="text-4xl font-bold text-emerald-900">{formatCurrency(totalMustPay)}</p>
+                          <p className="text-2xl sm:text-4xl font-bold text-emerald-900">{formatCurrency(totalMustPay)}</p>
                           <p className="text-sm text-emerald-600 mt-2">= Tổng chuyển nhân viên + tổng thuế TNCN phải nộp</p>
                         </div>
                       </>
@@ -5634,7 +5635,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
               <button 
                 onClick={() => setShowTotalSalaryModal(false)} 
                 className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"

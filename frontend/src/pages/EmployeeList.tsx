@@ -1348,7 +1348,7 @@ const EmployeeList: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6">
         {/* Statistics Section - At the top as requested */}
         <div className="mb-8">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -1545,7 +1545,7 @@ const EmployeeList: React.FC = () => {
         )}
 
         {/* Search and Filter Section */}
-        <div className="mb-6 bg-gray-50/50 p-5 rounded-2xl border border-gray-100">
+        <div className="mb-6 bg-gray-50/50 p-4 sm:p-5 rounded-2xl border border-gray-100">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-bold text-gray-900">Tìm kiếm nhân viên</h3>
             <div className="flex items-center gap-3">
@@ -1671,7 +1671,7 @@ const EmployeeList: React.FC = () => {
             <div className="flex flex-wrap items-center gap-2">
               {isAdmin &&(
                 <button 
-                  className={`px-4 py-2 rounded-xl transition-colors flex items-center ${
+                  className={`px-4 py-2 rounded-xl transition-colors flex items-center text-sm xl:text-base ${
                     isSendingEmails || emailCooldownRemaining > 0
                       ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       : 'bg-primary-600 text-white hover:bg-primary-700'
@@ -1706,7 +1706,7 @@ const EmployeeList: React.FC = () => {
               )}
               {(isAdmin || isSuperUser) && (
                 <button
-                  className="bg-amber-500 text-white px-4 py-2 rounded-xl hover:bg-amber-600 transition-colors flex items-center"
+                  className="bg-amber-500 text-white px-4 py-2 rounded-xl hover:bg-amber-600 transition-colors flex items-center text-sm xl:text-base"
                   onClick={() => { setShowImportDialog(true); setImportFile(null); setImportResult(null); }}
                 >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -1717,7 +1717,7 @@ const EmployeeList: React.FC = () => {
               )}
               {(isAdmin || isSuperUser) && (
                 <button
-                  className="bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors flex items-center"
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors flex items-center text-sm xl:text-base"
                   onClick={handleOpenChangeManagerDialog}
                 >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -1727,7 +1727,7 @@ const EmployeeList: React.FC = () => {
                 </button>
               )}
               <button
-                className="bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors flex items-center"
+                className="bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors flex items-center text-sm xl:text-base"
                 onClick={handleExport}
               >
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -1748,7 +1748,7 @@ const EmployeeList: React.FC = () => {
               )}
               {(isAdmin || isSuperUser || isHR) && (
                 <button
-                  className="bg-primary-700 text-white px-4 py-2 rounded-xl hover:bg-primary-800 transition-colors flex items-center"
+                  className="bg-primary-700 text-white px-4 py-2 rounded-xl hover:bg-primary-800 transition-colors flex items-center text-sm xl:text-base"
                   onClick={handleExportAll}
                 >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -1759,7 +1759,7 @@ const EmployeeList: React.FC = () => {
               )}
 
               <button 
-                className="btn-primary"
+                className="btn-primary text-sm xl:text-base"
                 onClick={() => navigate('/dashboard/employees/create')}
               >
                 + Thêm nhân viên
@@ -1789,7 +1789,7 @@ const EmployeeList: React.FC = () => {
             </button>
           </div>
         ) : employees.length === 0 ? (
-          <div className="border border-gray-100 rounded-2xl overflow-hidden">
+          <div className="border border-gray-100 rounded-2xl overflow-x-auto">
             <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -1832,7 +1832,7 @@ const EmployeeList: React.FC = () => {
           </div>
         ) : (
           <>
-            <div className="border border-gray-100 rounded-2xl overflow-hidden">
+            <div className="border border-gray-100 rounded-2xl overflow-x-auto">
               <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">

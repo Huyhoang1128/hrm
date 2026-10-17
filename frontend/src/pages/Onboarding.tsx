@@ -817,9 +817,9 @@ const Onboarding: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
         {/* Table header */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center sm:gap-0 mb-4">
           <div>
             <h2 className="text-sm font-bold text-gray-900">Quy trình onboarding</h2>
             <p className="text-xs text-gray-700">
@@ -829,7 +829,7 @@ const Onboarding: React.FC = () => {
           {isHR && (
             <button
               onClick={() => setShowCreateModal(true)}
-              className="btn-primary flex items-center gap-2"
+              className="btn-primary flex items-center gap-2 self-start sm:self-auto"
             >
               <UserPlusIcon className="w-4 h-4" />
               Tạo quy trình mới
@@ -839,7 +839,7 @@ const Onboarding: React.FC = () => {
 
         {/* Filter bar */}
         <div className="flex flex-wrap items-end gap-3 mb-4">
-          <div className="w-44">
+          <div className="w-full sm:w-44">
             <SelectBox
               label="Trạng thái"
               value={filterStatus}
@@ -852,7 +852,7 @@ const Onboarding: React.FC = () => {
               onChange={(v) => { setFilterStatus(v); setCurrentPage(1); }}
             />
           </div>
-          <div className="w-40">
+          <div className="w-full sm:w-40">
             <SelectBox
               label="Tháng"
               value={filterMonth}
@@ -864,7 +864,7 @@ const Onboarding: React.FC = () => {
             />
           </div>
           {filterMonth > 0 && (
-            <div className="w-32">
+            <div className="w-full sm:w-32">
               <SelectBox
                 label="Năm"
                 value={filterYear}
@@ -891,7 +891,7 @@ const Onboarding: React.FC = () => {
               }}
             />
           </div>
-          <div className="relative">
+          <div className="relative w-full sm:w-auto">
             <label className="block text-sm font-medium mb-1 text-gray-700">Tìm kiếm</label>
             <div className="relative">
               <input
@@ -899,7 +899,7 @@ const Onboarding: React.FC = () => {
                 value={filterSearch}
                 onChange={(e) => { setFilterSearch(e.target.value); }}
                 placeholder="Tìm tên hoặc mã NV..."
-                className="input-field pl-8 w-52"
+                className="input-field pl-8 w-full sm:w-52"
               />
               <svg className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />

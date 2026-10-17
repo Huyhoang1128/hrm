@@ -178,7 +178,7 @@ const TasksSection: React.FC<TasksSectionProps> = ({ tasks, onUpdate, canComplet
         {task.status === 'PENDING' && (
           <button
             onClick={() => handleStartTask(task.id)}
-            className="flex items-center px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 rounded-md hover:bg-blue-100"
+            className="flex items-center whitespace-nowrap px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 rounded-md hover:bg-blue-100"
           >
             <PlayIcon className="w-4 h-4 mr-1" />
             Bắt đầu
@@ -196,7 +196,7 @@ const TasksSection: React.FC<TasksSectionProps> = ({ tasks, onUpdate, canComplet
               }}
               disabled={!guard.allowed}
               title={!guard.allowed ? guard.reason : ''}
-              className={`flex items-center px-3 py-1.5 rounded-md border ${
+              className={`flex items-center whitespace-nowrap px-3 py-1.5 rounded-md border ${
                 !guard.allowed
                   ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
                   : 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100'
@@ -262,8 +262,8 @@ const TasksSection: React.FC<TasksSectionProps> = ({ tasks, onUpdate, canComplet
         <div key={task.id} className="border rounded-lg overflow-hidden">
           <div className="bg-gray-50 p-4">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-              <div className="flex-1">
-                <div className="flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-3">
                   <button
                     onClick={() =>
                       setExpandedTaskId(expandedTaskId === task.id ? null : task.id)

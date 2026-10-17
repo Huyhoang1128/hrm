@@ -109,16 +109,16 @@ const DocumentsSection: React.FC<DocumentsSectionProps> = ({
           {documents.map((doc) => (
             <div
               key={doc.id}
-              className="group bg-white border border-gray-200 rounded-xl p-5 hover:shadow-lg hover:border-blue-300 transition-all duration-200"
+              className="group bg-white border border-gray-200 rounded-xl p-4 sm:p-5 hover:shadow-lg hover:border-blue-300 transition-all duration-200"
             >
-              <div className="flex justify-between items-start gap-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start sm:gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 mt-1">
                       <DocumentTextIcon className="w-8 h-8 text-blue-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-gray-900 text-lg mb-2 flex items-center gap-2">
+                      <h4 className="font-semibold text-gray-900 text-lg mb-2 flex flex-wrap items-center gap-2">
                         {doc.document_name}
                         {doc.is_required && (
                           <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">
@@ -165,7 +165,7 @@ const DocumentsSection: React.FC<DocumentsSectionProps> = ({
                       )}
 
                       {/* Metadata */}
-                      <div className="flex items-center gap-4 text-xs text-gray-500">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
                         <span>
                           Tải lên bởi:{' '}
                           <span className="font-medium text-gray-700">
@@ -196,7 +196,7 @@ const DocumentsSection: React.FC<DocumentsSectionProps> = ({
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex flex-col gap-2 flex-shrink-0">
+                <div className="flex flex-row sm:flex-col gap-2 flex-shrink-0">
                   <button
                     onClick={() => handleViewDocument(doc)}
                     className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"

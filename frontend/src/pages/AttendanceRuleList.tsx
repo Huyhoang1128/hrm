@@ -219,7 +219,7 @@ const AttendanceRuleList: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-col items-start space-y-3 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4">
           <button
             onClick={() => navigate(-1)}
             className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -325,16 +325,16 @@ const AttendanceRuleList: React.FC = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
+          <div className="p-4 sm:p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <CogIcon className="h-6 w-6 text-gray-400" />
               </div>
-              <div className="ml-5 w-0 flex-1">
+              <div className="ml-3 sm:ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Tổng quy tắc</dt>
+                  <dt className="text-sm font-medium text-gray-500 sm:truncate">Tổng quy tắc</dt>
                   <dd className="text-lg font-medium text-gray-900">{rules.length}</dd>
                 </dl>
               </div>
@@ -343,14 +343,14 @@ const AttendanceRuleList: React.FC = () => {
         </div>
 
         <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
+          <div className="p-4 sm:p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <CheckCircleIcon className="h-6 w-6 text-green-400" />
               </div>
-              <div className="ml-5 w-0 flex-1">
+              <div className="ml-3 sm:ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Đang hoạt động</dt>
+                  <dt className="text-sm font-medium text-gray-500 sm:truncate">Đang hoạt động</dt>
                   <dd className="text-lg font-medium text-gray-900">
                     {rules.filter(r => r.is_active).length}
                   </dd>
@@ -361,14 +361,14 @@ const AttendanceRuleList: React.FC = () => {
         </div>
 
         <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
+          <div className="p-4 sm:p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <ClockIcon className="h-6 w-6 text-yellow-400" />
               </div>
-              <div className="ml-5 w-0 flex-1">
+              <div className="ml-3 sm:ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Đang áp dụng</dt>
+                  <dt className="text-sm font-medium text-gray-500 sm:truncate">Đang áp dụng</dt>
                   <dd className="text-lg font-medium text-gray-900">
                     {rules.filter(r => r.is_current).length}
                   </dd>
@@ -379,14 +379,14 @@ const AttendanceRuleList: React.FC = () => {
         </div>
 
         <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
+          <div className="p-4 sm:p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <DocumentTextIcon className="h-6 w-6 text-blue-400" />
               </div>
-              <div className="ml-5 w-0 flex-1">
+              <div className="ml-3 sm:ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Quy tắc ca làm</dt>
+                  <dt className="text-sm font-medium text-gray-500 sm:truncate">Quy tắc ca làm</dt>
                   <dd className="text-lg font-medium text-gray-900">
                     {rules.filter(r => r.rule_type === 'SHIFT_RULE').length}
                   </dd>

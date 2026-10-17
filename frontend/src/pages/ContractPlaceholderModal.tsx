@@ -244,14 +244,14 @@ const ContractPlaceholderModal: React.FC<Props> = ({ contractId, onClose, onSucc
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-7xl h-[95vh] flex flex-col">
 
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center">
               <DocumentTextIcon className="w-5 h-5" />
             </div>
             <div>
               <h4 className="font-semibold text-gray-900">Xuất PDF hợp đồng</h4>
-              <div className="flex items-center gap-3 mt-0.5">
+              <div className="flex flex-wrap items-center gap-x-3 mt-0.5">
                 <span className="text-xs text-emerald-600">
                   ✓ {autoItems.length} trường tự động điền
                 </span>
@@ -280,7 +280,7 @@ const ContractPlaceholderModal: React.FC<Props> = ({ contractId, onClose, onSucc
         <div className="flex flex-col lg:flex-row flex-1 min-h-0">
 
           {/* ── CỘT TRÁI ── */}
-          <div className="w-full lg:w-[380px] flex-shrink-0 flex flex-col border-r border-gray-100">
+          <div className="w-full lg:w-[380px] max-h-[60%] lg:max-h-none min-h-0 lg:flex-shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r border-gray-100">
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
 
               {/* Trường HR cần nhập */}

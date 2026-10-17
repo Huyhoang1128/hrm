@@ -37,11 +37,11 @@ export default function FilePreviewModal({ open, file_name, file_url, onClose }:
         }`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-50 flex-shrink-0">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b bg-gray-50 flex-shrink-0">
           <h3 className="text-sm font-semibold text-gray-900 truncate max-w-[70%]" title={file_name}>
             {file_name}
           </h3>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={handleDownload}
               className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1.5"
@@ -85,7 +85,7 @@ export default function FilePreviewModal({ open, file_name, file_url, onClose }:
               <DocumentIcon className="w-7 h-7 text-gray-400" />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-800">{file_name}</p>
+              <p className="text-sm font-medium text-gray-800 [overflow-wrap:anywhere]">{file_name}</p>
               <p className="text-xs text-gray-500 mt-1">Định dạng này không hỗ trợ xem trước. Nhấn tải xuống để mở bằng ứng dụng tương thích.</p>
             </div>
             <button

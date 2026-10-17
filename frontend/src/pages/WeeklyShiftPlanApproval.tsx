@@ -246,7 +246,68 @@ const WeeklyShiftPlanApproval: React.FC = () => {
         ) : plans.length === 0 ? (
           <p className="py-12 text-center text-sm text-gray-400">Không có kế hoạch nào.</p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-100">
+          <>
+          {/* Mobile: dạng thẻ — bảng 7 cột ngày không đọc được trên điện thoại */}
+          <div className="sm:hidden space-y-3">
+            {plans.map((p) => (
+              <div key={p.id} className="rounded-xl border border-gray-100 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <label className="flex min-w-0 items-start gap-2">
+                    {tab === 'PENDING' && (
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        disabled={!p.can_approve_now}
+                        checked={selected.includes(p.id)}
+                        onChange={(e) => setSelected((prev) => (e.target.checked ? [...prev, p.id] : prev.filter((x) => x !== p.id)))}
+                      />
+                    )}
+                    <span className="min-w-0">
+                      <span className="block font-medium text-gray-900 break-words">{p.employee_name}</span>
+                      <span className="block text-xs text-gray-500">
+                        {p.employee_code} · tuần {formatDate(p.week_start_date)}
+                      </span>
+                    </span>
+                  </label>
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_STYLE[p.status]}`}>{p.status_display}</span>
+                </div>
+                <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                  {WEEKDAY_LABELS.map((label, i) => (
+                    <div key={label} className="flex justify-between gap-2">
+                      <dt className="text-gray-500">{label}</dt>
+                      <dd className="text-right text-gray-800 break-words">{dayLabel(p.days.find((d) => d.date === addDays(p.week_start_date, i)))}</dd>
+                    </div>
+                  ))}
+                </dl>
+                {pendingStepLabel(p) && <p className="mt-2 text-xs text-amber-700">{pendingStepLabel(p)}</p>}
+                {p.status === 'REJECTED' && <p className="mt-2 text-xs text-red-600">{p.reject_reason}</p>}
+                {tab === 'PENDING' && (
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      disabled={busy || !p.can_approve_now}
+                      onClick={() => void act(() => weeklyShiftPlanService.approve(p.id), `Đã duyệt kế hoạch của ${p.employee_name}.`)}
+                      className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                    >
+                      Duyệt
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => {
+                        setRejectTarget(p);
+                        setRejectReason('');
+                      }}
+                      className="flex-1 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600"
+                    >
+                      Từ chối
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="hidden sm:block overflow-x-auto rounded-xl border border-gray-100">
             <table className="min-w-full divide-y divide-gray-100 text-sm">
               <thead className="bg-gray-50">
                 <tr>
@@ -327,6 +388,7 @@ const WeeklyShiftPlanApproval: React.FC = () => {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

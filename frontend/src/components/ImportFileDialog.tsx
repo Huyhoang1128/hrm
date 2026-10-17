@@ -58,7 +58,7 @@ const ImportFileDialog: React.FC<ImportFileDialogProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
           <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
           <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -67,7 +67,7 @@ const ImportFileDialog: React.FC<ImportFileDialogProps> = ({
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-5">
+        <div className="overflow-y-auto flex-1 px-4 sm:px-6 py-4 space-y-5">
           {/* Tải template */}
           <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
             <p className="text-sm font-medium text-primary-900 mb-1">Bước 1: Tải file mẫu</p>
@@ -88,7 +88,7 @@ const ImportFileDialog: React.FC<ImportFileDialogProps> = ({
             <p className="text-sm font-medium text-gray-900 mb-2">Bước 2: Upload file đã điền</p>
             {!file ? (
               <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-primary-400 hover:bg-primary-50 transition-all duration-200 group">
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                <div className="flex flex-col items-center justify-center pt-5 pb-6 px-3 text-center">
                   <svg className="w-10 h-10 text-gray-400 mb-3 group-hover:text-primary-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
@@ -132,7 +132,7 @@ const ImportFileDialog: React.FC<ImportFileDialogProps> = ({
           {result && (
             <div>
               <p className="text-sm font-medium text-gray-900 mb-2">Kết quả import</p>
-              <div className="grid grid-cols-4 gap-2 mb-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
                 <div className="bg-gray-100 rounded-lg p-3 text-center">
                   <p className="text-xs text-gray-500">Tổng</p>
                   <p className="text-xl font-bold text-gray-800">{result.summary.total}</p>
@@ -171,7 +171,7 @@ const ImportFileDialog: React.FC<ImportFileDialogProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t">
+        <div className="flex items-center justify-end gap-3 px-4 sm:px-6 py-4 border-t">
           <button
             onClick={handleClose}
             className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
