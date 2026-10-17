@@ -10,6 +10,7 @@ import {
   ArrowPathIcon,
   ExclamationTriangleIcon,
   PencilIcon,
+  ArrowsRightLeftIcon,
   XMarkIcon,
   LinkIcon,
   ArrowTopRightOnSquareIcon,
@@ -349,6 +350,16 @@ const EmployeeShow: React.FC = () => {
               >
                 {generatingSelfUpdateLink ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <LinkIcon className="w-4 h-4" />}
                 Link tự cập nhật hồ sơ
+              </button>
+            )}
+            {canManageEmployee && (
+              <button
+                onClick={() => navigate(`/dashboard/employee-changes?employee=${employee.id}`)}
+                title="Đổi phòng ban / chức vụ / lương từ một ngày, xem lịch sử điều chỉnh"
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors"
+              >
+                <ArrowsRightLeftIcon className="w-4 h-4" />
+                Điều chỉnh nhân sự
               </button>
             )}
             {canManageEmployee && (

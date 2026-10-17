@@ -628,6 +628,10 @@ class EmployeeSerializer(serializers.ModelSerializer):
         """
         Update employee with proper foreign key handling
         """
+        from .employee_change_service import direct_edit_conflict
+        conflict = direct_edit_conflict(instance, validated_data)
+        if conflict:
+            raise serializers.ValidationError({'detail': conflict})
         salary_payload_present = 'basic_salary' in validated_data or 'allowance' in validated_data
         old_basic_salary = instance.basic_salary
         old_allowance = instance.allowance

@@ -28,7 +28,12 @@ def capture_assignment_before_save(sender, instance, raw=False, update_fields=No
         old = type(instance).objects.filter(pk=instance.pk).values(*TRACKED_FIELDS).first()
         if not old or all(_norm(old[f]) == _norm(getattr(instance, f)) for f in fields):
             return
-        record_assignment_snapshot(instance.pk, old, current_personal_shift_ids(instance.pk))
+        record_assignment_snapshot(
+            instance.pk, old, current_personal_shift_ids(instance.pk),
+            # Điều chỉnh nhân sự (hrm/employee_change_service.py) truyền ngày hiệu lực
+            changed_from=getattr(instance, '_assignment_changed_from', None),
+            note=getattr(instance, '_assignment_note', ''),
+        )
     except Exception:
         # Ghi lịch sử là phụ — không được chặn việc lưu hồ sơ nhân viên.
         logger.exception("[AssignmentHistory] Không ghi được lịch sử điều chuyển NV id=%s", instance.pk)

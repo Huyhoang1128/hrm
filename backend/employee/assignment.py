@@ -82,19 +82,21 @@ def current_personal_shift_ids(employee_id) -> list:
     return sorted(ShiftConfig.objects.filter(apply_to_employees=employee_id).values_list('id', flat=True))
 
 
-def record_assignment_snapshot(employee_id, old_values: dict, personal_shift_ids):
+def record_assignment_snapshot(employee_id, old_values: dict, personal_shift_ids, changed_from=None, note=''):
     """Ghi phòng ban/vị trí/Team bác sĩ/hình thức/ca cá nhân CŨ trước khi đổi, áp
-    cho các ngày trước hôm nay. Trong ngày đã có dòng thì thôi: dòng đó đã giữ dữ
-    liệu đầu ngày, các lần đổi sau trong cùng ngày không làm khác gì các ngày trước."""
+    cho các ngày trước `changed_from` (mặc định hôm nay; điều chỉnh nhân sự có ngày hiệu
+    lực truyền đúng ngày áp dụng). Ngày đó đã có dòng thì thôi: dòng đó đã giữ dữ liệu
+    đầu ngày, các lần đổi sau trong cùng ngày không làm khác gì các ngày trước."""
     from django.utils import timezone
     from .models import EmployeeAssignmentHistory
 
-    today = timezone.localdate()
-    if EmployeeAssignmentHistory.objects.filter(employee_id=employee_id, changed_from=today).exists():
+    changed_from = changed_from or timezone.localdate()
+    if EmployeeAssignmentHistory.objects.filter(employee_id=employee_id, changed_from=changed_from).exists():
         return None
     return EmployeeAssignmentHistory.objects.create(
         employee_id=employee_id,
-        changed_from=today,
+        changed_from=changed_from,
+        note=note or '',
         department_id=old_values.get('department_id'),
         position_id=old_values.get('position_id'),
         doctor_team=old_values.get('doctor_team'),

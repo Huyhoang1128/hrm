@@ -49,6 +49,7 @@ services:
         while true; do
           echo '--- Running email queue processor ---'
           python manage.py process_email_queue --batch-size=10 --delay=2
+          python manage.py apply_employee_changes
           echo 'Waiting 5 minutes...'
           sleep 300
         done

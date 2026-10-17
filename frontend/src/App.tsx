@@ -66,6 +66,7 @@ import SalaryAdvance from './pages/SalaryAdvance';
 import RequestTemplates from './pages/RequestTemplates';
 import PaymentDocuments from './pages/PaymentDocuments';
 import ImportantAlerts from './pages/ImportantAlerts';
+import EmployeeChanges from './pages/EmployeeChanges';
 import Onboarding from './pages/Onboarding';
 import OnboardingDetail from './pages/OnboardingDetail';
 import Offboarding from './pages/Offboarding';
@@ -807,6 +808,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <SalaryAdvance />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/employee-changes"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'HR']}>
+                <Layout>
+                  <EmployeeChanges />
                 </Layout>
               </ProtectedRoute>
             }

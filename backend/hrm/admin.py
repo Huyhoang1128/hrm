@@ -26,6 +26,7 @@ from .models import (
 )
 from .event_models import EmployeeEvent, EmployeeEventAuditLog
 from .models import OnlineWorkQuotaOverride, ChildCareRegime
+from .employee_change_models import EmployeeChangeRecord
 
 
 class WorkFinalizationCSVUploadForm(forms.Form):
@@ -3400,3 +3401,18 @@ class ChildCareRegimeAdmin(admin.ModelAdmin):
     list_display = ('employee', 'start_date', 'end_date', 'allowance_minutes', 'note', 'updated_at')
     search_fields = ('employee__employee_id', 'employee__full_name')
     raw_id_fields = ('employee',)
+
+
+
+@admin.register(EmployeeChangeRecord)
+class EmployeeChangeRecordAdmin(admin.ModelAdmin):
+    """Chỉ xem — tạo / huỷ ở trang Điều chỉnh nhân sự."""
+    list_display = ('employee', 'change_type', 'status', 'effective_date', 'created_by_name', 'created_at')
+    list_filter = ('change_type', 'status')
+    search_fields = ('employee__employee_id', 'employee__full_name')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
