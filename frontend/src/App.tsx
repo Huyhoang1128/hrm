@@ -47,6 +47,8 @@ const RequestTemplates = lazy(() => import('./pages/RequestTemplates'));
 const PaymentDocuments = lazy(() => import('./pages/PaymentDocuments'));
 const ImportantAlerts = lazy(() => import('./pages/ImportantAlerts'));
 const EmployeeChanges = lazy(() => import('./pages/EmployeeChanges'));
+const WeeklyShiftPlan = lazy(() => import('./pages/WeeklyShiftPlan'));
+const WeeklyShiftPlanApproval = lazy(() => import('./pages/WeeklyShiftPlanApproval'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const OnboardingDetail = lazy(() => import('./pages/OnboardingDetail'));
 const Offboarding = lazy(() => import('./pages/Offboarding'));
@@ -543,6 +545,26 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <SalaryAdvance />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/weekly-shift-plan"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <WeeklyShiftPlan />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/weekly-shift-plan/approval"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <WeeklyShiftPlanApproval />
                   </Layout>
                 </ProtectedRoute>
               }

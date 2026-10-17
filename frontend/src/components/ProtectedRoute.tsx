@@ -67,6 +67,11 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
         // (Thiếu dòng này thì STAFF bị đá về /home dù menu đã hiện.)
         currentPath === '/dashboard/leave-violations' ||
         currentPath === '/dashboard/salary-advance' ||
+        // Kế hoạch ca tuần: mọi người lập kế hoạch của mình; trang duyệt cho
+        // quản lý (bước 1) và người có quyền duyệt chấm công (bước HCNS).
+        // Backend tự cắt phạm vi danh sách + quyền duyệt.
+        currentPath === '/dashboard/weekly-shift-plan' ||
+        ((isManager || employeePermission?.can_approve_attendance) && currentPath === '/dashboard/weekly-shift-plan/approval') ||
         currentPath === '/dashboard/kpi' ||
         currentPath === '/dashboard/okr' ||
         currentPath === '/dashboard/team-tasks' ||
@@ -126,6 +131,8 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
         currentPath === '/dashboard/meeting-rooms/bookings' ||
         currentPath === '/dashboard/organization-chart' ||
         currentPath === '/dashboard/approvals' ||
+        currentPath === '/dashboard/weekly-shift-plan' ||
+        ((isManager || employeePermission?.can_approve_attendance) && currentPath === '/dashboard/weekly-shift-plan/approval') ||
         currentPath === '/dashboard/onboarding' ||
         currentPath.startsWith('/dashboard/onboarding/') ||
         currentPath === '/dashboard/assigned-assets' ||

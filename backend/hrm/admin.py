@@ -27,6 +27,7 @@ from .models import (
 from .event_models import EmployeeEvent, EmployeeEventAuditLog
 from .models import OnlineWorkQuotaOverride, ChildCareRegime
 from .employee_change_models import EmployeeChangeRecord
+from .shift_plan_models import WeeklyShiftPlan, WeeklyShiftPlanDay, WeeklyShiftPlanLock
 
 
 class WorkFinalizationCSVUploadForm(forms.Form):
@@ -3421,3 +3422,26 @@ class EmployeeChangeRecordAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+class WeeklyShiftPlanDayInline(admin.TabularInline):
+    model = WeeklyShiftPlanDay
+    extra = 0
+    raw_id_fields = ('shift', 'shift_2')
+
+
+@admin.register(WeeklyShiftPlan)
+class WeeklyShiftPlanAdmin(admin.ModelAdmin):
+    list_display = ('employee', 'week_start_date', 'status', 'source', 'direct_manager_approved', 'approved_at')
+    list_filter = ('status', 'source')
+    search_fields = ('employee__employee_id', 'employee__full_name')
+    raw_id_fields = ('employee', 'direct_manager_approved_by', 'approved_by', 'rejected_by')
+    inlines = [WeeklyShiftPlanDayInline]
+
+
+@admin.register(WeeklyShiftPlanLock)
+class WeeklyShiftPlanLockAdmin(admin.ModelAdmin):
+    list_display = ('is_locked', 'note', 'updated_by', 'updated_at')
+
+    def has_add_permission(self, request):
+        return not WeeklyShiftPlanLock.objects.exists()

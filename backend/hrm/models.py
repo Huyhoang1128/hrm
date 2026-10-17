@@ -6031,3 +6031,4 @@ from .payment_document_models import PaymentDocument, PaymentDocumentAttachment 
 
 from .employee_change_models import EmployeeChangeRecord  # noqa: E402,F401
 from .explanation_quota_models import ManagerExplanationQuotaConfig  # noqa: E402,F401
+from .shift_plan_models import WeeklyShiftPlan, WeeklyShiftPlanDay, WeeklyShiftPlanLock  # noqa: E402,F401

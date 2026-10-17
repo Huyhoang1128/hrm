@@ -198,6 +198,19 @@ const navigationItems: NavigationItem[] = [
         roles: ['ADMIN', 'USER', 'CUSTOMER', 'STAFF', 'HR'],
       },
       {
+        name: 'Kế hoạch ca tuần',
+        href: '/dashboard/weekly-shift-plan',
+        icon: CalendarDaysIcon,
+        roles: ['ADMIN', 'USER', 'CUSTOMER', 'STAFF', 'HR'],
+      },
+      {
+        name: 'Duyệt kế hoạch ca',
+        href: '/dashboard/weekly-shift-plan/approval',
+        icon: CheckCircleIcon,
+        roles: ['ADMIN', 'HR'],
+        employeePermission: 'can_approve_attendance',
+      },
+      {
         name: 'Upload chấm công',
         href: '/dashboard/attendance/upload',
         icon: CloudArrowUpIcon,
@@ -618,6 +631,10 @@ export default function Sidebar({ onCollapseChange }: SidebarProps) {
     // các nút thao tác Chốt/Khóa/Xuất bị ẩn trên trang cho role không phải
     // ADMIN/HR). Không mở luôn "Phê duyệt chốt công" — vẫn chỉ dành ADMIN/HR.
     if (isManager && item.name === 'Chốt công') {
+      return true;
+    }
+    // Quản lý duyệt bước 1 kế hoạch ca tuần của nhân viên mình quản lý.
+    if (isManager && item.href === '/dashboard/weekly-shift-plan/approval') {
       return true;
     }
     // Trưởng phòng (is_manager) hoặc NV có quyền "can_manage_recruitment" được xem

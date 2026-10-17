@@ -431,6 +431,34 @@ def find_matching_shift(shift_configs: list, check_in_str: str, check_out_str: s
     return shift_configs[0] if shift_configs else None
 
 
+def _approved_weekly_plan_shifts(employee, target_date, cache=None):
+    """Ca trong kế hoạch ca tuần đã duyệt của ngày target_date: [ca, ca thứ 2] (bỏ trống, xếp
+    theo giờ), [] nếu ngày đó nghỉ, None nếu không có kế hoạch đã duyệt. Nạp cả tháng 1 lần."""
+    import datetime as _datetime
+    from .shift_plan_models import WeeklyShiftPlan, WeeklyShiftPlanDay
+
+    if isinstance(target_date, str):
+        try:
+            target_date = _datetime.date.fromisoformat(target_date[:10])
+        except ValueError:
+            return None
+    if isinstance(target_date, _datetime.datetime):
+        target_date = target_date.date()
+    key = ('__weekly_plan__', employee.id, target_date.year, target_date.month)
+    by_date = cache.get(key) if cache is not None else None
+    if by_date is None:
+        by_date = {}
+        days = (WeeklyShiftPlanDay.objects
+                .filter(plan__employee_id=employee.id, plan__status=WeeklyShiftPlan.Status.APPROVED,
+                        date__year=target_date.year, date__month=target_date.month)
+                .select_related('shift', 'shift_2'))
+        for day in days:
+            by_date[day.date] = sorted((sc for sc in (day.shift, day.shift_2) if sc), key=lambda sc: sc.start_time)
+        if cache is not None:
+            cache[key] = by_date
+    return by_date.get(target_date)
+
+
 def get_registered_shift_configs_for_date(employee, target_date, _scope_cache: dict = None):
     """
     Các ShiftConfig đã ĐĂNG KÝ (tính năng "Đăng ký ca làm") cho nhân viên vào
@@ -465,6 +493,11 @@ def get_registered_shift_configs_for_date(employee, target_date, _scope_cache: d
     """
     if not employee:
         return None
+
+    # Kế hoạch ca theo tuần ĐÃ DUYỆT (hrm/shift_plan_models.py) — ưu tiên trên mọi cơ chế khác.
+    planned = _approved_weekly_plan_shifts(employee, target_date, _scope_cache)
+    if planned is not None:
+        return planned
 
     from .shift_registration_models import ShiftRegistrationScopeConfig, ShiftRegistrationDay
     from employee.assignment import AssignmentResolver
