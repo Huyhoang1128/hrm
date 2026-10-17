@@ -41,6 +41,7 @@ import {
   ExclamationTriangleIcon,
   BanknotesIcon,
   BellAlertIcon,
+  ArrowsRightLeftIcon,
 } from '@heroicons/react/24/outline';
 import { BRAND } from '@/config/brand';
 
@@ -99,6 +100,12 @@ const navigationItems: NavigationItem[] = [
         href: '/dashboard/employees',
         icon: UserIcon,
         roles: ['ADMIN', 'USER'],
+      },
+      {
+        name: 'Điều chỉnh nhân sự',
+        href: '/dashboard/employee-changes',
+        icon: ArrowsRightLeftIcon,
+        roles: ['ADMIN', 'HR'],
       },
       {
         name: 'Cảnh báo quan trọng',

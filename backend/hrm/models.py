@@ -6009,3 +6009,5 @@ class MeetingRoomBookingLog(models.Model):
 from .violation_models import BlockedRequestAttempt, ViolationPenaltyOverride  # noqa: E402,F401
 
 from .payment_document_models import PaymentDocument, PaymentDocumentAttachment  # noqa: E402,F401
+
+from .employee_change_models import EmployeeChangeRecord  # noqa: E402,F401
