@@ -30,7 +30,7 @@ def _dec(row, key) -> Decimal:
 
 def row_metrics(row) -> dict:
     gross = (
-        _dec(row, 'luong_thuc_linh') + _dec(row, 'bh_deduction') + _dec(row, 'tong_phat')
+        _dec(row, 'luong_thuc_linh') + _dec(row, 'bh_deduction') + _dec(row, 'cong_doan') + _dec(row, 'tong_phat')
         + _dec(row, 'tong_phat_bienban') + _dec(row, 'phat_thieu_cong') + _dec(row, 'tam_ung')
     )
     return {

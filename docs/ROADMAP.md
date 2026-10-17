@@ -72,14 +72,6 @@ Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 
 
 ## Nợ kỹ thuật / việc cần xem lại
 
-- **Công đoàn trong tiền trừ lương — backend và giao diện đang lệch nhau** (cần chốt quy tắc):
-  - `build_salary_row` ([finalization_views.py](../backend/hrm/finalization_views.py)) trừ
-    `EMPLOYEE_BH_TOTAL_RATE` = 8% + 1,5% + 1% + **1% công đoàn** = 11,5% mức đóng BH vào
-    `luong_thuc_linh`, và không trừ khoản `cong_doan` của cấu hình lương.
-  - Giao diện bảng lương / phiếu lương (`SalaryManagement.tsx`) và email phiếu lương trừ 10,5% +
-    `cong_doan` theo cấu hình (`payroll_config.deductions.unionFee`).
-  - Hệ quả: `luong_thuc_linh` / `con_phai_thanh_toan` của API (dùng ở báo cáo so sánh, bản chốt lương)
-    có thể khác số hiển thị trên phiếu lương. Cần chọn 1 quy tắc rồi sửa phía còn lại.
 - **Địa điểm làm việc** đang là danh sách cố định (`WORK_LOCATION` trong `employee/models.py` và
   `frontend/src/constants/onboarding.ts`). Nên chuyển thành dữ liệu cấu hình.
 - Migration mới chỉ kiểm tra trên SQLite, **chưa chạy thử trên PostgreSQL**.

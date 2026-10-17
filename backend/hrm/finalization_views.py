@@ -1415,13 +1415,13 @@ def _get_dependent_record_counts(employee_ids, period_start, period_end) -> dict
 # (tổng lương, phiếu lương, email phiếu lương). Không kiểm tra quyền: nơi gọi tự lo.
 # ---------------------------------------------------------------------------
 
-# Tỷ lệ BH/CĐ phần người lao động
+# Tỷ lệ BH phần người lao động: 10,5% mức đóng BH — trừ vào lương và trừ khi tính thuế.
+# Phí công đoàn KHÔNG tính theo tỷ lệ ở đây: lấy khoản cố định trong cấu hình lương của nhân
+# viên (payroll_config.deductions.unionFee, 0 nếu không phải đoàn viên), giống phiếu lương.
 EMPLOYEE_BHXH_RATE = Decimal('0.08')
 EMPLOYEE_BHYT_RATE = Decimal('0.015')
 EMPLOYEE_BHTN_RATE = Decimal('0.01')
-EMPLOYEE_CD_RATE = Decimal('0.01')
-EMPLOYEE_INSURANCE_RATE = EMPLOYEE_BHXH_RATE + EMPLOYEE_BHYT_RATE + EMPLOYEE_BHTN_RATE  # 0.105, trừ khi tính thuế
-EMPLOYEE_BH_TOTAL_RATE = EMPLOYEE_INSURANCE_RATE + EMPLOYEE_CD_RATE  # 0.115, trừ vào lương
+EMPLOYEE_INSURANCE_RATE = EMPLOYEE_BHXH_RATE + EMPLOYEE_BHYT_RATE + EMPLOYEE_BHTN_RATE  # 0.105
 
 
 @dataclass
@@ -1602,7 +1602,7 @@ def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
         ins_base = Decimal('0')
         bh_deduction = Decimal('0')
     else:
-        bh_deduction = ins_base * EMPLOYEE_BH_TOTAL_RATE
+        bh_deduction = ins_base * EMPLOYEE_INSURANCE_RATE
 
     if employee.id in ctx.dependent_counts:
         dependent_count = ctx.dependent_counts[employee.id]
@@ -1668,7 +1668,8 @@ def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
         tax_method = 'PROGRESSIVE'
 
     salary_income_for_net = taxable_basic_income
-    net_salary = salary_income_for_net + total_allowance + sales_commission + other_fixed_income - total_penalty - advance_amount - bh_deduction
+    net_salary = (salary_income_for_net + total_allowance + sales_commission + other_fixed_income
+                  - total_penalty - advance_amount - bh_deduction - union_fee)
     con_phai_thanh_toan = net_salary - pit_amount
 
     return {

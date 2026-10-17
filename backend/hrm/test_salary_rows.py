@@ -97,9 +97,10 @@ class SalaryRowsTests(APITestCase):
         self.assertEqual(len(rows['NV00101']), 52)
         self.assertEqual((rows['NV00101']['cong_thieu'], rows['NV00101']['phat_thieu_cong']), (0, 0))
         expected = {
-            'NV00101': ('PROGRESSIVE', 20_800_000, 20_800_000),
+            # 10,5% BH (1.050.000) + công đoàn theo cấu hình (50.000)
+            'NV00101': ('PROGRESSIVE', 20_850_000, 20_850_000),
             'NV00102': ('FLAT_10_PROBATION', 3_020_000, 2_718_000),
-            'NV00103': ('PROGRESSIVE', 13_780_000, 13_780_000),
+            'NV00103': ('PROGRESSIVE', 13_860_000, 13_860_000),
             'NV00104': ('PROGRESSIVE', 0, 0),
         }
         for code, values in expected.items():
@@ -109,9 +110,10 @@ class SalaryRowsTests(APITestCase):
         self.assertEqual(
             (official['phu_cap'], official['phu_cap_an_trua'], official['phu_cap_gui_xe'], official['luong_doanh_so'],
              official['tong_phat'], official['tong_phat_bienban'], official['bh_deduction'], official['so_nguoi_phu_thuoc']),
-            (400_000, 300_000, 100_000, 1_000_000, 50_000, 200_000, 1_150_000, 1))
+            (400_000, 300_000, 100_000, 1_000_000, 50_000, 200_000, 1_050_000, 1))
+        self.assertEqual(official['cong_doan'], 50_000)
         self.assertEqual((mixed['phu_cap_an_trua'], mixed['tam_ung'], mixed['thu_nhap_khac'], mixed['bh_deduction'],
-                          mixed['so_nguoi_phu_thuoc']), (0, 500_000, 500_000, 920_000, 1))
+                          mixed['so_nguoi_phu_thuoc']), (0, 500_000, 500_000, 840_000, 1))
 
     def test_filters_and_envelope(self):
         data = self._get(department_id=self.dept_a.id)
@@ -135,4 +137,4 @@ class SalaryRowsTests(APITestCase):
         self.client.force_authenticate(self.admin)
         data = self.client.get('/api/v1/salary/records/total-summary/', {'year': YEAR, 'month': MONTH}).data
         self.assertEqual((data['employee_count'], data['total_luong_thuc_linh'], data['total_con_phai_thanh_toan'],
-                          data['total_thue_tncn']), (4, 37_600_000, 37_298_000, 302_000))
+                          data['total_thue_tncn']), (4, 37_730_000, 37_428_000, 302_000))
