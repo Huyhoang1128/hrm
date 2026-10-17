@@ -11941,3 +11941,21 @@ class OnlineWorkQuotaOverrideViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         from .serializers import OnlineWorkQuotaOverrideSerializer
         return OnlineWorkQuotaOverrideSerializer
+
+
+class ChildCareRegimeViewSet(viewsets.ModelViewSet):
+    """/api-hrm/child-care-regimes/ — người hưởng chế độ con nhỏ (Admin/HCNS). Lọc ?employee=<id>.
+    Nhân viên xem chế độ của chính mình qua ghi chú trên lịch chấm công."""
+    permission_classes = [IsAuthenticated, IsAdminOrHR]
+    pagination_class = None
+
+    def get_queryset(self):
+        from .models import ChildCareRegime
+        qs = ChildCareRegime.objects.select_related('employee__department')
+        if employee_id := self.request.query_params.get('employee'):
+            qs = qs.filter(employee_id=employee_id)
+        return qs
+
+    def get_serializer_class(self):
+        from .serializers import ChildCareRegimeSerializer
+        return ChildCareRegimeSerializer

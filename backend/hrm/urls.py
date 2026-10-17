@@ -121,6 +121,7 @@ router.register(r'feedbacks', feedback_views.FeedbackViewSet, basename='feedback
 router.register(r'employee-permissions', views.EmployeePermissionViewSet, basename='employee-permission')
 router.register(r'onboardings', OnboardingProcessViewSet, basename='onboardings')
 router.register(r'online-work-quota-overrides', views.OnlineWorkQuotaOverrideViewSet, basename='online-work-quota-override')
+router.register(r'child-care-regimes', views.ChildCareRegimeViewSet, basename='child-care-regime')
 router.register(r'onboarding-tasks', OnboardingTaskViewSet, basename='onboarding-task')
 router.register(r'onboarding-checklist', OnboardingChecklistViewSet, basename='onboarding-checklist')
 router.register(r'onboarding-documents', OnboardingDocumentViewSet, basename='onboarding-document')
