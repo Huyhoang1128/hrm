@@ -35,6 +35,7 @@ const CompanyConfigEdit: React.FC = () => {
     paternity_leave_days: 14,
     max_explanation_count_per_month: 3,
     supplement_work_hours_per_month: 10.0,
+    lock_employee_self_edit: false,
     is_active: true,
     effective_from: new Date().toISOString().split('T')[0],
     effective_to: '',
@@ -69,6 +70,7 @@ const CompanyConfigEdit: React.FC = () => {
         paternity_leave_days: config.paternity_leave_days,
         max_explanation_count_per_month: config.max_explanation_count_per_month,
         supplement_work_hours_per_month: config.supplement_work_hours_per_month,
+        lock_employee_self_edit: !!config.lock_employee_self_edit,
         is_active: config.is_active,
         effective_from: config.effective_from.split('T')[0],
         effective_to: config.effective_to ? config.effective_to.split('T')[0] : '',
@@ -133,6 +135,7 @@ const CompanyConfigEdit: React.FC = () => {
         paternity_leave_days: Number(formData.paternity_leave_days) || 14,
         max_explanation_count_per_month: Number(formData.max_explanation_count_per_month) || 3,
         supplement_work_hours_per_month: Number(formData.supplement_work_hours_per_month) || 10.0,
+        lock_employee_self_edit: !!formData.lock_employee_self_edit,
         is_active: formData.is_active !== false,
         effective_from: formData.effective_from,
         effective_to: formData.effective_to || undefined,
@@ -567,6 +570,22 @@ const CompanyConfigEdit: React.FC = () => {
               />
               <label htmlFor="is_active" className="text-sm font-medium text-gray-700 cursor-pointer">
                 Kích hoạt cấu hình này
+              </label>
+            </div>
+            <div className="md:col-span-2 flex items-start gap-3 pt-1">
+              <input
+                type="checkbox"
+                name="lock_employee_self_edit"
+                id="lock_employee_self_edit"
+                checked={!!formData.lock_employee_self_edit}
+                onChange={handleInputChange}
+                className="mt-0.5 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+              />
+              <label htmlFor="lock_employee_self_edit" className="text-sm text-gray-700 cursor-pointer">
+                <span className="font-medium">Khoá nhân viên tự sửa hồ sơ</span>
+                <span className="block text-xs text-gray-500">
+                  Bật: nhân viên thường không tự sửa được thông tin cá nhân trên trang Hồ sơ (chỉ HCNS / Admin sửa).
+                </span>
               </label>
             </div>
           </div>

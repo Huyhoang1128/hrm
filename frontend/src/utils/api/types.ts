@@ -316,6 +316,8 @@ export interface DocumentDomain {
 // Employee API Types
 export interface Employee {
   id: number;
+  /** Chỉ có ở /employees/me/: hồ sơ đang bị khoá tự sửa (CompanyConfig.lock_employee_self_edit) */
+  self_edit_locked?: boolean;
   employee_id: string;
   full_name: string;
   gender: 'M' | 'F' | 'O';
@@ -849,6 +851,8 @@ export interface CompanyConfig {
   paternity_leave_days: number;
   max_explanation_count_per_month: number;
   supplement_work_hours_per_month: number;
+  /** Bật: nhân viên thường không tự sửa được hồ sơ của mình */
+  lock_employee_self_edit?: boolean;
   is_active: boolean;
   effective_from: string;
   effective_to?: string;

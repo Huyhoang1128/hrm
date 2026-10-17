@@ -2346,6 +2346,13 @@ class CompanyConfig(models.Model):
     max_leave_count_per_month = models.DecimalField(max_digits=4, decimal_places=1, default=1.0,
                                                     verbose_name="Số ngày nghỉ phép tháng tối đa mỗi tháng")
     max_online_work_count_per_month = models.DecimalField(max_digits=4, decimal_places=1, default=3.0, verbose_name="Số ngày làm việc online tối đa mỗi tháng")
+
+    # Hồ sơ nhân viên
+    lock_employee_self_edit = models.BooleanField(
+        default=False, verbose_name="Khoá nhân viên tự sửa hồ sơ",
+        help_text="Bật: nhân viên thường không tự sửa được thông tin cá nhân trên hồ sơ của mình "
+                  "(chỉ HCNS / Admin sửa). Tắt: được tự sửa các trường thông tin cá nhân.",
+    )
     
     # Trạng thái
     is_active = models.BooleanField(default=True, verbose_name="Đang hoạt động")
