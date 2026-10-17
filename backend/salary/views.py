@@ -17,7 +17,7 @@ from hrm.models import MonthlyWorkCredit, CompanyAnnouncement
 from users.utils import get_user_role
 
 from .models import MonthlySalaryRecord, SalaryComponent, SalaryFormula, SalaryComponentOverride
-from .salary_data_models import EmployeeSalaryHistory, EmployeeKPIRecord, TaxBracketConfig, TaxBracket, DisciplinaryPenalty, SalesCommission, OvertimeRateConfig, SalaryAdvance, OtherAllowance, ParkingAllowanceOverride, LunchAllowanceOverride, EmployeeMonthlySalaryInput
+from .salary_data_models import EmployeeSalaryHistory, EmployeeKPIRecord, TaxBracketConfig, TaxBracket, DisciplinaryPenalty, SalesCommission, OvertimeRateConfig, SalaryAdvance, OtherAllowance, ParkingAllowanceOverride, LunchAllowanceOverride, EmployeeMonthlySalaryInput, MissingWorkdayPenalty
 from .salary_engine import SalaryRuleEngine
 from .serializers import (
     ApproveSalarySerializer,
@@ -31,6 +31,7 @@ from .serializers import (
     OtherAllowanceSerializer,
     ParkingAllowanceOverrideSerializer,
     LunchAllowanceOverrideSerializer,
+    MissingWorkdayPenaltySerializer,
     SalaryAdvanceSerializer,
     CalculateSalarySerializer,
     DisciplinaryPenaltySerializer,
@@ -313,6 +314,7 @@ def _build_default_payslip_body(record: dict, year: int, month: int) -> str:
     cong_doan = float(record.get('cong_doan') or 0)
     phat_di_muon = float(record.get('tong_phat') or 0)
     phat_bien_ban = float(record.get('tong_phat_bienban') or 0)
+    phat_thieu_cong = float(record.get('phat_thieu_cong') or 0)
     thue_tncn = float(record.get('thue_tncn') or 0)
     tam_ung = float(record.get('tam_ung') or 0)
     dieu_chinh = float(record.get('dieu_chinh') or 0)
@@ -334,7 +336,7 @@ def _build_default_payslip_body(record: dict, year: int, month: int) -> str:
     tong_luong_iii = luong_ngay_cong + luong_doanh_so + luong_ot + ban_san_pham + phu_mo + luong_truc_ca + thu_nhap_khac
     tong_phu_cap_iv = phu_cap_gui_xe + phu_cap_an_trua + phu_cap_remainder
     tong_thu_nhap = tong_luong_iii + tong_phu_cap_iv + thuong
-    tong_giam_tru = bhxh + bhyt + bhtn + cong_doan + phat_di_muon + phat_bien_ban
+    tong_giam_tru = bhxh + bhyt + bhtn + cong_doan + phat_di_muon + phat_bien_ban + phat_thieu_cong
     luong_thuc_linh = tong_thu_nhap - tong_giam_tru + dieu_chinh
     con_phai_thanh_toan = luong_thuc_linh - tam_ung - thue_tncn
 
@@ -387,6 +389,7 @@ def _build_default_payslip_body(record: dict, year: int, month: int) -> str:
         *([ f"  Công đoàn          : -{_fmtN(cong_doan)}" ] if cong_doan else []),
         *([ f"  Phạt đi muộn       : -{_fmtN(phat_di_muon)}" ] if phat_di_muon else []),
         *([ f"  Phạt (biên bản)    : -{_fmtN(phat_bien_ban)}" ] if phat_bien_ban else []),
+        *([ f"  Phạt thiếu công    : -{_fmtN(phat_thieu_cong)}" ] if phat_thieu_cong else []),
         *([ f"  Thuế TNCN          : -{_fmtN(thue_tncn)}" ] if thue_tncn else []),
         *([ f"  Tạm ứng            : -{_fmtN(tam_ung)}" ] if tam_ung else []),
         "════════════════════════════════════════",
@@ -2724,3 +2727,19 @@ class OvertimeRateConfigViewSet(viewsets.ModelViewSet):
             except Employee.DoesNotExist:
                 pass
         serializer.save(created_by=employee)
+
+
+class MissingWorkdayPenaltyViewSet(viewsets.ModelViewSet):
+    """
+    CRUD danh sách phạt thiếu công (salary.MissingWorkdayPenalty) — chỉ Admin.
+    Filter: ?employee=<id>
+    """
+    serializer_class = MissingWorkdayPenaltySerializer
+    permission_classes = [IsAuthenticated, SalaryAdminPermission]
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = MissingWorkdayPenalty.objects.select_related('employee', 'employee__department')
+        if employee_id := self.request.query_params.get('employee'):
+            qs = qs.filter(employee_id=employee_id)
+        return qs

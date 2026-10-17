@@ -31,6 +31,7 @@ import {
 } from '../services/salary.service';
 import { SelectBox } from '../components/LandingLayout/SelectBox';
 import Pagination from '../components/Pagination';
+import MissingWorkdayPenaltyTab from '../components/MissingWorkdayPenaltyTab';
 import { employeesAPI } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -95,7 +96,7 @@ interface ParsedMonthlyInputRow {
   parseError?: string;
 }
 
-type TabKey = 'commission' | 'penalty' | 'other_allowance' | 'parking_allowance' | 'lunch_allowance' | 'salary_adjustment' | 'monthly_input';
+type TabKey = 'commission' | 'penalty' | 'other_allowance' | 'parking_allowance' | 'lunch_allowance' | 'salary_adjustment' | 'monthly_input' | 'missing_workday_penalty';
 
 interface AddFormState {
   open: boolean;
@@ -131,6 +132,7 @@ const TABS: { key: TabKey; label: string; icon: React.ElementType; hrAllowed?: b
   { key: 'lunch_allowance',   label: 'Phụ Cấp Ăn Trưa', icon: CurrencyDollarIcon, hrAllowed: true },
   { key: 'salary_adjustment', label: 'Điều Chỉnh Lương', icon: CurrencyDollarIcon },
   { key: 'monthly_input', label: 'Dữ Liệu Lương Tháng', icon: CurrencyDollarIcon },
+  { key: 'missing_workday_penalty', label: 'Phạt Thiếu Công', icon: ExclamationCircleIcon },
 ];
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -222,6 +224,7 @@ const SalaryData: React.FC = () => {
     lunch_allowance: { ...INITIAL_ADD_FORM_STATE },
     salary_adjustment: { ...INITIAL_ADD_FORM_STATE },
     monthly_input: { ...INITIAL_ADD_FORM_STATE },
+    missing_workday_penalty: { ...INITIAL_ADD_FORM_STATE },
   });
 
   // ── Commission state ──
@@ -542,7 +545,8 @@ const SalaryData: React.FC = () => {
     else if (activeTab === 'penalty') loadPenalties(selectedMonth, selectedYear);
     else if (activeTab === 'other_allowance') loadOtherAllowances(selectedMonth, selectedYear);
     else if (activeTab === 'salary_adjustment') loadSalaryAdjustments(selectedMonth, selectedYear);
-    else loadMonthlyInputs(selectedMonth, selectedYear);
+    else if (activeTab === 'monthly_input') loadMonthlyInputs(selectedMonth, selectedYear);
+    // 'missing_workday_penalty': danh sách không theo tháng, tab tự tải
   }, [activeTab, selectedMonth, selectedYear, isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // HR (không phải Admin) chỉ được dùng các tab phụ cấp gửi xe / ăn trưa — ép về tab
@@ -2268,7 +2272,7 @@ const SalaryData: React.FC = () => {
             <SelectBox<number> label="Năm" value={selectedYear} options={YEARS.map((y) => ({ value: y, label: String(y) }))} onChange={handleYearChange} />
           </div>
           <button
-            onClick={() => activeTab === 'commission' ? loadCommissions() : activeTab === 'penalty' ? loadPenalties() : activeTab === 'other_allowance' ? loadOtherAllowances() : activeTab === 'parking_allowance' ? loadParkingAllowances() : activeTab === 'lunch_allowance' ? loadLunchAllowances() : activeTab === 'salary_adjustment' ? loadSalaryAdjustments() : loadMonthlyInputs()}
+            onClick={() => activeTab === 'commission' ? loadCommissions() : activeTab === 'penalty' ? loadPenalties() : activeTab === 'other_allowance' ? loadOtherAllowances() : activeTab === 'parking_allowance' ? loadParkingAllowances() : activeTab === 'lunch_allowance' ? loadLunchAllowances() : activeTab === 'salary_adjustment' ? loadSalaryAdjustments() : activeTab === 'monthly_input' ? loadMonthlyInputs() : undefined}
             disabled={loadingCommission || loadingPenalty || loadingO || loadingPa || loadingLa || loadingS || loadingM}
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-700 disabled:opacity-60 transition-colors"
           >
@@ -3273,6 +3277,9 @@ const SalaryData: React.FC = () => {
               </div>
             </>
           )}
+
+          {/* ═══ TAB PHẠT THIẾU CÔNG ═══ */}
+          {activeTab === 'missing_workday_penalty' && <MissingWorkdayPenaltyTab />}
 
           {/* ═══ TAB PHẠT BIÊN BẢN ═══ */}
           {activeTab === 'penalty' && (

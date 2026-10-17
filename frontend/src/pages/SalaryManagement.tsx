@@ -364,7 +364,8 @@ const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose
     (savedConfig?.deductions as Record<string, number> | undefined)?.unionFee ?? 0);
   const phatDiMuon = record.tong_phat ?? 0;
   const phatBienBan = record.tong_phat_bienban ?? 0;
-  const tongGiamTruVII = tongBH + congDoan + phatDiMuon + phatBienBan;
+  const phatThieuCong = record.phat_thieu_cong ?? 0;
+  const tongGiamTruVII = tongBH + congDoan + phatDiMuon + phatBienBan + phatThieuCong;
   const dieuChinhVIII = (record as unknown as Record<string, number>)['dieu_chinh'] ?? 0;
   const tamUng = record.tam_ung ?? 0;
   const taxDetail = payrollTax.taxDetail;
@@ -434,6 +435,7 @@ const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose
       ...(congDoan ? [`  Công đoàn          : -${fmtN(congDoan)}`] : []),
       ...(phatDiMuon ? [`  Phạt đi muộn       : -${fmtN(phatDiMuon)}`] : []),
       ...(phatBienBan ? [`  Phạt (biên bản)    : -${fmtN(phatBienBan)}`] : []),
+      ...(phatThieuCong ? [`  Phạt thiếu công    : -${fmtN(phatThieuCong)}`] : []),
       ...(thue ? [`  Thuế TNCN          : -${fmtN(thue)}`] : []),
       ...(tamUng ? [`  Tạm ứng            : -${fmtN(tamUng)}`] : []),
       '════════════════════════════════════════',
@@ -810,8 +812,10 @@ const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose
               </tr>
               <tr>
                 <td className="border border-gray-300 px-3 py-2 text-center text-gray-500">21</td>
-                <td className="border border-gray-300 px-3 py-2 text-gray-700">Phạt đi muộn + phạt biên bản</td>
-                <td className="border border-gray-300 px-3 py-2 text-right text-red-600">{(phatDiMuon + phatBienBan) > 0 ? fmt(phatDiMuon + phatBienBan) : '—'}</td>
+                <td className="border border-gray-300 px-3 py-2 text-gray-700">
+                  Phạt đi muộn + phạt biên bản{phatThieuCong > 0 ? ' + phạt thiếu công' : ''}
+                </td>
+                <td className="border border-gray-300 px-3 py-2 text-right text-red-600">{(phatDiMuon + phatBienBan + phatThieuCong) > 0 ? fmt(phatDiMuon + phatBienBan + phatThieuCong) : '—'}</td>
               </tr>
               <tr className="bg-red-50">
                 <td className="border border-gray-300 px-3 py-2 text-center font-semibold text-red-700" colSpan={2}>
@@ -1621,7 +1625,8 @@ const calculatePayslipNetPayable = (record: SalaryRecord, employee?: Employee, c
   const congDoan = toNumber((record as unknown as Record<string, number>)['cong_doan'],
     (savedConfig?.deductions as Record<string, number> | undefined)?.unionFee ?? 0);
 
-  const tongGiamTruVII = payrollTax.insuranceTotal + congDoan + (record.tong_phat ?? 0) + (record.tong_phat_bienban ?? 0);
+  const tongGiamTruVII = payrollTax.insuranceTotal + congDoan + (record.tong_phat ?? 0) + (record.tong_phat_bienban ?? 0)
+    + (record.phat_thieu_cong ?? 0);
   const dieuChinhVIII = (record as unknown as Record<string, number>)['dieu_chinh'] ?? 0;
   const tamUng = record.tam_ung ?? 0;
   const luongThucLinh = tongThuNhapVI - tongGiamTruVII + dieuChinhVIII;
@@ -2974,6 +2979,7 @@ const PAYROLL_EXCEL_COLUMNS = [
     { header: 'Công đoàn', key: 'cong_doan', width: 12 },
     { header: 'Phạt đi muộn', key: 'tong_phat', width: 14 },
     { header: 'Phạt biên bản', key: 'tong_phat_bienban', width: 14 },
+    { header: 'Phạt thiếu công', key: 'phat_thieu_cong', width: 14 },
     { header: 'Tổng giảm trừ (VII)', key: 'tong_giam_tru_vii', width: 18 },
     { header: 'Điều chỉnh (VIII)', key: 'dieu_chinh', width: 16 },
     { header: 'Thuế TNCN (X)', key: 'thue_tncn', width: 14 },
@@ -3008,6 +3014,7 @@ const PAYROLL_SUM_KEYS = [
   'cong_doan',
   'tong_phat',
   'tong_phat_bienban',
+  'phat_thieu_cong',
   'tong_giam_tru_vii',
   'dieu_chinh',
   'thue_tncn',
@@ -3117,7 +3124,8 @@ const buildPayrollExcelRow = (
     (savedConfig?.deductions as Record<string, number> | undefined)?.unionFee ?? 0);
   const tongPhat = record.tong_phat ?? 0;
   const tongPhatBienBan = record.tong_phat_bienban ?? 0;
-  const tongGiamTruVII = tongBH + congDoan + tongPhat + tongPhatBienBan;
+  const tongPhatThieuCong = record.phat_thieu_cong ?? 0;
+  const tongGiamTruVII = tongBH + congDoan + tongPhat + tongPhatBienBan + tongPhatThieuCong;
   const dieuChinhVIII = (record as unknown as Record<string, number>)['dieu_chinh'] ?? 0;
   const tamUng = record.tam_ung ?? 0;
   const thue = payrollTax.taxAmount;
@@ -3154,6 +3162,7 @@ const buildPayrollExcelRow = (
     cong_doan: Math.round(congDoan),
     tong_phat: Math.round(tongPhat),
     tong_phat_bienban: Math.round(tongPhatBienBan),
+    phat_thieu_cong: Math.round(tongPhatThieuCong),
     tong_giam_tru_vii: Math.round(tongGiamTruVII),
     dieu_chinh: Math.round(dieuChinhVIII),
     thue_tncn: Math.round(thue),
@@ -3588,7 +3597,8 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
         (savedConfig?.deductions as Record<string, number> | undefined)?.unionFee ?? 0);
       const tongPhat = record.tong_phat ?? 0;
       const tongPhatBienBan = record.tong_phat_bienban ?? 0;
-      const tongGiamTruVII = tongBH + congDoan + tongPhat + tongPhatBienBan;
+      const tongPhatThieuCong = record.phat_thieu_cong ?? 0;
+      const tongGiamTruVII = tongBH + congDoan + tongPhat + tongPhatBienBan + tongPhatThieuCong;
       const dieuChinhVIII = (record as unknown as Record<string, number>)['dieu_chinh'] ?? 0;
       const tamUng = record.tam_ung ?? 0;
       const thue = payrollTax.taxAmount;
@@ -3625,6 +3635,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
         cong_doan: Math.round(congDoan),
         tong_phat: Math.round(tongPhat),
         tong_phat_bienban: Math.round(tongPhatBienBan),
+        phat_thieu_cong: Math.round(tongPhatThieuCong),
         tong_giam_tru_vii: Math.round(tongGiamTruVII),
         dieu_chinh: Math.round(dieuChinhVIII),
         thue_tncn: Math.round(thue),
@@ -4610,7 +4621,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                           <td className="px-3 py-3 text-right text-gray-700">{formatCurrency((record as unknown as Record<string, number>)['phu_cap_livestream'] ?? 0)}</td>
                           <td className="px-3 py-3 text-right text-gray-700">{formatNumber(record.tong_cong)}</td>
                           <td className="px-3 py-3 text-right text-blue-600">{formatCurrency(incomeBreakdown.luongOt)}</td>
-                          <td className="px-3 py-3 text-right text-red-600">{formatCurrency((record.tong_phat ?? 0) + (record.tong_phat_bienban ?? 0))}</td>
+                          <td className="px-3 py-3 text-right text-red-600">{formatCurrency((record.tong_phat ?? 0) + (record.tong_phat_bienban ?? 0) + (record.phat_thieu_cong ?? 0))}</td>
                           <td className="px-3 py-3 font-semibold text-red-700 bg-red-50">
                             <div className="flex items-center justify-end gap-1.5">
                               {formatCurrency(recordTax)}
@@ -5447,6 +5458,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                     <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Công đoàn</th>
                     <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Phạt đi muộn</th>
                     <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Phạt biên bản</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Phạt thiếu công</th>
                     <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Tổng giảm trừ VII</th>
                     <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Điều chỉnh VIII</th>
                     <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Thuế TNCN X</th>
@@ -5489,6 +5501,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                       <td className="px-3 py-2 text-right text-gray-700">{formatCurrency(row.cong_doan)}</td>
                       <td className="px-3 py-2 text-right text-gray-700">{formatCurrency(row.tong_phat)}</td>
                       <td className="px-3 py-2 text-right text-gray-700">{formatCurrency(row.tong_phat_bienban)}</td>
+                      <td className="px-3 py-2 text-right text-gray-700">{formatCurrency(row.phat_thieu_cong)}</td>
                       <td className="px-3 py-2 text-right text-red-700">{formatCurrency(row.tong_giam_tru_vii)}</td>
                       <td className="px-3 py-2 text-right text-gray-700">{formatCurrency(row.dieu_chinh)}</td>
                       <td className="px-3 py-2 text-right text-red-700">{formatCurrency(row.thue_tncn)}</td>
