@@ -634,6 +634,12 @@ export interface CompanyConfig {
   supplement_work_hours_per_month: number;
   /** Bật: nhân viên thường không tự sửa được hồ sơ của mình */
   lock_employee_self_edit?: boolean;
+  /** COMBINED: 1 hạn mức giải trình chung; PER_TYPE: hạn mức riêng từng loại + rổ gộp */
+  explanation_quota_mode?: 'COMBINED' | 'PER_TYPE';
+  max_late_explanation_per_month?: number;
+  max_early_leave_explanation_per_month?: number;
+  max_incomplete_attendance_explanation_per_month?: number;
+  manager_combined_explanation_quota?: number;
   is_active: boolean;
   effective_from: string;
   effective_to?: string;

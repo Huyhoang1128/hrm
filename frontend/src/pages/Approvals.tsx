@@ -2324,7 +2324,8 @@ const Approvals: React.FC = () => {
         const empId = Number(item.employee_id || (typeof item.employee === 'object' ? item.employee.id : item.employee));
         const dateStr = item.event_date || item.attendance_date || item.date || item.created_at;
         const d = new Date(dateStr);
-        const key = `${empId}-${d.getFullYear()}-${d.getMonth() + 1}`;
+        // Hạn mức theo từng loại: tách thêm theo giỏ (quota_bucket = null khi dùng chung 1 giỏ)
+        const key = `${empId}-${d.getFullYear()}-${d.getMonth() + 1}-${item.quota_bucket ?? ''}`;
         if (!groups[key]) groups[key] = [];
         groups[key].push(item);
       });

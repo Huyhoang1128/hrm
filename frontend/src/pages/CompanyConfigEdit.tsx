@@ -36,6 +36,11 @@ const CompanyConfigEdit: React.FC = () => {
     max_explanation_count_per_month: 3,
     supplement_work_hours_per_month: 10.0,
     lock_employee_self_edit: false,
+    explanation_quota_mode: 'COMBINED',
+    max_late_explanation_per_month: 1,
+    max_early_leave_explanation_per_month: 1,
+    max_incomplete_attendance_explanation_per_month: 1,
+    manager_combined_explanation_quota: 5,
     is_active: true,
     effective_from: new Date().toISOString().split('T')[0],
     effective_to: '',
@@ -71,6 +76,11 @@ const CompanyConfigEdit: React.FC = () => {
         max_explanation_count_per_month: config.max_explanation_count_per_month,
         supplement_work_hours_per_month: config.supplement_work_hours_per_month,
         lock_employee_self_edit: !!config.lock_employee_self_edit,
+        explanation_quota_mode: config.explanation_quota_mode || 'COMBINED',
+        max_late_explanation_per_month: config.max_late_explanation_per_month ?? 1,
+        max_early_leave_explanation_per_month: config.max_early_leave_explanation_per_month ?? 1,
+        max_incomplete_attendance_explanation_per_month: config.max_incomplete_attendance_explanation_per_month ?? 1,
+        manager_combined_explanation_quota: config.manager_combined_explanation_quota ?? 5,
         is_active: config.is_active,
         effective_from: config.effective_from.split('T')[0],
         effective_to: config.effective_to ? config.effective_to.split('T')[0] : '',
@@ -136,6 +146,11 @@ const CompanyConfigEdit: React.FC = () => {
         max_explanation_count_per_month: Number(formData.max_explanation_count_per_month) || 3,
         supplement_work_hours_per_month: Number(formData.supplement_work_hours_per_month) || 10.0,
         lock_employee_self_edit: !!formData.lock_employee_self_edit,
+        explanation_quota_mode: formData.explanation_quota_mode === 'PER_TYPE' ? 'PER_TYPE' : 'COMBINED',
+        max_late_explanation_per_month: Number(formData.max_late_explanation_per_month) || 0,
+        max_early_leave_explanation_per_month: Number(formData.max_early_leave_explanation_per_month) || 0,
+        max_incomplete_attendance_explanation_per_month: Number(formData.max_incomplete_attendance_explanation_per_month) || 0,
+        manager_combined_explanation_quota: Number(formData.manager_combined_explanation_quota) || 0,
         is_active: formData.is_active !== false,
         effective_from: formData.effective_from,
         effective_to: formData.effective_to || undefined,
@@ -512,6 +527,74 @@ const CompanyConfigEdit: React.FC = () => {
                 max="100"
                 className="input-field w-full"
                 required
+              />
+            </div>
+            <div className="md:col-span-2 border-t border-gray-100 pt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Cách tính hạn mức giải trình</label>
+              <select
+                name="explanation_quota_mode"
+                value={formData.explanation_quota_mode || 'COMBINED'}
+                onChange={handleInputChange}
+                className="input-field w-full"
+              >
+                <option value="COMBINED">Chung cho mọi loại (dùng "Số lần giải trình tối đa/tháng")</option>
+                <option value="PER_TYPE">Theo từng loại (Đi muộn / Về sớm / Quên chấm công)</option>
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Theo từng loại: mỗi loại một hạn mức riêng; nhân viên trong danh sách "Rổ gộp giải trình" (Quản lý phân
+                quyền) dùng chung 1 rổ cho mọi loại.
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Đi muộn / tháng</label>
+              <input
+                type="number"
+                name="max_late_explanation_per_month"
+                value={formData.max_late_explanation_per_month ?? 0}
+                onChange={handleInputChange}
+                min="0"
+                max="100"
+                disabled={formData.explanation_quota_mode !== 'PER_TYPE'}
+                className="input-field w-full disabled:bg-gray-50 disabled:text-gray-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Về sớm / tháng</label>
+              <input
+                type="number"
+                name="max_early_leave_explanation_per_month"
+                value={formData.max_early_leave_explanation_per_month ?? 0}
+                onChange={handleInputChange}
+                min="0"
+                max="100"
+                disabled={formData.explanation_quota_mode !== 'PER_TYPE'}
+                className="input-field w-full disabled:bg-gray-50 disabled:text-gray-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Quên chấm công / tháng</label>
+              <input
+                type="number"
+                name="max_incomplete_attendance_explanation_per_month"
+                value={formData.max_incomplete_attendance_explanation_per_month ?? 0}
+                onChange={handleInputChange}
+                min="0"
+                max="100"
+                disabled={formData.explanation_quota_mode !== 'PER_TYPE'}
+                className="input-field w-full disabled:bg-gray-50 disabled:text-gray-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Rổ gộp / tháng</label>
+              <input
+                type="number"
+                name="manager_combined_explanation_quota"
+                value={formData.manager_combined_explanation_quota ?? 0}
+                onChange={handleInputChange}
+                min="0"
+                max="100"
+                disabled={formData.explanation_quota_mode !== 'PER_TYPE'}
+                className="input-field w-full disabled:bg-gray-50 disabled:text-gray-400"
               />
             </div>
 

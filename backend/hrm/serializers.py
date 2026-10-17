@@ -22,7 +22,7 @@ from datetime import timedelta
 from dateutil.relativedelta import relativedelta
 from users.utils import get_user_display_name
 from employee.models import PROBATION_CONTRACT_TYPES, OFFICIAL_LABOR_CONTRACT_TYPES, probation_months_for
-from .models import OnlineWorkQuotaOverride, ChildCareRegime
+from .models import OnlineWorkQuotaOverride, ChildCareRegime, ManagerExplanationQuotaConfig
 logger = logging.getLogger(__name__)
 
 
@@ -1941,6 +1941,8 @@ class CompanyConfigSerializer(serializers.ModelSerializer):
             'max_explanation_count_per_month', 'supplement_work_hours_per_month',
             'max_leave_count_per_month', 'max_online_work_count_per_month',
             'lock_employee_self_edit',
+            'explanation_quota_mode', 'max_late_explanation_per_month', 'max_early_leave_explanation_per_month',
+            'max_incomplete_attendance_explanation_per_month', 'manager_combined_explanation_quota',
             'is_active', 'effective_from', 'effective_to',
             'created_at', 'updated_at', 'created_by', 'created_by_name', 'created_by_id',
             'is_current'
@@ -6348,3 +6350,28 @@ class ChildCareRegimeSerializer(serializers.ModelSerializer):
                     'start_date': f'{employee.full_name} đã có chế độ con nhỏ trùng khoảng ngày này.',
                 })
         return attrs
+
+
+class ManagerExplanationQuotaConfigSerializer(serializers.ModelSerializer):
+    """Danh sách nhân viên dùng rổ gộp hạn mức giải trình (singleton). PUT danh sách = thay thế toàn bộ."""
+    eligible_employees = serializers.PrimaryKeyRelatedField(many=True, queryset=Employee.objects.all(), required=False)
+    eligible_employees_detail = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ManagerExplanationQuotaConfig
+        fields = ['id', 'eligible_employees', 'eligible_employees_detail', 'updated_at']
+        read_only_fields = ['updated_at']
+
+    def get_eligible_employees_detail(self, obj):
+        return [
+            {'id': e.id, 'employee_id': e.employee_id, 'full_name': e.full_name,
+             'department_name': e.department.name if e.department_id else None}
+            for e in obj.eligible_employees.select_related('department').all()
+        ]
+
+    def update(self, instance, validated_data):
+        employees = validated_data.pop('eligible_employees', None)
+        if employees is not None:
+            instance.eligible_employees.set(employees)
+        instance.save()
+        return instance

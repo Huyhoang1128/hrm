@@ -1896,6 +1896,32 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
         </div>
       )}
 
+      {/* Hạn mức theo từng loại: số đã dùng / tối đa của từng giỏ */}
+      {engineSummary?.explanation_quota_mode === 'PER_TYPE' && engineSummary.explanation_quota_by_type && (
+        <div className="px-2.5 pb-2.5 md:px-6 md:pb-3 border-b border-gray-100 bg-amber-50/30 flex flex-wrap items-center gap-2">
+          {engineSummary.explanation_quota_shared ? (
+            <span className="text-[10px] md:text-xs font-semibold text-amber-700">
+              {engineSummary.is_manager_combined_quota ? 'Rổ gộp: ' : ''}dùng chung cho Đi muộn / Về sớm / Quên chấm công
+            </span>
+          ) : (
+            ([['LATE', 'Đi muộn'], ['EARLY_LEAVE', 'Về sớm'], ['INCOMPLETE_ATTENDANCE', 'Quên chấm công']] as const).map(([key, label]) => {
+              const q = engineSummary.explanation_quota_by_type[key];
+              if (!q) return null;
+              return (
+                <span
+                  key={key}
+                  className={`rounded-full border px-2 py-0.5 text-[10px] md:text-xs font-semibold ${
+                    q.remaining > 0 ? 'border-amber-200 bg-white text-amber-800' : 'border-red-200 bg-red-50 text-red-600'
+                  }`}
+                >
+                  {label}: {q.used}/{q.max} lần
+                </span>
+              );
+            })
+          )}
+        </div>
+      )}
+
       <div className="p-2.5 md:p-5">
         {/* ===== DESKTOP: Calendar Grid (md+) ===== */}
         <div className="hidden md:block">

@@ -156,13 +156,22 @@ def get_employee_monthly_stats(employee, date, company_config=None):
     # _get_quota_remaining() tự gọi lại _get_quota_used() (query trùng) VÀ tự
     # fetch lại CompanyConfig (query trùng thứ 2), nhân đôi số query không cần
     # thiết cho MỌI lời gọi hàm này (kể cả đơn lẻ).
-    quota_used = _get_quota_used(employee, date)
-    quota_remaining = max(0, max_quota - quota_used) if date else 3
+    # Hạn mức giải trình (hrm/explanation_quota.py): COMBINED như trước; theo từng loại thì
+    # quota_* là tổng các giỏ, chi tiết từng giỏ ở explanation_quota_by_type.
+    from .explanation_quota import explanation_quota_status
+    quota_status = explanation_quota_status(employee, date, company_config)
+    quota_used = quota_status['combined']['used']
+    quota_remaining = quota_status['combined']['remaining'] if date else 3
+    max_quota = quota_status['combined']['max']
 
     return {
         'quota_used': quota_used,
         'quota_remaining': quota_remaining,
         'max_explanation_quota': max_quota,
+        'explanation_quota_mode': quota_status['mode'],
+        'explanation_quota_shared': quota_status['shared'],
+        'is_manager_combined_quota': quota_status['is_manager_combined_quota'],
+        'explanation_quota_by_type': quota_status['by_type'],
         'online_work_used': _get_online_work_used(employee, date),
         'max_online_quota': max_online_quota,
         'leave_used': _get_leave_used(employee, date),

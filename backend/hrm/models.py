@@ -2353,6 +2353,25 @@ class CompanyConfig(models.Model):
         help_text="Bật: nhân viên thường không tự sửa được thông tin cá nhân trên hồ sơ của mình "
                   "(chỉ HCNS / Admin sửa). Tắt: được tự sửa các trường thông tin cá nhân.",
     )
+
+    # Hạn mức giải trình theo từng loại (hrm/explanation_quota.py) — mặc định COMBINED:
+    # dùng chung max_explanation_count_per_month như trước.
+    EXPLANATION_QUOTA_MODES = [
+        ('COMBINED', 'Chung cho mọi loại'),
+        ('PER_TYPE', 'Theo từng loại'),
+    ]
+    explanation_quota_mode = models.CharField(
+        max_length=10, choices=EXPLANATION_QUOTA_MODES, default='COMBINED',
+        verbose_name="Cách tính hạn mức giải trình",
+    )
+    max_late_explanation_per_month = models.PositiveSmallIntegerField(
+        default=1, verbose_name="Hạn mức giải trình Đi muộn / tháng (theo từng loại)")
+    max_early_leave_explanation_per_month = models.PositiveSmallIntegerField(
+        default=1, verbose_name="Hạn mức giải trình Về sớm / tháng (theo từng loại)")
+    max_incomplete_attendance_explanation_per_month = models.PositiveSmallIntegerField(
+        default=1, verbose_name="Hạn mức giải trình Quên chấm công / tháng (theo từng loại)")
+    manager_combined_explanation_quota = models.PositiveSmallIntegerField(
+        default=5, verbose_name="Rổ gộp giải trình / tháng (nhân viên trong danh sách rổ gộp)")
     
     # Trạng thái
     is_active = models.BooleanField(default=True, verbose_name="Đang hoạt động")
@@ -6011,3 +6030,4 @@ from .violation_models import BlockedRequestAttempt, ViolationPenaltyOverride  #
 from .payment_document_models import PaymentDocument, PaymentDocumentAttachment  # noqa: E402,F401
 
 from .employee_change_models import EmployeeChangeRecord  # noqa: E402,F401
+from .explanation_quota_models import ManagerExplanationQuotaConfig  # noqa: E402,F401

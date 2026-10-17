@@ -1384,17 +1384,20 @@ class AttendanceExplanationViewSet(BulkRejectMixin, FinalizationLockMixin, views
         _QUOTA_SUBJECT_TYPES = ('LATE', 'EARLY_LEAVE', 'LATE_EARLY')
         _explanation_type = str((event.data or {}).get('explanation_type', '')).upper()
         if _explanation_type in _QUOTA_SUBJECT_TYPES:
-            from .stats_utils import _get_quota_used
-            _cfg = CompanyConfig.objects.filter(is_active=True).order_by('-effective_from').first()
-            _max_quota = _cfg.max_explanation_count_per_month if _cfg else 3
-            _quota_used = _get_quota_used(event.employee, event.event_date)
+            # Hạn mức chung hoặc của đúng giỏ loại đơn này (hrm/explanation_quota.py)
+            from .explanation_quota import BUCKET_LABELS, BUCKET_OF, bucket_entry, explanation_quota_status
+            _quota = explanation_quota_status(event.employee, event.event_date)
+            _bucket = bucket_entry(_quota, _explanation_type)
+            _quota_used, _max_quota = _bucket['used'], _bucket['max']
             if _quota_used >= _max_quota:
+                _which = '' if _quota['shared'] else f' {BUCKET_LABELS[BUCKET_OF[_explanation_type]].lower()}'
                 return Response({
-                    'error': f'Nhân viên đã dùng {_quota_used}/{_max_quota} lượt giải trình tháng này. '
+                    'error': f'Nhân viên đã dùng {_quota_used}/{_max_quota} lượt giải trình{_which} tháng này. '
                              f'Đã hết hạn mức, không thể duyệt thêm — cần từ chối hoặc liên hệ HCNS.',
                     'quota_exceeded': True,
                     'quota_used': _quota_used,
                     'max_quota': _max_quota,
+                    'quota_type': None if _quota['shared'] else BUCKET_OF[_explanation_type],
                 }, status=status.HTTP_400_BAD_REQUEST)
 
         d = dict(event.data or {})
@@ -1744,7 +1747,7 @@ class AttendanceExplanationViewSet(BulkRejectMixin, FinalizationLockMixin, views
             })
 
         now_str = timezone.now().isoformat()
-        from .stats_utils import _get_quota_remaining, _get_leave_used
+        from .stats_utils import _get_leave_used
         
         to_approve_batch_all = [] # Accumulate all for bulk update
 
@@ -1753,8 +1756,16 @@ class AttendanceExplanationViewSet(BulkRejectMixin, FinalizationLockMixin, views
             first_item = items[0]['event']
             emp_obj = first_item.employee
             
-            # Tính quota còn lại thực tế
-            remaining = _get_quota_remaining(emp_obj, first_item.event_date)
+            # Hạn mức còn lại thực tế — 1 giỏ chung (COMBINED / rổ gộp) hoặc từng giỏ
+            from .explanation_quota import BUCKET_OF, explanation_quota_status
+            _quota = explanation_quota_status(emp_obj, first_item.event_date)
+            if _quota['shared']:
+                temp_remaining = {'*': _quota['combined']['remaining']}
+            else:
+                temp_remaining = {bucket: v['remaining'] for bucket, v in _quota['by_type'].items()}
+
+            def _quota_key(item):
+                return '*' if _quota['shared'] else BUCKET_OF[(item['event'].data or {}).get('explanation_type')]
             
             # Tách các nhóm đơn theo loại quota
             quota_subject_types = [
@@ -1797,21 +1808,20 @@ class AttendanceExplanationViewSet(BulkRejectMixin, FinalizationLockMixin, views
                     x['event'].created_at
                 ))
                 
-                temp_remaining = max(0, remaining)
-                
                 for item in quota_items:
+                    key = _quota_key(item)
                     is_forget = (item['event'].data or {}).get('explanation_type') == ExplanationType.INCOMPLETE_ATTENDANCE
                     if is_forget:
                         # NGOẠI LỆ: Luôn duyệt đơn Quên chấm công để đảm bảo công cho nhân viên
-                        # Chỉnh sửa: Có thể bị phạt nếu temp_remaining <= 0 (Logic Engine xử lý khi ghi nhận công)
+                        # Chỉnh sửa: Có thể bị phạt nếu hết hạn mức (Logic Engine xử lý khi ghi nhận công)
                         to_approve_batch.append(item)
-                        if temp_remaining > 0:
-                            temp_remaining -= 1
+                        if temp_remaining[key] > 0:
+                            temp_remaining[key] -= 1
                     else:
                         # Các loại khác (Đi muộn, Về sớm) -> Chỉ phê duyệt nếu còn hạn mức quota
-                        if temp_remaining > 0:
+                        if temp_remaining[key] > 0:
                             to_approve_batch.append(item)
-                            temp_remaining -= 1
+                            temp_remaining[key] -= 1
                         else:
                             to_reject_batch.append(item)
             
@@ -2037,6 +2047,12 @@ class AttendanceExplanationViewSet(BulkRejectMixin, FinalizationLockMixin, views
             from .stats_utils import online_quota_amount
             approved_online_work += online_quota_amount(ev.employee, ev.event_date, ev.data)
 
+        # Hạn mức theo từng loại: số còn lại / tối đa lấy theo giỏ của đúng người đang xem.
+        explanation_quota = None
+        if quota_employee is not None:
+            from .explanation_quota import explanation_quota_status
+            _quota = explanation_quota_status(quota_employee, date(int(year), int(month), 1))
+            explanation_quota = _quota if _quota['mode'] == 'PER_TYPE' else None
         return Response({
             'filters': {
                 'employee_id': employee_id,
@@ -2049,8 +2065,15 @@ class AttendanceExplanationViewSet(BulkRejectMixin, FinalizationLockMixin, views
                 'pending_explanations': pending_explanations,
                 'approved_explanations': approved_explanations,
                 'rejected_explanations': rejected_explanations,
-                'remaining_explanations': max(0, max_explanations_per_month - approved_explanations),
-                'max_explanations_per_month': max_explanations_per_month,
+                'remaining_explanations': (
+                    explanation_quota['combined']['remaining'] if explanation_quota
+                    else max(0, max_explanations_per_month - approved_explanations)
+                ),
+                'max_explanations_per_month': (
+                    explanation_quota['combined']['max'] if explanation_quota else max_explanations_per_month
+                ),
+                # Hạn mức theo từng giỏ (hrm/explanation_quota.py) của người đang xem
+                'explanation_quota': explanation_quota,
                 'approved_leave': approved_leave,
                 'remaining_leave': max(0, max_leave_per_month - approved_leave),
                 'max_leave_per_month': max_leave_per_month,
@@ -2167,8 +2190,7 @@ class AttendanceExplanationViewSet(BulkRejectMixin, FinalizationLockMixin, views
             'month': target_month,
             'year': target_year,
             'explanation_count': count,
-            'max_explanations_per_month': max_per_month,
-            'remaining_count': max(0, max_per_month - count),
+            **_remaining_payload(employee, target_year, target_month, count, max_per_month),
         })
 
 
@@ -2499,4 +2521,19 @@ class MonthlyLeaveViewSet(AttendanceExplanationViewSet):
             'remaining': max(0, 1.0 - total_used)
         })
 
+
+def _remaining_payload(employee, year, month, count, max_per_month) -> dict:
+    """Số lượt tối đa / còn lại: hạn mức chung như cũ, hoặc tổng các giỏ khi tính theo
+    từng loại (kèm chi tiết từng giỏ) — hrm/explanation_quota.py."""
+    import datetime as _datetime
+    from .explanation_quota import explanation_quota_status
+
+    status_ = explanation_quota_status(employee, _datetime.date(year, month, 1))
+    if status_['mode'] != 'PER_TYPE':
+        return {'max_explanations_per_month': max_per_month, 'remaining_count': max(0, max_per_month - count)}
+    return {
+        'max_explanations_per_month': status_['combined']['max'],
+        'remaining_count': status_['combined']['remaining'],
+        'explanation_quota': status_,
+    }
 

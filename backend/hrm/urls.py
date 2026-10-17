@@ -216,6 +216,8 @@ urlpatterns = [
     # Work Finalization (Chốt công) API endpoints
     path('work-finalization/', WorkFinalizationListView.as_view(), name='work-finalization-list'),
     path('salary/department/', SalaryDepartmentView.as_view(), name='salary-department-list'),
+    path('manager-explanation-quota-config/', views.ManagerExplanationQuotaConfigView.as_view(),
+         name='manager-explanation-quota-config'),
     # Chốt lương tháng (salary/payroll_finalization.py)
     path('salary/finalize/', FinalizeSalaryMonthView.as_view(), name='salary-finalize'),
     path('salary/unfinalize/', UnfinalizeSalaryMonthView.as_view(), name='salary-unfinalize'),

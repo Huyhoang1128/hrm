@@ -12020,3 +12020,23 @@ class ChildCareRegimeViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         from .serializers import ChildCareRegimeSerializer
         return ChildCareRegimeSerializer
+
+
+class ManagerExplanationQuotaConfigView(APIView):
+    """GET / PUT /api-hrm/manager-explanation-quota-config/ — danh sách nhân viên dùng rổ gộp
+    hạn mức giải trình (Admin / HCNS). Chỉ có tác dụng khi hạn mức tính theo từng loại."""
+    permission_classes = [IsAuthenticated, IsAdminOrHR]
+
+    def get(self, request):
+        from .explanation_quota_models import ManagerExplanationQuotaConfig
+        from .serializers import ManagerExplanationQuotaConfigSerializer
+        return Response(ManagerExplanationQuotaConfigSerializer(ManagerExplanationQuotaConfig.get_solo()).data)
+
+    def put(self, request):
+        from .explanation_quota_models import ManagerExplanationQuotaConfig
+        from .serializers import ManagerExplanationQuotaConfigSerializer
+        serializer = ManagerExplanationQuotaConfigSerializer(
+            ManagerExplanationQuotaConfig.get_solo(), data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)

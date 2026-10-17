@@ -264,6 +264,15 @@ def serialize_duyet_don_event(event: EmployeeEvent, violation_info: dict = None,
         result["quota_used"] = stats.get("quota_used", 0)
         result["quota_remaining"] = stats.get("quota_remaining", 0)
         result["max_explanation_quota"] = stats.get("max_explanation_quota", 3)
+        # Hạn mức theo từng loại: số của đúng giỏ loại đơn này (hrm/explanation_quota.py)
+        from .explanation_quota import BUCKET_OF
+        _bucket = BUCKET_OF.get(str(result.get("explanation_type") or "").upper())
+        _bucket_stats = (stats.get("explanation_quota_by_type") or {}).get(_bucket) if _bucket else None
+        result["quota_bucket"] = None if stats.get("explanation_quota_shared", True) else _bucket
+        if _bucket_stats and not stats.get("explanation_quota_shared", True):
+            result["quota_used"] = _bucket_stats["used"]
+            result["quota_remaining"] = _bucket_stats["remaining"]
+            result["max_explanation_quota"] = _bucket_stats["max"]
         result["leave_used"] = stats.get("leave_used", 0)
         result["max_leave_quota"] = stats.get("max_leave_quota", 1)
 

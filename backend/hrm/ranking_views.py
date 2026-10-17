@@ -137,6 +137,12 @@ def _get_remaining_explanations_map(
         for employee_id, used_count in used_counts.items():
             remaining_map[employee_id] = max(0, max_per_month - used_count)
 
+    # Hạn mức theo từng loại: còn lại = tổng các giỏ (hrm/explanation_quota.py)
+    from .explanation_quota import PER_TYPE, active_company_config, remaining_map as per_type_remaining
+    cfg = active_company_config()
+    if cfg and getattr(cfg, 'explanation_quota_mode', None) == PER_TYPE:
+        remaining_map = per_type_remaining(list(remaining_map), year, month, cfg)
+
     return max_per_month, remaining_map
 
 
