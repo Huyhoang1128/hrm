@@ -547,6 +547,31 @@ def _self_update_prefill(onboarding) -> dict:
     }
 
 
+def _employee_has_org_wide_edit_access(user, employee) -> bool:
+    """Admin, HCNS (cờ is_hr / chức danh / phòng ban có từ khoá HR) hoặc người có quyền
+    duyệt chấm công — cùng nhóm "toàn quyền" của StaffOwnDataPermission, được sửa hồ sơ
+    của mọi nhân viên nên không bị giới hạn khi tự sửa hồ sơ chính mình."""
+    from users.utils import get_user_role
+    if get_user_role(user) in ('admin', 'hr'):
+        return True
+    if not employee:
+        return False
+    for name in (getattr(employee.position, 'title', None), getattr(employee.department, 'name', None)):
+        upper = (name or '').upper()
+        if 'HR' in upper or 'NHÂN SỰ' in upper:
+            return True
+    from .models import EmployeePermission
+    permission = EmployeePermission.objects.filter(employee=employee).only('can_approve_attendance').first()
+    return bool(permission and permission.can_approve_attendance)
+
+
+def _employee_self_edit_locked() -> bool:
+    """CompanyConfig đang hiệu lực có bật "Khoá nhân viên tự sửa hồ sơ" không."""
+    from .models import CompanyConfig
+    config = CompanyConfig.objects.filter(is_active=True).order_by('-effective_from').first()
+    return bool(config and config.lock_employee_self_edit)
+
+
 class EmployeeViewSet(viewsets.ModelViewSet):
     """
     API endpoint for managing employees
@@ -555,6 +580,37 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     serializer_class = EmployeeSerializer
     permission_classes = [IsAuthenticated, StaffOwnDataPermission]
     pagination_class = StandardResultsSetPagination
+
+    # Nhân viên thường khi tự sửa hồ sơ CHÍNH MÌNH chỉ được đổi các trường thông tin cá
+    # nhân này (khớp trang "Hồ sơ của tôi"). Lương, phụ cấp, chức vụ, phòng ban, quản lý,
+    # trạng thái làm việc, hợp đồng… chỉ HCNS / Admin sửa — kể cả trên hồ sơ của chính
+    # nhân viên đó, tránh tự nâng lương / đổi chức vụ qua API.
+    SELF_EDIT_ALLOWED_FIELDS = frozenset({
+        'phone_number', 'personal_email',
+        'bank_name', 'bank_account',
+        'date_of_birth',
+        'cccd_number', 'cccd_issue_date', 'cccd_issue_place',
+        'permanent_residence', 'current_address',
+    })
+
+    def update(self, request, *args, **kwargs):
+        """PUT / PATCH (partial_update gọi update()): giới hạn nhân viên thường tự sửa hồ sơ."""
+        instance = self.get_object()
+        employee = getattr(request.user, 'employee', None)
+        if employee and employee.id == instance.id and not _employee_has_org_wide_edit_access(request.user, employee):
+            if _employee_self_edit_locked():
+                return Response(
+                    {'error': 'Hồ sơ đang khoá tự chỉnh sửa. Vui lòng liên hệ HCNS để cập nhật thông tin.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            disallowed = sorted(set(request.data.keys()) - self.SELF_EDIT_ALLOWED_FIELDS)
+            if disallowed:
+                return Response(
+                    {'error': f"Bạn không có quyền tự chỉnh sửa trường: {', '.join(disallowed)}. "
+                              "Vui lòng liên hệ HCNS để được hỗ trợ."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        return super().update(request, *args, **kwargs)
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     
     filterset_fields = [
@@ -715,7 +771,12 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             # Get the employee associated with the current user
             employee = Employee.objects.get(user=request.user)
             serializer = EmployeeSerializer(employee, context=self.get_serializer_context())
-            return Response(serializer.data)
+            data = dict(serializer.data)
+            # Trang "Hồ sơ của tôi" ẩn nút sửa khi bị khoá (CompanyConfig.lock_employee_self_edit)
+            data['self_edit_locked'] = (
+                not _employee_has_org_wide_edit_access(request.user, employee) and _employee_self_edit_locked()
+            )
+            return Response(data)
         except Employee.DoesNotExist:
             return Response(
                 {'error': 'Employee profile not found for this user'},

@@ -501,13 +501,23 @@ const Profile: React.FC = () => {
               <KeyIcon className="h-3.5 w-3.5" />
               Đổi mật khẩu
             </button>
-            <button
-              onClick={openEditModal}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200 rounded-lg transition-colors"
-            >
-              <PencilIcon className="h-3.5 w-3.5" />
-              Chỉnh sửa thông tin
-            </button>
+            {employee?.self_edit_locked ? (
+              <span
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200 rounded-lg"
+                title="Công ty đang khoá nhân viên tự sửa hồ sơ. Liên hệ HCNS để cập nhật thông tin."
+              >
+                <PencilIcon className="h-3.5 w-3.5" />
+                Hồ sơ đang khoá chỉnh sửa — liên hệ HCNS
+              </span>
+            ) : (
+              <button
+                onClick={openEditModal}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200 rounded-lg transition-colors"
+              >
+                <PencilIcon className="h-3.5 w-3.5" />
+                Chỉnh sửa thông tin
+              </button>
+            )}
           </div>
         </div>
       </div>

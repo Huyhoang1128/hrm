@@ -31,6 +31,7 @@ const CompanyConfigCreate: React.FC = () => {
     sick_leave_days_per_year: 12,
     maternity_leave_days: 180,
     paternity_leave_days: 14,
+    lock_employee_self_edit: false,
     is_active: true,
     effective_from: new Date().toISOString().split('T')[0],
     effective_to: '',
@@ -86,6 +87,7 @@ const CompanyConfigCreate: React.FC = () => {
         sick_leave_days_per_year: Number(formData.sick_leave_days_per_year) || 12,
         maternity_leave_days: Number(formData.maternity_leave_days) || 180,
         paternity_leave_days: Number(formData.paternity_leave_days) || 14,
+        lock_employee_self_edit: !!formData.lock_employee_self_edit,
         is_active: formData.is_active !== false,
         effective_from: formData.effective_from,
         effective_to: formData.effective_to || undefined,
@@ -513,6 +515,22 @@ const CompanyConfigCreate: React.FC = () => {
                   className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                 />
                 <span className="text-sm font-semibold text-gray-700">Kích hoạt</span>
+              </label>
+            </div>
+            <div className="md:col-span-2 flex items-start gap-3 pt-1">
+              <input
+                type="checkbox"
+                name="lock_employee_self_edit"
+                id="lock_employee_self_edit"
+                checked={!!formData.lock_employee_self_edit}
+                onChange={handleInputChange}
+                className="mt-0.5 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+              />
+              <label htmlFor="lock_employee_self_edit" className="text-sm text-gray-700 cursor-pointer">
+                <span className="font-medium">Khoá nhân viên tự sửa hồ sơ</span>
+                <span className="block text-xs text-gray-500">
+                  Bật: nhân viên thường không tự sửa được thông tin cá nhân trên trang Hồ sơ (chỉ HCNS / Admin sửa).
+                </span>
               </label>
             </div>
           </div>
