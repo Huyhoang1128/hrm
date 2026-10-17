@@ -1788,8 +1788,8 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
     <DayDetailDialog />
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
       {/* Calendar header */}
-      <div className="flex justify-between items-center px-2.5 py-3 md:px-6 md:py-4 border-b border-gray-100">
-        <div className="flex items-center gap-2 md:gap-3">
+      <div className="flex flex-wrap justify-between items-center gap-2 px-2.5 py-3 md:px-6 md:py-4 border-b border-gray-100">
+        <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
           <button
             onClick={goToPreviousMonth}
             className="p-1.5 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-colors"
@@ -1797,7 +1797,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
           >
             <ChevronLeftIcon className="h-5 w-5 text-gray-500" />
           </button>
-          <h2 className="text-base md:text-xl font-bold text-gray-900 min-w-[130px] md:min-w-[160px] text-center">
+          <h2 className="text-base md:text-xl font-bold text-gray-900 min-w-[110px] sm:min-w-[130px] md:min-w-[160px] text-center">
             {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
           </h2>
           <button
@@ -1810,7 +1810,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
         </div>
         <button
           onClick={goToToday}
-          className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 transition-colors font-medium"
+          className="shrink-0 whitespace-nowrap px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 transition-colors font-medium"
         >
           Hôm nay
         </button>
@@ -2134,7 +2134,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
                   }
                   if (onDateClick) onDateClick(day.date, day);
                 }}
-                className={`flex flex-col gap-4 p-4 rounded-[20px] cursor-pointer transition-all shadow-sm border
+                className={`flex flex-col gap-3 p-3 sm:gap-4 sm:p-4 rounded-[20px] cursor-pointer transition-all shadow-sm border
                   ${isToday
                     ? 'ring-2 ring-primary-500 bg-primary-50/50'
                     : day.dayStatusSummary?.display_color === 'green'
@@ -2259,7 +2259,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
                     })()}
                   </div>
                 ) : (
-                  <div className="text-center py-4 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                  <div className="text-center py-3 sm:py-4 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
                     <span className="text-xs text-slate-400 font-medium italic">Không phát sinh dữ liệu chấm công</span>
                   </div>
                 )}

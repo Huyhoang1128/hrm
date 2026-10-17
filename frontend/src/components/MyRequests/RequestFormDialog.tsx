@@ -201,7 +201,7 @@ const RequestFormDialog: React.FC<Props> = ({
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 overflow-y-auto">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl my-auto flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b">
           <h3 className="text-lg font-semibold text-gray-900">
             {isAdminMode
               ? 'Admin chỉnh sửa đơn'
@@ -214,7 +214,7 @@ const RequestFormDialog: React.FC<Props> = ({
           </button>
         </div>
 
-        <div className="flex-1 px-6 py-4 space-y-4">
+        <div className="flex-1 px-4 sm:px-6 py-4 space-y-4">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded">
               {error}
@@ -448,7 +448,7 @@ const RequestFormDialog: React.FC<Props> = ({
           const validationError = validate();
           const canSubmit = !validationError && !submitting;
           return (
-            <div className="px-6 py-4 border-t flex justify-end gap-2 bg-gray-50">
+            <div className="px-4 sm:px-6 py-4 border-t flex flex-wrap justify-end gap-2 bg-gray-50">
               <button
                 onClick={onClose}
                 disabled={submitting}

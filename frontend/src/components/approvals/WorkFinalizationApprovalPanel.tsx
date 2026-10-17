@@ -72,8 +72,8 @@ const WorkFinalizationApprovalPanel: React.FC<WorkFinalizationApprovalPanelProps
             duyệt nên KHÔNG tự lọc theo activeTab nữa — trang cha quyết
             định có render hay không. */}
         {!loading && showWorkFinalizationPanel && (
-          <div className="mt-8 mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 bg-white p-3 sm:p-4 md:p-5 rounded-lg shadow-sm border border-gray-100">
+          <div className="mt-4 sm:mt-8 mb-4 sm:mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 sm:mb-6 bg-white p-3 sm:p-4 md:p-5 rounded-lg shadow-sm border border-gray-100">
               <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
                 <div className="w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 bg-gradient-to-br from-primary-500 to-violet-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-primary-100">
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -299,39 +299,42 @@ const WorkFinalizationApprovalPanel: React.FC<WorkFinalizationApprovalPanelProps
                         }
                         (item._itemType === 'ONLINE_WORK' || item._itemType === 'REGISTRATION' || item._itemType === 'OVERTIME') ? handleViewOnlineWorkDetails(item) : handleViewDetails(item);
                       }}
-                      className="p-5 bg-white active:bg-gray-50 transition-all border-b border-gray-50"
+                      className="p-4 sm:p-5 bg-white active:bg-gray-50 transition-all border-b border-gray-50"
                     >
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center text-white font-semibold shadow-lg shadow-primary-100">
+                      {/* flex-wrap + nowrap: tên phòng dài thì khối thời gian tự xuống hàng
+                          (căn phải) thay vì bị ép thành nhiều dòng. */}
+                      <div className="flex flex-wrap justify-between items-start gap-x-3 gap-y-2 mb-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 shrink-0 rounded-lg bg-primary-600 flex items-center justify-center text-white font-semibold shadow-lg shadow-primary-100">
                             {item.department_name?.charAt(0)}
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <h4 className="text-sm font-semibold text-gray-800 uppercase tracking-tight">{item.department_name || item.department_code}</h4>
-                            <p className="text-xs font-bold text-primary-500 uppercase tracking-[0.1em]">Chốt công : {item.month}/{item.year}</p>
+                            <p className="text-xs font-bold text-primary-500 uppercase tracking-[0.1em] whitespace-nowrap">Chốt công : {item.month}/{item.year}</p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-xs font-bold text-gray-300 uppercase tracking-widest">Thời gian gửi</div>
-                          <div className="text-xs font-semibold text-gray-500">
-                            {getDayOfWeek(item.created_at)}, {formatDateTime(item.created_at).split(' ')[0]}
+                        <div className="text-right shrink-0 ml-auto">
+                          <div className="text-xs font-bold text-gray-300 uppercase tracking-widest whitespace-nowrap">Thời gian gửi</div>
+                          <div className="text-xs font-semibold text-gray-500 whitespace-nowrap">
+                            {/* toLocaleString('vi-VN') ra "17:14:08 9/10/2026" — giờ đứng trước, ngày ở cuối */}
+                            {getDayOfWeek(item.created_at)}, {formatDateTime(item.created_at).split(' ').pop()}
                           </div>
                         </div>
                       </div>
 
                       <div className="px-4 py-3 bg-gray-50 rounded-lg border border-gray-100 mb-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Trạng thái hiện tại:</span>
+                        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Trạng thái hiện tại:</span>
                           {item.status === 'APPROVED' ? (
-                            <span className="text-xs font-semibold text-emerald-600 uppercase">Đã phê duyệt</span>
+                            <span className="text-xs font-semibold text-emerald-600 uppercase whitespace-nowrap">Đã phê duyệt</span>
                           ) : item.status === 'REJECTED' ? (
-                            <span className="text-xs font-semibold text-rose-600 uppercase">Đã từ chối</span>
+                            <span className="text-xs font-semibold text-rose-600 uppercase whitespace-nowrap">Đã từ chối</span>
                           ) : isWfPartiallyApproved(item) ? (
-                            <span className="text-xs font-semibold text-violet-600 uppercase">
+                            <span className="text-xs font-semibold text-violet-600 uppercase whitespace-nowrap">
                               Đã duyệt {getWfApprovalProgress(item).approved}/{getWfApprovalProgress(item).total}
                             </span>
                           ) : (
-                            <span className="text-xs font-semibold text-amber-600 uppercase animate-pulse">Đang chờ xử lý</span>
+                            <span className="text-xs font-semibold text-amber-600 uppercase animate-pulse whitespace-nowrap">Đang chờ xử lý</span>
                           )}
                         </div>
                         <p className="text-xs text-gray-400 mt-1 italic font-medium">Người gửi: {item.sent_by_name}</p>

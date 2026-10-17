@@ -2039,7 +2039,7 @@ const AttendanceManagement: React.FC = () => {
 
           {/* Skeleton Loading for Stats */}
       {loading && initialLoading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-8">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="bg-gray-50 h-32 rounded-2xl animate-pulse border border-gray-100"></div>
           ))}
@@ -2048,9 +2048,9 @@ const AttendanceManagement: React.FC = () => {
 
       {/* Summary Statistics - Responsive Grid */}
       {!initialLoading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-8">
           {/* === KPIs chính === */}
-          <div className="group bg-white p-4 rounded-2xl shadow-sm border border-red-100 hover:shadow-md hover:-translate-y-1 transition-all duration-300 relative overflow-hidden">
+          <div className="col-span-2 sm:col-span-1 group bg-white p-4 rounded-2xl shadow-sm border border-red-100 hover:shadow-md hover:-translate-y-1 transition-all duration-300 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-1/2 h-full bg-gradient-to-r from-red-600 to-transparent opacity-5"></div>
             <div className="absolute top-0 left-0 w-1 h-full bg-red-600"></div>
             <div className="flex items-center justify-between mb-3">
@@ -2080,7 +2080,7 @@ const AttendanceManagement: React.FC = () => {
               <div className="p-2 bg-primary-50 rounded-lg">
                 <CalendarIcon className="h-6 w-6 text-primary-600" />
               </div>
-              <span className="text-[10px] font-bold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Tháng này</span>
+              <span className="hidden sm:inline text-[10px] font-bold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Tháng này</span>
             </div>
             <h3 className="text-sm font-semibold text-gray-600">Tổng ngày công</h3>
             <div className="flex items-baseline gap-1 mt-1">
@@ -2097,7 +2097,7 @@ const AttendanceManagement: React.FC = () => {
               <div className="p-2 bg-emerald-50 rounded-lg">
                 <CheckCircleIcon className="h-6 w-6 text-emerald-600" />
               </div>
-              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Ổn định</span>
+              <span className="hidden sm:inline text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Ổn định</span>
             </div>
             <h3 className="text-sm font-semibold text-gray-600">Ngày đủ công</h3>
             <div className="flex items-baseline gap-1 mt-1">
@@ -2114,7 +2114,7 @@ const AttendanceManagement: React.FC = () => {
               <div className="p-2 bg-amber-50 rounded-lg">
                 <ClockIcon className="h-6 w-6 text-amber-600" />
               </div>
-              <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Cần chú ý</span>
+              <span className="hidden sm:inline text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Cần chú ý</span>
             </div>
             <h3 className="text-sm font-semibold text-gray-600">Số phút Muộn/Sớm</h3>
             <div className="flex items-baseline gap-1 mt-1">
@@ -2131,7 +2131,7 @@ const AttendanceManagement: React.FC = () => {
               <div className="p-2 bg-red-50 rounded-lg">
                 <NoSymbolIcon className="h-6 w-6 text-red-600" />
               </div>
-              <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Cảnh báo</span>
+              <span className="hidden sm:inline text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Cảnh báo</span>
             </div>
             <h3 className="text-sm font-semibold text-gray-600">Số ngày Vắng mặt</h3>
             <div className="flex items-baseline gap-1 mt-1">
@@ -2165,7 +2165,7 @@ const AttendanceManagement: React.FC = () => {
               <div className="p-2 bg-violet-50 rounded-lg">
                 <ExclamationTriangleIcon className="h-6 w-6 text-violet-600" />
               </div>
-              <span className="text-[10px] font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Chưa hoàn thành</span>
+              <span className="hidden sm:inline text-[10px] font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Chưa hoàn thành</span>
             </div>
             <h3 className="text-sm font-semibold text-gray-600">Quên chấm công</h3>
             <div className="flex items-baseline gap-1 mt-1">
@@ -2341,7 +2341,7 @@ const AttendanceManagement: React.FC = () => {
 
       {/* Disciplinary Regulations & Labor Rules Section */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-8">
-        <div className="bg-gradient-to-r from-red-50 to-amber-50 px-6 py-4 border-b border-red-100 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-red-50 to-amber-50 px-4 sm:px-6 py-4 border-b border-red-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-red-100 rounded-lg shadow-sm">
               <ExclamationCircleIcon className="h-5 w-5 text-red-600" />
@@ -2364,12 +2364,12 @@ const AttendanceManagement: React.FC = () => {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+          <table className="min-w-[560px] sm:min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50/50">
               <tr>
-                <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 border-r border-gray-100 uppercase tracking-widest w-1/2">Nội dung vi phạm</th>
-                <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 border-r border-gray-100 uppercase tracking-widest">Xử lý vi phạm</th>
-                <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest italic">Ghi chú</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-[10px] font-black text-gray-400 border-r border-gray-100 uppercase tracking-widest w-1/2">Nội dung vi phạm</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-[10px] font-black text-gray-400 border-r border-gray-100 uppercase tracking-widest">Xử lý vi phạm</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest italic">Ghi chú</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium whitespace-pre-wrap">
@@ -2384,13 +2384,13 @@ const AttendanceManagement: React.FC = () => {
                 { nội_dung: 'Nghỉ không báo / Nghỉ không được duyệt', xử_lý: '500.000 VNĐ\nvà tùy mức độ vi phạm, sa thải...', ghi_chú: 'Hình thức xử lý cao nhất: Sa thải' },
               ].map((item, idx) => (
                 <tr key={idx} className="hover:bg-gray-50/40 transition-colors group">
-                  <td className="px-6 py-4 text-[13px] text-gray-600 border-r border-gray-50 group-hover:text-primary-600 transition-colors leading-relaxed">
+                  <td className="px-3 sm:px-6 py-4 text-[13px] text-gray-600 border-r border-gray-50 group-hover:text-primary-600 transition-colors leading-relaxed">
                     {item.nội_dung}
                   </td>
-                  <td className="px-6 py-4 text-[12px] font-black text-red-600 border-r border-gray-50">
+                  <td className="px-3 sm:px-6 py-4 text-[12px] font-black text-red-600 border-r border-gray-50">
                     {item.xử_lý}
                   </td>
-                  <td className="px-6 py-4 text-[11px] text-gray-400 italic">
+                  <td className="px-3 sm:px-6 py-4 text-[11px] text-gray-400 italic">
                     {item.ghi_chú}
                   </td>
                 </tr>
@@ -2398,7 +2398,7 @@ const AttendanceManagement: React.FC = () => {
             </tbody>
           </table>
         </div>
-        <div className="bg-red-50/30 px-6 py-3 border-t border-red-100/50">
+        <div className="bg-red-50/30 px-4 sm:px-6 py-3 border-t border-red-100/50">
           <p className="text-[10px] text-gray-500 font-medium leading-relaxed italic">
             * Lưu ý: Mọi vi phạm sẽ được hệ thống dữ liệu tự động ghi nhận và áp dụng mức xử phạt theo quy định trên. Đối với các trường hợp đặc biệt phát sinh, Ban lãnh đạo HRM sẽ xem xét và quyết định hình thức xử lý cuối cùng.
           </p>
@@ -4131,8 +4131,8 @@ const AttendanceManagement: React.FC = () => {
                             Thời gian tăng ca
                           </h3>
 
-                          <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                            <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-gray-50 rounded-xl p-3 sm:p-4 border border-gray-200">
+                            <div className="grid grid-cols-2 gap-3 sm:gap-4">
                               {/* Giờ bắt đầu */}
                               <div>
                                 <label
@@ -4148,7 +4148,7 @@ const AttendanceManagement: React.FC = () => {
                                   onChange={(e) =>
                                     setOvertimeStartTime(e.target.value)
                                   }
-                                  className="block w-full rounded-lg border-2 border-gray-200 shadow-sm focus:border-violet-500 focus:ring-violet-500 sm:text-sm p-3 transition-colors duration-200"
+                                  className="block w-full rounded-lg border-2 border-gray-200 shadow-sm focus:border-violet-500 focus:ring-violet-500 sm:text-sm px-2 py-3 sm:p-3 transition-colors duration-200"
                                 />
                               </div>
 
@@ -4167,7 +4167,7 @@ const AttendanceManagement: React.FC = () => {
                                   onChange={(e) =>
                                     setOvertimeEndTime(e.target.value)
                                   }
-                                  className="block w-full rounded-lg border-2 border-gray-200 shadow-sm focus:border-violet-500 focus:ring-violet-500 sm:text-sm p-3 transition-colors duration-200"
+                                  className="block w-full rounded-lg border-2 border-gray-200 shadow-sm focus:border-violet-500 focus:ring-violet-500 sm:text-sm px-2 py-3 sm:p-3 transition-colors duration-200"
                                 />
                               </div>
                             </div>
@@ -4319,8 +4319,8 @@ const AttendanceManagement: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                            <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-gray-50 rounded-xl p-3 sm:p-4 border border-gray-200">
+                            <div className="grid grid-cols-2 gap-3 sm:gap-4">
                               {/* Giờ bắt đầu */}
                               <div>
                                 <label
@@ -4336,7 +4336,7 @@ const AttendanceManagement: React.FC = () => {
                                   onChange={(e) =>
                                     setExtraHoursStartTime(e.target.value)
                                   }
-                                  className="block w-full rounded-lg border-2 border-gray-200 shadow-sm focus:border-violet-500 focus:ring-violet-500 sm:text-sm p-3 transition-colors duration-200"
+                                  className="block w-full rounded-lg border-2 border-gray-200 shadow-sm focus:border-violet-500 focus:ring-violet-500 sm:text-sm px-2 py-3 sm:p-3 transition-colors duration-200"
                                 />
                               </div>
 
@@ -4355,7 +4355,7 @@ const AttendanceManagement: React.FC = () => {
                                   onChange={(e) =>
                                     setExtraHoursEndTime(e.target.value)
                                   }
-                                  className="block w-full rounded-lg border-2 border-gray-200 shadow-sm focus:border-violet-500 focus:ring-violet-500 sm:text-sm p-3 transition-colors duration-200"
+                                  className="block w-full rounded-lg border-2 border-gray-200 shadow-sm focus:border-violet-500 focus:ring-violet-500 sm:text-sm px-2 py-3 sm:p-3 transition-colors duration-200"
                                 />
                               </div>
                             </div>
@@ -4647,8 +4647,8 @@ const AttendanceManagement: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                            <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-gray-50 rounded-xl p-3 sm:p-4 border border-gray-200">
+                            <div className="grid grid-cols-2 gap-3 sm:gap-4">
                               {/* Giờ bắt đầu */}
                               <div>
                                 <label
@@ -4664,7 +4664,7 @@ const AttendanceManagement: React.FC = () => {
                                   onChange={(e) =>
                                     setLiveStartTime(e.target.value)
                                   }
-                                  className="block w-full rounded-lg border-2 border-gray-200 shadow-sm focus:border-violet-500 focus:ring-violet-500 sm:text-sm p-3 transition-colors duration-200"
+                                  className="block w-full rounded-lg border-2 border-gray-200 shadow-sm focus:border-violet-500 focus:ring-violet-500 sm:text-sm px-2 py-3 sm:p-3 transition-colors duration-200"
                                 />
                               </div>
 
@@ -4681,7 +4681,7 @@ const AttendanceManagement: React.FC = () => {
                                   id="live-end"
                                   value={liveEndTime}
                                   onChange={(e) => setLiveEndTime(e.target.value)}
-                                  className="block w-full rounded-lg border-2 border-gray-200 shadow-sm focus:border-violet-500 focus:ring-violet-500 sm:text-sm p-3 transition-colors duration-200"
+                                  className="block w-full rounded-lg border-2 border-gray-200 shadow-sm focus:border-violet-500 focus:ring-violet-500 sm:text-sm px-2 py-3 sm:p-3 transition-colors duration-200"
                                 />
                               </div>
                             </div>
@@ -5780,8 +5780,8 @@ const AttendanceManagement: React.FC = () => {
                               <div key={`${item._type}-${item.id}-${idx}`} className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-300">
                                 <div className="flex flex-col gap-3">
                                   {/* Header: Badges & Code */}
-                                  <div className="flex justify-between items-center">
-                                    <div className="flex items-center gap-2">
+                                  <div className="flex justify-between items-center gap-2">
+                                    <div className="flex flex-wrap items-center gap-2 min-w-0">
                                       <span className={`inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide ${typeConfig.bg}`}>
                                         {typeConfig.label}
                                       </span>
@@ -5791,7 +5791,7 @@ const AttendanceManagement: React.FC = () => {
                                         </span>
                                       )}
                                     </div>
-                                    <span className={`inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide ${statusConfig.cls}`}>
+                                    <span className={`shrink-0 whitespace-nowrap inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide ${statusConfig.cls}`}>
                                       {statusConfig.label}
                                     </span>
                                   </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFeedbackNotice } from '../../contexts/FeedbackNoticeContext';
@@ -6,7 +6,6 @@ import {
   Cog6ToothIcon,
   Squares2X2Icon,
   XMarkIcon,
-  Bars3Icon,
   ChevronLeftIcon,
   ChevronRightIcon,
   UserIcon,
@@ -556,10 +555,12 @@ const navigationItems: NavigationItem[] = [
 
 interface SidebarProps {
   onCollapseChange?: (isCollapsed: boolean) => void;
+  /** Menu trượt trên điện thoại — nút mở nằm ở Header nên state đặt ở Layout. */
+  mobileOpen: boolean;
+  onMobileOpenChange: (open: boolean) => void;
 }
 
-export default function Sidebar({ onCollapseChange }: SidebarProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+export default function Sidebar({ onCollapseChange, mobileOpen: sidebarOpen, onMobileOpenChange: setSidebarOpen }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [collapsedByUser, setCollapsedByUser] = useState<Set<string>>(new Set());
@@ -567,6 +568,11 @@ export default function Sidebar({ onCollapseChange }: SidebarProps) {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const { pending_count: feedbackPendingCount } = useFeedbackNotice();
+
+  // Điện thoại: bấm 1 mục menu xong thì đóng menu trượt để thấy trang vừa mở.
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname, setSidebarOpen]);
 
   if (loading) {
     return (
@@ -820,9 +826,10 @@ export default function Sidebar({ onCollapseChange }: SidebarProps) {
             />
             <button
               onClick={() => setSidebarOpen(false)}
-              className="absolute right-3 p-1 rounded-md text-primary-500 hover:text-white hover:bg-primary-800 transition-colors"
+              className="absolute right-2 p-2 rounded-md text-primary-300 hover:text-white hover:bg-primary-800 transition-colors"
             >
-              <XMarkIcon className="h-4 w-4" />
+              <span className="sr-only">Đóng menu</span>
+              <XMarkIcon className="h-5 w-5" />
             </button>
           </div>
           <nav className="flex-1 overflow-y-auto scrollbar-hide space-y-1 px-2 py-4">
@@ -935,24 +942,6 @@ export default function Sidebar({ onCollapseChange }: SidebarProps) {
         </div>
       </div>
 
-      {/* Mobile top bar */}
-      <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center border-b border-primary-800/60 bg-primary-900 px-4 shadow-sm lg:hidden">
-        <button
-          type="button"
-          className="p-1.5 text-primary-400 hover:text-white transition-colors"
-          onClick={() => setSidebarOpen(true)}
-        >
-          <Bars3Icon className="h-5 w-5" />
-        </button>
-        <div className="flex flex-1 items-center justify-center">
-          <img
-            src={BRAND.logoUrl}
-            alt={BRAND.appName}
-            className="h-8 w-auto max-w-[120px] object-contain brightness-[400]"
-          />
-        </div>
-        <div className="w-8" />
-      </div>
     </>
   );
 }

@@ -678,10 +678,94 @@ const MyRequests: React.FC = () => {
 
   const confirmDialogProps = getConfirmDialogProps();
 
+  // Nút thao tác của 1 đơn — dùng chung cho bảng (desktop) và thẻ (mobile)
+  const renderActions = (req: GenericRequest) => (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {/* Tab "Cần tôi duyệt": Duyệt + Từ chối lên đầu (ưu tiên action quan trọng).
+          Manager duyệt cấp 1 (PENDING_MANAGER); Admin/HR duyệt cấp 2 (PENDING_ADMIN). */}
+      {activeTab === 'to-approve' &&
+        ((req.status === 'PENDING_MANAGER' && !isAdmin) ||
+          (req.status === 'PENDING_ADMIN' && isAdmin)) && (
+        <>
+          <button
+            onClick={() => { setApproveTarget(req); setApprovalNote(''); }}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-md shadow-sm hover:bg-emerald-700 hover:shadow transition-all"
+          >
+            <CheckIcon className="w-3.5 h-3.5" />
+            Duyệt
+          </button>
+          <button
+            onClick={() => { setRejectTarget(req); setApprovalNote(''); }}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-white bg-red-600 rounded-md shadow-sm hover:bg-red-700 hover:shadow transition-all"
+          >
+            <XMarkIcon className="w-3.5 h-3.5" />
+            Từ chối
+          </button>
+        </>
+      )}
+
+      {/* Tab "Đơn của tôi" - DRAFT: Sửa + Gửi duyệt + Xoá lên đầu */}
+      {activeTab === 'mine' && req.status === 'DRAFT' && (
+        <>
+          <button
+            onClick={() => handleSubmit(req)}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-md shadow-sm hover:bg-emerald-700 hover:shadow transition-all"
+          >
+            <PaperAirplaneIcon className="w-3.5 h-3.5" />
+            Gửi duyệt
+          </button>
+          <button
+            onClick={() => openEdit(req)}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-primary-700 bg-white border border-primary-200 rounded-md shadow-sm hover:bg-primary-50 hover:border-primary-300 transition-all"
+          >
+            <PencilSquareIcon className="w-3.5 h-3.5" />
+            Sửa
+          </button>
+          <button
+            onClick={() => handleDelete(req)}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-700 bg-white border border-red-200 rounded-md shadow-sm hover:bg-red-50 hover:border-red-300 transition-all"
+          >
+            <TrashIcon className="w-3.5 h-3.5" />
+            Xoá
+          </button>
+        </>
+      )}
+
+      {/* Tab "Đơn của tôi" - PENDING: nút Huỷ */}
+      {activeTab === 'mine' && req.status === 'PENDING_MANAGER' && (
+        <button
+          onClick={() => handleCancel(req)}
+          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-white border border-amber-200 rounded-md shadow-sm hover:bg-amber-50 hover:border-amber-300 transition-all"
+        >
+          <XMarkIcon className="w-3.5 h-3.5" />
+          Huỷ đơn
+        </button>
+      )}
+
+      {/* View buttons (Xem PDF + Chi tiết) — đẩy xuống cuối */}
+      {req.request_type === 'RESIGNATION' && (
+        <button
+          onClick={() => setPreviewRequest(req)}
+          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-violet-700 bg-white border border-violet-200 rounded-md shadow-sm hover:bg-violet-50 hover:border-violet-300 transition-all"
+        >
+          <DocumentTextIcon className="w-3.5 h-3.5" />
+          Xem PDF
+        </button>
+      )}
+      <button
+        onClick={() => setDetailRequest(req)}
+        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-md shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all"
+      >
+        <EyeIcon className="w-3.5 h-3.5" />
+        Chi tiết
+      </button>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Yêu cầu & Đơn từ</h1>
           <p className="text-gray-600 mt-2">
@@ -734,7 +818,7 @@ const MyRequests: React.FC = () => {
 
       {/* Filter bar */}
       <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-wrap items-end gap-3">
-        <div className="w-52">
+        <div className="w-full sm:w-52">
           <SelectBox
             label="Loại đơn"
             value={filterType}
@@ -759,7 +843,7 @@ const MyRequests: React.FC = () => {
             onChange={(v) => { setFilterType(v as TypeFilter); setCurrentPage(1); }}
           />
         </div>
-        <div className="w-52">
+        <div className="w-full sm:w-52">
           <SelectBox
             label="Trạng thái"
             value={filterStatus}
@@ -785,7 +869,7 @@ const MyRequests: React.FC = () => {
             onChange={(v) => { setFilterStatus(v as GenericRequestStatus | ''); setCurrentPage(1); }}
           />
         </div>
-        <div className="w-40">
+        <div className="flex-1 sm:flex-initial sm:w-40">
           <SelectBox
             label="Tháng"
             value={filterMonth}
@@ -797,7 +881,7 @@ const MyRequests: React.FC = () => {
           />
         </div>
         {filterMonth > 0 && (
-          <div className="w-32">
+          <div className="flex-1 sm:flex-initial sm:w-32">
             <SelectBox
               label="Năm"
               value={filterYear}
@@ -809,7 +893,7 @@ const MyRequests: React.FC = () => {
             />
           </div>
         )}
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <label className="block text-sm font-medium mb-1 text-gray-700">Tìm kiếm</label>
           <div className="relative">
             <input
@@ -817,7 +901,7 @@ const MyRequests: React.FC = () => {
               value={filterSearch}
               onChange={(e) => { setFilterSearch(e.target.value); setCurrentPage(1); }}
               placeholder="Tiêu đề, lý do, mã đơn..."
-              className="input-field pl-9 w-60"
+              className="input-field pl-9 w-full sm:w-60"
             />
             <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -844,8 +928,62 @@ const MyRequests: React.FC = () => {
         </button>
       </div>
 
+      {/* Mobile: danh sách dạng thẻ (bảng 7–8 cột không đọc được trên điện thoại) */}
+      <div className="sm:hidden space-y-3">
+        {loading ? (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-10 text-center text-gray-500">
+            Đang tải...
+          </div>
+        ) : requests.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-10 text-center text-gray-500">
+            {activeTab === 'to-approve'
+              ? 'Không có đơn nào cần bạn duyệt.'
+              : `Chưa có đơn nào${hasFilter ? ' khớp với bộ lọc' : ''}.`}
+          </div>
+        ) : (
+          requests.map((req) => (
+            <div key={req.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              {activeTab === 'to-approve' ? (
+                <>
+                  <p className="font-semibold text-gray-900">{req.employee_name}</p>
+                  <p className="text-xs text-gray-500">
+                    <span className="font-mono">{req.employee_code}</span>
+                    {req.employee_department ? ` · ${req.employee_department}` : ''}
+                  </p>
+                </>
+              ) : (
+                <p className="font-semibold text-gray-900 break-words">{req.title}</p>
+              )}
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <span className="font-mono text-xs text-gray-500">{req.request_code || '—'}</span>
+                <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full whitespace-nowrap ${STATUS_COLORS[req.status]}`}>
+                  {STATUS_LABELS[req.status]}
+                </span>
+              </div>
+              <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                <div>
+                  <dt className="text-xs text-gray-500">Loại đơn</dt>
+                  <dd className="text-gray-800">{req.request_type_display}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">Ngày nghỉ dự kiến</dt>
+                  <dd className="text-gray-800">{formatDate(req.expected_date)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">Ngày tạo</dt>
+                  <dd className="text-gray-800">{formatDate(req.created_at)}</dd>
+                </div>
+              </dl>
+              <div className="mt-3 pt-3 border-t border-gray-100 [&_button]:px-3 [&_button]:py-1.5">
+                {renderActions(req)}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="hidden sm:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto w-full">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -974,86 +1112,7 @@ const MyRequests: React.FC = () => {
                       {formatDate(req.created_at)}
                     </td>
                     <td className="table-cell whitespace-nowrap">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {/* Tab "Cần tôi duyệt": Duyệt + Từ chối lên đầu (ưu tiên action quan trọng).
-                            Manager duyệt cấp 1 (PENDING_MANAGER); Admin/HR duyệt cấp 2 (PENDING_ADMIN). */}
-                        {activeTab === 'to-approve' &&
-                          ((req.status === 'PENDING_MANAGER' && !isAdmin) ||
-                            (req.status === 'PENDING_ADMIN' && isAdmin)) && (
-                          <>
-                            <button
-                              onClick={() => { setApproveTarget(req); setApprovalNote(''); }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-md shadow-sm hover:bg-emerald-700 hover:shadow transition-all"
-                            >
-                              <CheckIcon className="w-3.5 h-3.5" />
-                              Duyệt
-                            </button>
-                            <button
-                              onClick={() => { setRejectTarget(req); setApprovalNote(''); }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-white bg-red-600 rounded-md shadow-sm hover:bg-red-700 hover:shadow transition-all"
-                            >
-                              <XMarkIcon className="w-3.5 h-3.5" />
-                              Từ chối
-                            </button>
-                          </>
-                        )}
-
-                        {/* Tab "Đơn của tôi" - DRAFT: Sửa + Gửi duyệt + Xoá lên đầu */}
-                        {activeTab === 'mine' && req.status === 'DRAFT' && (
-                          <>
-                            <button
-                              onClick={() => handleSubmit(req)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-md shadow-sm hover:bg-emerald-700 hover:shadow transition-all"
-                            >
-                              <PaperAirplaneIcon className="w-3.5 h-3.5" />
-                              Gửi duyệt
-                            </button>
-                            <button
-                              onClick={() => openEdit(req)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-primary-700 bg-white border border-primary-200 rounded-md shadow-sm hover:bg-primary-50 hover:border-primary-300 transition-all"
-                            >
-                              <PencilSquareIcon className="w-3.5 h-3.5" />
-                              Sửa
-                            </button>
-                            <button
-                              onClick={() => handleDelete(req)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-700 bg-white border border-red-200 rounded-md shadow-sm hover:bg-red-50 hover:border-red-300 transition-all"
-                            >
-                              <TrashIcon className="w-3.5 h-3.5" />
-                              Xoá
-                            </button>
-                          </>
-                        )}
-
-                        {/* Tab "Đơn của tôi" - PENDING: nút Huỷ */}
-                        {activeTab === 'mine' && req.status === 'PENDING_MANAGER' && (
-                          <button
-                            onClick={() => handleCancel(req)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-white border border-amber-200 rounded-md shadow-sm hover:bg-amber-50 hover:border-amber-300 transition-all"
-                          >
-                            <XMarkIcon className="w-3.5 h-3.5" />
-                            Huỷ đơn
-                          </button>
-                        )}
-
-                        {/* View buttons (Xem PDF + Chi tiết) — đẩy xuống cuối */}
-                        {req.request_type === 'RESIGNATION' && (
-                          <button
-                            onClick={() => setPreviewRequest(req)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-violet-700 bg-white border border-violet-200 rounded-md shadow-sm hover:bg-violet-50 hover:border-violet-300 transition-all"
-                          >
-                            <DocumentTextIcon className="w-3.5 h-3.5" />
-                            Xem PDF
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setDetailRequest(req)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-md shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all"
-                        >
-                          <EyeIcon className="w-3.5 h-3.5" />
-                          Chi tiết
-                        </button>
-                      </div>
+                      {renderActions(req)}
                     </td>
                   </tr>
                   );
