@@ -43,6 +43,8 @@ export interface AttendanceDay {
     live_sessions: number;
     late_minutes: number;
     early_leave_minutes: number;
+    /** Chế độ con nhỏ: số phút được đi muộn / về sớm thêm của ngày (0 = không hưởng). */
+    child_care_minutes?: number;
     rules_applied: string[];
   };
   shifts: Array<{
@@ -1403,6 +1405,17 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Chế độ con nhỏ */}
+            {Number(day.engine_context?.child_care_minutes) > 0 && (
+              <div className="rounded-xl border border-pink-200 bg-pink-50 px-4 py-3 text-xs text-pink-800">
+                <p className="font-semibold">Chế độ con nhỏ</p>
+                <p className="mt-1">
+                  Ngày này được đi muộn tối đa {day.engine_context.child_care_minutes} phút và về sớm tối đa{' '}
+                  {day.engine_context.child_care_minutes} phút mà không tính lỗi. Chỉ phần vượt mới tính là đi muộn / về sớm.
+                </p>
               </div>
             )}
 

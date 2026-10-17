@@ -2439,6 +2439,18 @@ const AttendanceManagement: React.FC = () => {
                     )}
                   </div>
 
+                  {/* Chế độ con nhỏ */}
+                  {Number(selectedDayData?.engine_context?.child_care_minutes) > 0 && (
+                    <div className="mb-4 rounded-xl border border-pink-200 bg-pink-50 px-4 py-3 text-xs text-pink-800">
+                      <p className="font-semibold">Chế độ con nhỏ</p>
+                      <p className="mt-1">
+                        Ngày này được đi muộn tối đa {selectedDayData.engine_context.child_care_minutes} phút và về sớm tối
+                        đa {selectedDayData.engine_context.child_care_minutes} phút mà không tính lỗi. Chỉ phần vượt mới tính
+                        là đi muộn / về sớm.
+                      </p>
+                    </div>
+                  )}
+
                   {penaltyAmount > 0 && (
                     <div className="mb-6 p-3 bg-red-50/50 border border-red-100 rounded-xl flex items-center gap-2 text-xs text-red-700 italic">
                       <ExclamationCircleIcon className="h-4 w-4 shrink-0" />

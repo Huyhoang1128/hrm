@@ -1941,6 +1941,9 @@ class AttendanceCalendarView(APIView):
         # ── 8. Xây dựng calendar ─────────────────────────────────────────
         calendar_days = []
         cur = first_day
+        # Ngày NV hưởng chế độ con nhỏ (được đi muộn / về sớm thêm N phút) — để lịch ghi chú.
+        from .child_care_regime import child_care_minutes_by_date
+        child_care_minutes = child_care_minutes_by_date(employee.id, first_day, last_day)
 
         # Vai trò của NGƯỜI XEM — tính 1 lần cho cả tháng (có query
         # managed_departments/subordinates nên không được tính lại cho từng
@@ -2028,6 +2031,8 @@ class AttendanceCalendarView(APIView):
                     "live_sessions":        int(agg_effects.get("live",     0)),
                     "late_minutes":         int(agg_effects.get("late_minutes",        0)),
                     "early_leave_minutes":  int(agg_effects.get("early_leave_minutes", 0)),
+                    # Chế độ con nhỏ: số phút được đi muộn / về sớm thêm của ngày (0 = không hưởng)
+                    "child_care_minutes":   child_care_minutes.get(day_str, 0),
                     "explanation_quota_delta": agg_delta.get("explanation_quota_used", 0),
                     "explanation_quota_used": day_entries[-1].get("state_after", {}).get("explanation_quota_used", 0) if day_entries else 0,
                     "rules_applied":        [

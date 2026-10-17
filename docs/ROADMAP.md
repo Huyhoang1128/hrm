@@ -50,7 +50,7 @@ Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 
 | 2.9 | ✅ **Phân loại tài sản nhập tự do** | M | |
 | 2.10 | ✅ **Hạn mức ngày online theo NV / vị trí / phòng ban** | M | Mặc định lấy `CompanyConfig.max_online_work_count_per_month`. |
 | 2.11 | ✅ **Số công cố định của ca** (`ShiftConfig.fixed_workday`) | S–M | Để trống thì không có tác dụng. |
-| 2.12 | **Chế độ con nhỏ**: đi muộn / về sớm tối đa N phút | M | N cấu hình được. |
+| 2.12 | ✅ **Chế độ con nhỏ**: đi muộn / về sớm tối đa N phút | M | N cấu hình được. |
 | 2.13 | **Phạt thiếu công** theo danh sách NV được chọn | S–M | Danh sách rỗng thì không có tác dụng. |
 | 2.14 | **Đơn giải trình "Lỗi máy chấm công"** | M | Không tính vào hạn mức giải trình. |
 | 2.15 | **Khoá NV tự sửa hồ sơ** | S | Đặt sau một cờ trong `CompanyConfig`, mặc định tắt. |

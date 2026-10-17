@@ -22,7 +22,7 @@ from datetime import timedelta
 from dateutil.relativedelta import relativedelta
 from users.utils import get_user_display_name
 from employee.models import PROBATION_CONTRACT_TYPES, OFFICIAL_LABOR_CONTRACT_TYPES, probation_months_for
-from .models import OnlineWorkQuotaOverride
+from .models import OnlineWorkQuotaOverride, ChildCareRegime
 logger = logging.getLogger(__name__)
 
 
@@ -6297,3 +6297,39 @@ class OnlineWorkQuotaOverrideSerializer(serializers.ModelSerializer):
         if sum(1 for v in scopes if v is not None) != 1:
             raise serializers.ValidationError("Phải chọn đúng 1 trong 3: nhân viên, vị trí hoặc phòng ban.")
         return data
+
+
+class ChildCareRegimeSerializer(serializers.ModelSerializer):
+    """Một người hưởng chế độ con nhỏ trong một khoảng ngày."""
+    employee_code = serializers.CharField(source='employee.employee_id', read_only=True)
+    employee_name = serializers.CharField(source='employee.full_name', read_only=True)
+    department_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ChildCareRegime
+        fields = ['id', 'employee', 'employee_code', 'employee_name', 'department_name',
+                  'start_date', 'end_date', 'allowance_minutes', 'note', 'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at']
+
+    def get_department_name(self, obj):
+        return obj.employee.department.name if obj.employee.department_id else None
+
+    def validate(self, attrs):
+        employee = attrs.get('employee', getattr(self.instance, 'employee', None))
+        start = attrs.get('start_date', getattr(self.instance, 'start_date', None))
+        end = attrs.get('end_date', getattr(self.instance, 'end_date', None))
+        if start and end and end < start:
+            raise serializers.ValidationError({'end_date': 'Đến ngày phải sau hoặc bằng Từ ngày.'})
+        if employee and start:
+            overlap = ChildCareRegime.objects.filter(employee=employee).filter(
+                Q(end_date__isnull=True) | Q(end_date__gte=start)
+            )
+            if end:
+                overlap = overlap.filter(start_date__lte=end)
+            if self.instance is not None:
+                overlap = overlap.exclude(pk=self.instance.pk)
+            if overlap.exists():
+                raise serializers.ValidationError({
+                    'start_date': f'{employee.full_name} đã có chế độ con nhỏ trùng khoảng ngày này.',
+                })
+        return attrs

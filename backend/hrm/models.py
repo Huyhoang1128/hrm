@@ -2281,6 +2281,35 @@ class OnlineWorkQuotaOverride(models.Model):
             raise ValidationError("Phải chọn đúng 1 trong 3: nhân viên, vị trí hoặc phòng ban.")
 
 
+class ChildCareRegime(models.Model):
+    """Chế độ con nhỏ của 1 nhân viên trong 1 khoảng ngày: mỗi ngày được đi muộn tối
+    đa ``allowance_minutes`` phút và về sớm tối đa ``allowance_minutes`` phút — xem
+    hrm/child_care_regime.py. Lưu theo khoảng ngày để tính lại tháng cũ vẫn đúng."""
+    employee = models.ForeignKey(
+        Employee, on_delete=models.CASCADE, related_name='child_care_regimes',
+        verbose_name="Nhân viên",
+    )
+    start_date = models.DateField(verbose_name="Từ ngày")
+    end_date = models.DateField(null=True, blank=True, verbose_name="Đến ngày",
+                                help_text="Để trống = chưa xác định ngày kết thúc")
+    allowance_minutes = models.PositiveSmallIntegerField(
+        default=60, validators=[MinValueValidator(1), MaxValueValidator(240)],
+        verbose_name="Số phút được đi muộn / về sớm",
+        help_text="Áp dụng riêng cho mỗi chiều: đi muộn tối đa N phút và về sớm tối đa N phút mỗi ngày.",
+    )
+    note = models.CharField(max_length=255, blank=True, default='', verbose_name="Ghi chú")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Chế độ con nhỏ"
+        verbose_name_plural = "Chế độ con nhỏ"
+        ordering = ['-start_date', 'employee__full_name']
+
+    def __str__(self):
+        return f"{self.employee} · {self.start_date} → {self.end_date or '…'} · {self.allowance_minutes}'"
+
+
 class CompanyConfig(models.Model):
     """Cấu hình chung của công ty"""
     name = models.CharField(max_length=255, verbose_name="Tên cấu hình")
