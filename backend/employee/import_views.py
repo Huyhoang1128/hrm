@@ -290,6 +290,9 @@ class EmployeeSocialInsuranceImportView(APIView):
                 if employee.social_insurance_contribution_level == amount:
                     skipped += 1
                     continue
+                if employee.social_insurance_periods.exists():
+                    errors.append({"row": line_no, "employee": employee.employee_id, "error": 'Nhân viên đang quản lý BHXH theo kỳ đóng — sửa mức đóng trong "Kỳ đóng BHXH" thay vì trên hồ sơ.'})
+                    continue
 
                 employee.social_insurance_contribution_level = amount
                 employee.save(update_fields=['social_insurance_contribution_level', 'updated_at'])

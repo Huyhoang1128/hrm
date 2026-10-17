@@ -45,7 +45,7 @@ Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 
 | 2.4 | ✅ **Link tự cập nhật hồ sơ** cho NV đang làm (dùng lại form onboarding) | S–M | |
 | 2.5 | ✅ **Lịch sử trạng thái NV** + trạng thái Nghỉ thai sản | M | |
 | 2.6 | ✅ **Thêm loại hợp đồng**: 6 tháng, 3 năm, thử việc 1–2 tháng | S–M | Mọi chỗ kiểm tra "thử việc / chưa chính thức" phải nhận mã mới. |
-| 2.7 | **Quản lý BHXH theo kỳ** (nhiều bản ghi mỗi NV, tỷ lệ NLĐ/DN) | M | Cần quyết định: giữ trường trên hồ sơ làm "hiện tại" và thêm bảng lịch sử, hay thay hẳn. |
+| 2.7 | ✅ **Quản lý BHXH theo kỳ** (nhiều bản ghi mỗi NV, tỷ lệ NLĐ/DN) | M | Giữ trường trên hồ sơ làm "hiện tại" (tự cập nhật theo kỳ hiện hành) + bảng kỳ đóng; bảng lương lấy mức đóng theo kỳ của tháng, NV chưa có kỳ nào dùng trường trên hồ sơ. |
 | 2.8 | ✅ **Thông tin sử dụng tài sản** + file mẫu import; tách người sử dụng / người bàn giao | M | |
 | 2.9 | ✅ **Phân loại tài sản nhập tự do** | M | |
 | 2.10 | ✅ **Hạn mức ngày online theo NV / vị trí / phòng ban** | M | Mặc định lấy `CompanyConfig.max_online_work_count_per_month`. |

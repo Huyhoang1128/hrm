@@ -1029,3 +1029,50 @@ class EmployeeDependent(models.Model):
 
     def __str__(self):
         return f"{self.full_name} ({self.employee.employee_id})"
+
+
+class SocialInsurancePeriod(models.Model):
+    """Một kỳ đóng BHXH của nhân viên (từ tháng … đến tháng, lưu ngày 01) — xem
+    employee/social_insurance.py.
+
+    Nhân viên đã có kỳ đóng: bảng lương tháng nào lấy mức đóng của kỳ có hiệu lực tháng
+    đó (tháng không thuộc kỳ nào → không đóng), và trường social_insurance_contribution_level
+    trên hồ sơ tự cập nhật theo kỳ hiện hành. Chưa có kỳ nào thì vẫn dùng trường trên hồ sơ.
+    Tỷ lệ NLĐ / DN để ghi nhận; tiền trừ lương vẫn theo tỷ lệ luật định của bảng lương."""
+    DEFAULT_EMPLOYEE_RATE = 10.5
+    DEFAULT_EMPLOYER_RATE = 21.5
+
+    employee = models.ForeignKey(
+        Employee, on_delete=models.CASCADE, related_name='social_insurance_periods',
+        verbose_name="Nhân viên",
+    )
+    from_month = models.DateField(verbose_name="Từ tháng")
+    to_month = models.DateField(null=True, blank=True, verbose_name="Đến tháng",
+                                help_text="Để trống = đang đóng")
+    contribution_level = models.IntegerField(verbose_name="Mức đóng BHXH (VNĐ)")
+    employee_rate = models.DecimalField(max_digits=5, decimal_places=2, default=DEFAULT_EMPLOYEE_RATE,
+                                        verbose_name="Tỷ lệ người lao động đóng (%)")
+    employer_rate = models.DecimalField(max_digits=5, decimal_places=2, default=DEFAULT_EMPLOYER_RATE,
+                                        verbose_name="Tỷ lệ doanh nghiệp đóng (%)")
+    note = models.CharField(max_length=255, blank=True, default='', verbose_name="Ghi chú")
+    created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name='created_social_insurance_periods', verbose_name="Người tạo")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Kỳ đóng BHXH"
+        verbose_name_plural = "Kỳ đóng BHXH"
+        ordering = ['employee_id', '-from_month']
+
+    def save(self, *args, **kwargs):
+        # Chỉ quan tâm tháng: luôn lưu ngày 01.
+        if self.from_month:
+            self.from_month = self.from_month.replace(day=1)
+        if self.to_month:
+            self.to_month = self.to_month.replace(day=1)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        end = self.to_month.strftime('%m/%Y') if self.to_month else '…'
+        return f"BHXH {self.employee.employee_id} · {self.from_month:%m/%Y} → {end} · {self.contribution_level:,}đ"
