@@ -52,7 +52,7 @@ Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 
 | 2.11 | ✅ **Số công cố định của ca** (`ShiftConfig.fixed_workday`) | S–M | Để trống thì không có tác dụng. |
 | 2.12 | ✅ **Chế độ con nhỏ**: đi muộn / về sớm tối đa N phút | M | N cấu hình được. |
 | 2.13 | ✅ **Phạt thiếu công** theo danh sách NV được chọn | S–M | Danh sách rỗng thì không có tác dụng. |
-| 2.14 | **Đơn giải trình "Lỗi máy chấm công"** | M | Không tính vào hạn mức giải trình. |
+| 2.14 | ✅ **Đơn giải trình "Lỗi máy chấm công"** | M | Không tính vào hạn mức giải trình. |
 | 2.15 | **Khoá NV tự sửa hồ sơ** | S | Đặt sau một cờ trong `CompanyConfig`, mặc định tắt. |
 | 2.16 | ⛔ ~~**Vai trò BOD xem lương**~~ | S | Không làm: giữ "chỉ admin" xem lương. |
 
