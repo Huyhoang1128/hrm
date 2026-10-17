@@ -487,6 +487,50 @@ class LunchAllowanceOverride(models.Model):
         return f"PC ăn trưa {self.employee.full_name} – {self.month}/{self.year}: {self.amount:,.0f}đ"
 
 
+class MissingWorkdayPenalty(models.Model):
+    """
+    Phạt thiếu công: nhân viên trong danh sách (thường là quản lý không có lương
+    cứng) không đi đủ công chuẩn của tháng thì bị trừ
+        base_amount / công chuẩn × số công thiếu
+    trên bảng lương — xem salary/missing_workday_penalty.py. Danh sách rỗng thì
+    không ai bị phạt. Áp dụng theo khoảng tháng (from_month … to_month, lưu ngày
+    01) để tính lại bảng lương tháng cũ vẫn đúng sau khi bỏ người khỏi danh sách.
+    """
+    DEFAULT_BASE_AMOUNT = Decimal('10000000')
+
+    employee = models.ForeignKey(
+        'employee.Employee', on_delete=models.CASCADE,
+        related_name='missing_workday_penalties', verbose_name="Nhân viên",
+    )
+    from_month = models.DateField(verbose_name="Áp dụng từ tháng")
+    to_month = models.DateField(null=True, blank=True, verbose_name="Đến tháng",
+                                help_text="Để trống = chưa xác định tháng kết thúc")
+    base_amount = models.DecimalField(
+        max_digits=14, decimal_places=0, default=DEFAULT_BASE_AMOUNT,
+        verbose_name="Mốc lương tính phạt (VNĐ)",
+    )
+    note = models.CharField(max_length=255, blank=True, default='', verbose_name="Ghi chú")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Phạt thiếu công"
+        verbose_name_plural = "Phạt thiếu công"
+        ordering = ['-from_month', 'employee__full_name']
+
+    def save(self, *args, **kwargs):
+        # Chỉ quan tâm tháng: luôn lưu ngày 01.
+        if self.from_month:
+            self.from_month = self.from_month.replace(day=1)
+        if self.to_month:
+            self.to_month = self.to_month.replace(day=1)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        end = self.to_month.strftime('%m/%Y') if self.to_month else '…'
+        return f"Phạt thiếu công {self.employee} · {self.from_month:%m/%Y} → {end}"
+
+
 # ---------------------------------------------------------------------------
 # OvertimeRateConfig – Đơn giá tăng ca (M2M: dept/pos/emp, có hiệu lực)
 # ---------------------------------------------------------------------------

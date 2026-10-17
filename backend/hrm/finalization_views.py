@@ -4,7 +4,7 @@ API views for Work Finalization (Chốt công).
 import io
 import math
 import calendar as cal_module
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import datetime as _dt
 from collections import defaultdict
 from datetime import date
@@ -27,6 +27,7 @@ from .employee_work_utils import is_holiday_creditable, get_holiday_credit_for_e
 from users.utils import get_user_role
 from django.db.models import Q, Sum
 from salary.models import MonthlySalaryRecord
+from salary.missing_workday_penalty import active_penalty_bases, compute_missing_workday_penalty
 from salary.salary_data_models import (
     EmployeeSalaryHistory,
     OtherAllowance,
@@ -1437,6 +1438,7 @@ class SalaryMonthContext:
     dependent_counts: dict   # employee_id -> số người phụ thuộc có hồ sơ trong tháng
     bien_ban_penalties: dict  # employee_id -> tổng phạt biên bản
     sales_commissions: dict   # employee_id -> tổng hoa hồng
+    missing_workday_bases: dict = field(default_factory=dict)  # employee_id -> mốc lương phạt thiếu công
 
 
 def resolve_salary_employees(year: int, month: int, department_id=None, legal_entity: str = '',
@@ -1492,6 +1494,7 @@ def build_salary_context(employees: list, year: int, month: int) -> SalaryMonthC
         ),
         bien_ban_penalties=sums_by_employee(DisciplinaryPenalty),
         sales_commissions=sums_by_employee(SalesCommission),
+        missing_workday_bases=active_penalty_bases(employee_ids, year, month),
     )
 
 
@@ -1555,7 +1558,14 @@ def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
 
     attendance_penalty = _to_decimal(rec.tong_phat if rec else 0)
     bien_ban_penalty = ctx.bien_ban_penalties.get(employee.id, Decimal('0'))
-    total_penalty = attendance_penalty + bien_ban_penalty
+    # Phạt thiếu công (salary/missing_workday_penalty.py): chỉ NV trong danh sách và đã có bản chốt công.
+    missing_workdays, missing_workday_penalty = Decimal('0'), Decimal('0')
+    missing_workday_base = ctx.missing_workday_bases.get(employee.id)
+    if missing_workday_base is not None and rec is not None:
+        missing_workdays, missing_workday_penalty = compute_missing_workday_penalty(
+            missing_workday_base, standard_work_days, total_work_days,
+        )
+    total_penalty = attendance_penalty + bien_ban_penalty + missing_workday_penalty
 
     # Lương tăng ca: ưu tiên từ salary record đã tính, fallback tính từ OT rate config
     ot_pay = Decimal('0')
@@ -1687,6 +1697,8 @@ def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
         "cong_chuan": float(standard_work_days),
         "tong_phat": float(attendance_penalty),
         "tong_phat_bienban": float(bien_ban_penalty),
+        "cong_thieu": float(missing_workdays),
+        "phat_thieu_cong": float(missing_workday_penalty),
         "bh_deduction": float(bh_deduction),
         "muc_luong_dong_bh": float(ins_base),
         "luong_tang_ca": float(ot_pay),

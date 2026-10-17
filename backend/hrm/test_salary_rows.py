@@ -94,7 +94,8 @@ class SalaryRowsTests(APITestCase):
     def test_rows_lock_current_results(self):
         rows = {r['ma_nv']: r for r in self._get()['results']}
         self.assertEqual(list(rows), ['NV00101', 'NV00102', 'NV00103', 'NV00104'])  # NV00105 đã nghỉ trước tháng
-        self.assertEqual(len(rows['NV00101']), 50)
+        self.assertEqual(len(rows['NV00101']), 52)
+        self.assertEqual((rows['NV00101']['cong_thieu'], rows['NV00101']['phat_thieu_cong']), (0, 0))
         expected = {
             'NV00101': ('PROGRESSIVE', 20_800_000, 20_800_000),
             'NV00102': ('FLAT_10_PROBATION', 3_020_000, 2_718_000),

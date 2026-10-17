@@ -41,6 +41,9 @@ export interface SalaryRecord {
   cong_chuan?: number;
   tong_phat: number;
   tong_phat_bienban: number;
+  /** Phạt thiếu công: số công thiếu so với công chuẩn và tiền phạt (0 nếu không trong danh sách) */
+  cong_thieu?: number;
+  phat_thieu_cong?: number;
   bh_deduction: number;
   so_gio_tang_ca: number;
   luong_tang_ca: number;
