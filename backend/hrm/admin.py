@@ -740,8 +740,10 @@ class ShiftConfigAdmin(admin.ModelAdmin):
     """Admin interface for ShiftConfig"""
     list_display = ('code', 'name', 'shift_type_display', 'apply_scope_display', 'start_time', 'end_time',
                    'total_hours', 'working_hours', 'is_active', 'is_default', 'detection_only', 'counts_as_night_duty',
+                   'no_attendance_required',
                    'effective_from', 'effective_to', 'is_current_display', 'created_at')
-    list_filter = ('shift_type', 'apply_scope', 'is_active', 'is_default', 'detection_only', 'counts_as_night_duty', 'effective_from')
+    list_filter = ('shift_type', 'apply_scope', 'is_active', 'is_default', 'detection_only', 'counts_as_night_duty',
+                   'no_attendance_required', 'effective_from')
     search_fields = ('code', 'name', 'description')
     filter_horizontal = ('apply_to_departments', 'apply_to_positions', 'apply_to_employees')
     ordering = ('start_time', 'code')
@@ -758,7 +760,8 @@ class ShiftConfigAdmin(admin.ModelAdmin):
             'fields': ('apply_to_departments', 'apply_to_positions', 'apply_to_employees')
         }),
         ('Thông tin hiệu lực', {
-            'fields': ('is_active', 'is_default', 'detection_only', 'counts_as_night_duty', 'effective_from', 'effective_to'),
+            'fields': ('is_active', 'is_default', 'detection_only', 'counts_as_night_duty', 'no_attendance_required',
+                       'effective_from', 'effective_to'),
             'description': (
                 'Bật "Chỉ dùng để tự nhận diện" cho các ca DÀI/HOẠ HOẰN (vd "Ca kinh '
                 'doanh") mà bạn muốn gán cho nhiều vị trí/phòng ban để hệ thống tự nhận '
@@ -3427,7 +3430,7 @@ class EmployeeChangeRecordAdmin(admin.ModelAdmin):
 class WeeklyShiftPlanDayInline(admin.TabularInline):
     model = WeeklyShiftPlanDay
     extra = 0
-    raw_id_fields = ('shift', 'shift_2')
+    raw_id_fields = ('shift', 'shift_2', 'extra_shift')
 
 
 @admin.register(WeeklyShiftPlan)

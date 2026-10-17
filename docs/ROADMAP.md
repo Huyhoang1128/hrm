@@ -64,7 +64,7 @@ Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 
 | 3.2 | ✅ **Điều chỉnh nhân sự có ngày hiệu lực** (phòng ban / vị trí / lương), huỷ được, có log | M–L | Phần lương ghi vào `EmployeeSalaryHistory`. |
 | 3.3 | ✅ **Hạn mức giải trình theo từng loại** + rổ gộp cho trưởng phòng | L | Có 2 chế độ: COMBINED (mặc định) và PER_TYPE. |
 | 3.4 | ✅ **Kế hoạch ca theo tuần**: chọn ca tự do, duyệt 2 bước, khoá, nhập / xuất Excel | L | Model `WeeklyShiftPlan` (tách khỏi `ShiftRegistration`); kế hoạch đã duyệt được ưu tiên khi chấm công. |
-| 3.5 | Ca online cộng thêm (không cần chấm) | M | Làm sau 3.4. |
+| 3.5 | ✅ **Ca online cộng thêm** (không cần chấm công) | M | Ca có cờ `no_attendance_required`, chọn ở ô "Ca online thêm" của kế hoạch ca tuần; được cộng số công cố định của ca. |
 | 3.6 | Cấu hình lương theo mốc hiệu lực | L | Hoãn, vì chủ yếu là nợ kỹ thuật. |
 | 3.7 | Tối ưu giao diện cho điện thoại | L | Làm dần theo từng trang. |
 

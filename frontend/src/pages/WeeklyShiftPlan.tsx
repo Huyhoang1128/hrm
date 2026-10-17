@@ -29,9 +29,11 @@ import {
 interface DayRow {
   shift: number | '';
   shift_2: number | '';
+  /** Ca online cộng thêm (không chấm công) */
+  extra: number | '';
 }
 
-const emptyWeek = (): DayRow[] => Array.from({ length: 7 }, () => ({ shift: '', shift_2: '' }));
+const emptyWeek = (): DayRow[] => Array.from({ length: 7 }, () => ({ shift: '', shift_2: '', extra: '' }));
 
 /**
  * Kế hoạch ca theo tuần: chọn ca cho từng ngày (để trống = nghỉ), lưu nháp, gửi duyệt —
@@ -84,7 +86,7 @@ const WeeklyShiftPlan: React.FC = () => {
       const next = emptyWeek();
       found?.days.forEach((d) => {
         const index = dates.indexOf(d.date);
-        if (index >= 0) next[index] = { shift: d.shift ?? '', shift_2: d.shift_2 ?? '' };
+        if (index >= 0) next[index] = { shift: d.shift ?? '', shift_2: d.shift_2 ?? '', extra: d.extra_shift ?? '' };
       });
       setRows(next);
     } catch (err) {
@@ -99,7 +101,12 @@ const WeeklyShiftPlan: React.FC = () => {
   }, [load]);
 
   const payload = (): PlanDayInput[] =>
-    rows.map((r, i) => ({ date: dates[i], shift: r.shift === '' ? null : r.shift, shift_2: r.shift_2 === '' ? null : r.shift_2 }));
+    rows.map((r, i) => ({
+      date: dates[i],
+      shift: r.shift === '' ? null : r.shift,
+      shift_2: r.shift_2 === '' ? null : r.shift_2,
+      extra_shift: r.extra === '' ? null : r.extra,
+    }));
 
   const run = async (fn: () => Promise<Plan | void>, ok: string) => {
     setBusy(true);
@@ -154,10 +161,19 @@ const WeeklyShiftPlan: React.FC = () => {
     }
   };
 
+  const shiftLabel = (s: ShiftBrief) => `${s.code} · ${s.start_time.slice(0, 5)}–${s.end_time.slice(0, 5)}`;
   const shiftOptions = [
     { value: '' as const, label: 'Nghỉ / không chọn' },
-    ...shifts.map((s) => ({ value: s.id, label: `${s.code} · ${s.start_time.slice(0, 5)}–${s.end_time.slice(0, 5)}` })),
+    ...shifts.filter((s) => !s.no_attendance_required).map((s) => ({ value: s.id, label: shiftLabel(s) })),
   ];
+  // Ca online cộng thêm: không chấm công, được số công cố định của ca (mặc định 0,5)
+  const onlineOptions = [
+    { value: '' as const, label: 'Không có ca online' },
+    ...shifts
+      .filter((s) => s.no_attendance_required)
+      .map((s) => ({ value: s.id, label: `${shiftLabel(s)} · +${s.fixed_workday != null ? Number(s.fixed_workday) : 0.5} công` })),
+  ];
+  const hasOnline = onlineOptions.length > 1;
 
   return (
     <div className="space-y-5">
@@ -246,7 +262,10 @@ const WeeklyShiftPlan: React.FC = () => {
         ) : (
           <div className="divide-y divide-gray-100 rounded-xl border border-gray-100">
             {dates.map((date, i) => (
-              <div key={date} className="grid grid-cols-1 gap-2 px-3 py-3 sm:grid-cols-[9rem_1fr_1fr] sm:items-center">
+              <div
+                key={date}
+                className={`grid grid-cols-1 gap-2 px-3 py-3 sm:items-center ${hasOnline ? 'sm:grid-cols-[9rem_1fr_1fr_1fr]' : 'sm:grid-cols-[9rem_1fr_1fr]'}`}
+              >
                 <div className="text-sm font-medium text-gray-800">
                   {WEEKDAY_LABELS[i]} <span className="text-gray-400">{formatDate(date)}</span>
                 </div>
@@ -266,6 +285,15 @@ const WeeklyShiftPlan: React.FC = () => {
                   disabled={disabled || rows[i].shift === ''}
                   searchable
                 />
+                {hasOnline && (
+                  <SelectBox<number | ''>
+                    label=""
+                    value={rows[i].extra}
+                    options={onlineOptions}
+                    onChange={(v) => setRows((prev) => prev.map((r, j) => (j === i ? { ...r, extra: v } : r)))}
+                    disabled={disabled}
+                  />
+                )}
               </div>
             ))}
           </div>

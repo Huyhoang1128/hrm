@@ -158,7 +158,8 @@ def load_shift_configs_for_employee(employee_code: str, ref_date, _cache: dict =
         nào mà không cần phòng đó có sẵn ca ngắn nào để "đấu" cùng cấp.
         """
         for sc in sorted(queryset, key=lambda sc: (sc.start_time, sc.working_hours)):
-            if sc.detection_only:
+            # Ca online (no_attendance_required) không có giờ vào / ra — không làm ca mặc định
+            if sc.detection_only or sc.no_attendance_required:
                 continue
             rule_type = _SHIFT_TYPE_TO_RULE_TYPE.get(sc.shift_type, 'SHIFT_RULE_MORNING')
             if rule_type not in seen_rule_types:
@@ -236,8 +237,11 @@ def get_all_candidate_shifts_for_employee(employee_code: str, ref_date, _cache: 
             scope_q |= Q(apply_to_departments=employee.department_id)
         # Không lọc effective_from/effective_to ở đây -> tái dùng được cho
         # MỌI ref_date của cùng nhân viên; lọc theo ngày làm ở Python bên dưới.
-        scoped = list(ShiftConfig.objects.filter(is_active=True).filter(scope_q).distinct())
-        default_fallback = list(ShiftConfig.objects.filter(is_active=True, is_default=True))
+        # Ca online (no_attendance_required) không có giờ vào / ra — không bao giờ nhận diện
+        scoped = list(ShiftConfig.objects.filter(is_active=True, no_attendance_required=False)
+                      .filter(scope_q).distinct())
+        default_fallback = list(ShiftConfig.objects.filter(is_active=True, is_default=True,
+                                                           no_attendance_required=False))
         cached = (scoped, default_fallback)
         if _cache is not None:
             _cache[key] = cached

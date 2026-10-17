@@ -34,4 +34,7 @@ EVENT_RULE_CATEGORY_MAP = {
     "explanation_approval": ["EXPLANATION_APPROVAL_RULE"],
     "online_work":          ["ONLINE_WORK_RULE"],
     "off_duty":             ["OVERTIME_RULE"],
+    # Ca online cộng thêm trong kế hoạch ca tuần đã duyệt — sự kiện tổng hợp do
+    # replay_month tạo (hrm/online_shift.py), không lưu trong DB.
+    "registered_online_shift": ["ONLINE_SHIFT_RULE"],
 }

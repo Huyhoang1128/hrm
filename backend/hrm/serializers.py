@@ -2033,7 +2033,8 @@ class ShiftConfigSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'code', 'description',
             'start_time', 'end_time', 'break_start_time', 'break_end_time', 'break_duration_minutes',
-            'total_hours', 'working_hours', 'fixed_workday', 'shift_type', 'shift_type_display',
+            'total_hours', 'working_hours', 'fixed_workday', 'no_attendance_required',
+            'shift_type', 'shift_type_display',
             'apply_scope', 'apply_scope_display',
             'apply_to_departments', 'apply_to_positions', 'apply_to_employees',
             'effective_from', 'effective_to',

@@ -1526,6 +1526,14 @@ class AttendanceCalendarView(APIView):
                     badge = "Duyệt 0.5 công online"
                 return "ONLINE_WORK", badge
 
+        # Ca online cộng thêm (kế hoạch ca tuần, hrm/online_shift.py)
+        online_credits = agg_effects.get("cong_ca_online", 0) or 0
+        if online_credits > 0 and total_work_credits > 0:
+            on_site = total_work_credits - online_credits
+            badge = ("Có mặt + ca online" if on_site >= 1.0
+                     else "Nửa công + ca online" if on_site > 0 else "Ca online")
+            return ("FULL" if total_work_credits >= 1.0 else "HALF"), badge
+
         if total_work_credits >= 1.0:
             return "FULL", "Có mặt"
         if total_work_credits > 0:
