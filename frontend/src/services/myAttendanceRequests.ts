@@ -54,6 +54,7 @@ const TYPE_LABELS: Record<string, string> = {
   LATE: 'Đơn giải trình đi muộn',
   EARLY_LEAVE: 'Đơn giải trình về sớm',
   INCOMPLETE_ATTENDANCE: 'Đơn giải trình quên chấm công',
+  MACHINE_ERROR: 'Đơn giải trình lỗi máy chấm công',
   BUSINESS_TRIP: 'Đơn giải trình công tác',
   FIRST_DAY: 'Đơn giải trình ngày đầu',
   OVERTIME: 'Đơn đăng ký tăng ca',

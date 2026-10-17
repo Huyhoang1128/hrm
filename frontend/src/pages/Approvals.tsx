@@ -36,6 +36,7 @@ const EXPLANATION_SUB_TYPES = [
   { value: 'EARLY_LEAVE', label: 'Về sớm' },
   { value: 'LATE_EARLY', label: 'Đi muộn/Về sớm' },
   { value: 'INCOMPLETE_ATTENDANCE', label: 'Quên chấm công' },
+  { value: 'MACHINE_ERROR', label: 'Lỗi máy chấm công' },
   { value: 'BUSINESS_TRIP', label: 'Đi công tác' },
   { value: 'FIRST_DAY', label: 'Ngày đầu đi làm' },
 ];
@@ -1049,6 +1050,7 @@ const Approvals: React.FC = () => {
     EARLY_LEAVE: 'Về sớm',
     LATE_EARLY: 'Đi muộn/Về sớm',
     INCOMPLETE_ATTENDANCE: 'Quên chấm công',
+    MACHINE_ERROR: 'Lỗi máy chấm công',
     BUSINESS_TRIP: 'Đi công tác',
     FIRST_DAY: 'Ngày đầu đi làm',
     OTHER: 'Giải trình khác',
@@ -4663,7 +4665,7 @@ const Approvals: React.FC = () => {
                                                             {calculateDuration(item.start_time, item.end_time)}
                                                           </span>
                                                         )}
-                                                        {item.explanation_type === 'INCOMPLETE_ATTENDANCE' && (
+                                                        {['INCOMPLETE_ATTENDANCE', 'MACHINE_ERROR'].includes(item.explanation_type) && (
                                                           (() => {
                                                             const checkIn = item.actual_check_in || item.forgot_checkin_time;
                                                             const checkOut = item.actual_check_out || item.forgot_checkout_time;
@@ -4816,14 +4818,14 @@ const Approvals: React.FC = () => {
                                                 )}
 
                                                 {(item.late_minutes > 0 || item.early_leave_minutes > 0 || item.penalty_amount > 0
-                                                  || (item.explanation_type === 'INCOMPLETE_ATTENDANCE' && (item.actual_check_in || item.forgot_checkin_time || item.actual_check_out || item.forgot_checkout_time))
+                                                  || (['INCOMPLETE_ATTENDANCE', 'MACHINE_ERROR'].includes(item.explanation_type) && (item.actual_check_in || item.forgot_checkin_time || item.actual_check_out || item.forgot_checkout_time))
                                                   || renderLeavePayCategoryBadge(item)) && (
                                                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
                                                     {renderLeavePayCategoryBadge(item)}
                                                     {item.late_minutes > 0 && <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[11px] font-medium rounded border border-amber-100">Muộn {item.late_minutes}m</span>}
                                                     {item.early_leave_minutes > 0 && <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[11px] font-medium rounded border border-amber-100">Về sớm {item.early_leave_minutes}m</span>}
-                                                    {item.explanation_type === 'INCOMPLETE_ATTENDANCE' && (item.actual_check_in || item.forgot_checkin_time) && <span className="px-2 py-0.5 bg-gray-50 text-gray-600 text-[11px] font-medium rounded border border-gray-200">Vào {(item.actual_check_in || item.forgot_checkin_time)?.substring(0, 5)}</span>}
-                                                    {item.explanation_type === 'INCOMPLETE_ATTENDANCE' && (item.actual_check_out || item.forgot_checkout_time) && <span className="px-2 py-0.5 bg-gray-50 text-gray-600 text-[11px] font-medium rounded border border-gray-200">Ra {(item.actual_check_out || item.forgot_checkout_time)?.substring(0, 5)}</span>}
+                                                    {['INCOMPLETE_ATTENDANCE', 'MACHINE_ERROR'].includes(item.explanation_type) && (item.actual_check_in || item.forgot_checkin_time) && <span className="px-2 py-0.5 bg-gray-50 text-gray-600 text-[11px] font-medium rounded border border-gray-200">Vào {(item.actual_check_in || item.forgot_checkin_time)?.substring(0, 5)}</span>}
+                                                    {['INCOMPLETE_ATTENDANCE', 'MACHINE_ERROR'].includes(item.explanation_type) && (item.actual_check_out || item.forgot_checkout_time) && <span className="px-2 py-0.5 bg-gray-50 text-gray-600 text-[11px] font-medium rounded border border-gray-200">Ra {(item.actual_check_out || item.forgot_checkout_time)?.substring(0, 5)}</span>}
                                                     {item.penalty_amount > 0 && <span className="px-2 py-0.5 bg-rose-500 text-white text-[11px] font-semibold rounded">-{item.penalty_amount.toLocaleString('vi-VN')}</span>}
                                                   </div>
                                                 )}
@@ -5894,7 +5896,7 @@ const Approvals: React.FC = () => {
                                 )}
 
                                 {/* Hiển thị timeline quên chấm công */}
-                                {selectedExplanation.explanation_type === 'INCOMPLETE_ATTENDANCE' && (
+                                {['INCOMPLETE_ATTENDANCE', 'MACHINE_ERROR'].includes(selectedExplanation.explanation_type) && (
                                   <div className="mt-4 p-4 rounded-lg bg-primary-50/50 border border-primary-100 shadow-sm">
                                     <div className="flex items-center gap-3 mb-4">
                                       <div className="flex-shrink-0 w-9 h-9 bg-primary-500 rounded-lg flex items-center justify-center text-white shadow-lg shadow-primary-200">
