@@ -1,5 +1,9 @@
 import { managementApi } from '../utils/api';
 
+/** Mã loại tài liệu — đúng COMPANY_DOCUMENT_TYPE của backend (hrm/models.py). Backend lọc
+ *  document_type theo đúng danh sách này, mã lạ bị trả 400. */
+export type CompanyDocumentType = 'TRAINING' | 'ANNOUNCEMENT' | 'REGULATION' | 'FORM' | 'PROCEDURE' | 'OTHER';
+
 export interface CompanyDocument {
   id: number;
   document_code: string;
@@ -122,7 +126,7 @@ export const companyDocumentAPI = {
   },
 
   // Get documents by type
-  getByType: async (documentType: string, params?: {
+  getByType: async (documentType: CompanyDocumentType, params?: {
     page?: number;
     page_size?: number;
     search?: string;

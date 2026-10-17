@@ -24,8 +24,8 @@ const InternalForms: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      // Fetch internal forms (document_type = 'INTERNAL_FORM')
-      const response = await companyDocumentAPI.getByType('INTERNAL_FORM', {
+      // Fetch internal forms (document_type = 'FORM')
+      const response = await companyDocumentAPI.getByType('FORM', {
         page_size: 50
       });
       
