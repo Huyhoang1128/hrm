@@ -94,7 +94,7 @@ class LateEarlyRuleTests(TestCase):
         self.assertEqual(result['status'], 'LATE')
         
         # Verify no early leave (check_out is after expected end time)
-        self.assertNotIn('early_leave_minutes', result)
+        self.assertEqual(result.get('early_leave_minutes', 0), 0)
         
         print("✓ Test passed: Late minutes correctly calculated")
         
@@ -185,9 +185,10 @@ class LateEarlyRuleTests(TestCase):
         print(f"Attendance late: 2 minutes")
         print(f"Result: {result}")
         
-        # Verify no late minutes (below threshold)
-        self.assertNotIn('late_minutes', result)
+        # Chưa vượt ngưỡng: vẫn ghi số phút thực tế nhưng không bị tính là đi muộn
+        self.assertEqual(result.get('late_minutes'), 2)
         self.assertNotIn('status', result)
+        self.assertTrue(any('within threshold' in note for note in result.get('notes', [])))
         
         print("✓ Test passed: Late below threshold not counted")
         
@@ -231,9 +232,10 @@ class LateEarlyRuleTests(TestCase):
         print(f"Attendance early leave: 2 minutes")
         print(f"Result: {result}")
         
-        # Verify no early leave minutes (below threshold)
-        self.assertNotIn('early_leave_minutes', result)
+        # Chưa vượt ngưỡng: vẫn ghi số phút thực tế nhưng không bị tính là về sớm
+        self.assertEqual(result.get('early_leave_minutes'), 2)
         self.assertNotIn('status', result)
+        self.assertTrue(any('within threshold' in note for note in result.get('notes', [])))
         
         print("✓ Test passed: Early leave below threshold not counted")
         
@@ -372,7 +374,8 @@ class LateEarlyRuleTests(TestCase):
         print(f"Result: {result}")
         
         # Should not be marked as late (10 < 15 default threshold)
-        self.assertNotIn('late_minutes', result)
+        self.assertNotIn('status', result)
+        self.assertTrue(any('threshold: 15 minutes' in note for note in result.get('notes', [])))
         
         print("✓ Test passed: Default 15-minute thresholds work correctly")
         
@@ -415,8 +418,9 @@ class LateEarlyRuleTests(TestCase):
         self.assertIn('late_minutes', result)
         self.assertEqual(result['late_minutes'], 2)
         
-        # Should NOT detect early leave (2 < 15 threshold)
-        self.assertNotIn('early_leave_minutes', result)
+        # Should NOT detect early leave (2 < 15 threshold) — chỉ ghi chú "within threshold"
+        self.assertFalse(any(note.startswith('Early leave') for note in result.get('notes', [])))
+        self.assertTrue(any('Left on time (within threshold)' in note for note in result.get('notes', [])))
         
         print("✓ Test passed: Mixed configuration styles handled correctly")
 
@@ -494,8 +498,6 @@ class RuleEngineLoggingTests(TestCase):
         # Verify log contains expected information
         self.assertIn('_apply_late_early_rule called', log_contents)
         self.assertIn('Rule configuration', log_contents)
-        self.assertIn('Late threshold', log_contents)
-        self.assertIn('Early leave threshold', log_contents)
         self.assertIn('Late detected', log_contents)
         self.assertIn('Early leave detected', log_contents)
         

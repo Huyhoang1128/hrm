@@ -78,10 +78,6 @@ Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 
 - **`FakeRequest` trong [salary/views.py](../backend/salary/views.py)**: 5 chỗ gọi lại
   `SalaryDepartmentView` bằng request giả. Hiện vẫn an toàn vì viewset bên ngoài đã yêu cầu
   `SalaryAdminPermission`, nhưng cách làm này dễ vỡ. Sẽ xử lý trong 2.1.
-- **18 test lỗi thời**: dùng ngày gán cứng (tháng 9/2026) nên nay đã quá hạn tạo đơn, cộng
-  thêm vài test rule engine cũ. Gồm `test_unauthorized_absence_half_day`,
-  `test_unauthorized_absence_deadline_staircase`, `test_request_edit_delete_self_service` (2 test),
-  `tests.LateEarlyRuleTests`, `tests.RuleEngineLoggingTests`, `test_birthdays`.
 - **FE còn ~30 trang mẫu "chatbot admin"** (`/dashboard/chatbots`, `/documents`, `/api-keys`,
   `/bot-permissions`, `/users/*`…): có route nhưng không có trong menu, backend không tồn tại. Cần dọn.
 - **Địa điểm làm việc** đang là danh sách cố định (`WORK_LOCATION` trong `employee/models.py` và

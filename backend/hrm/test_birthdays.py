@@ -57,7 +57,8 @@ class BirthdayEmployeesTests(TestCase):
         response = self.view(request)
 
         self.assertEqual(response.status_code, 200)
+        rows = response.data['results'] if isinstance(response.data, dict) else response.data
         self.assertEqual(
-            {employee['employee_id'] for employee in response.data},
+            {employee['employee_id'] for employee in rows},
             {active.employee_id, future_departure.employee_id, suspended.employee_id},
         )
