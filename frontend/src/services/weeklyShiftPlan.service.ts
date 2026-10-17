@@ -9,14 +9,19 @@ export interface ShiftBrief {
   start_time: string;
   end_time: string;
   shift_type: string;
+  /** Ca online không chấm công — chỉ chọn ở ô "Ca online thêm" */
+  no_attendance_required: boolean;
+  fixed_workday: string | null;
 }
 
 export interface WeeklyShiftPlanDay {
   date: string;
   shift: number | null;
   shift_2: number | null;
+  extra_shift: number | null;
   shift_detail: ShiftBrief | null;
   shift_2_detail: ShiftBrief | null;
+  extra_shift_detail: ShiftBrief | null;
 }
 
 export interface WeeklyShiftPlan {
@@ -49,6 +54,7 @@ export interface PlanDayInput {
   date: string;
   shift: number | null;
   shift_2?: number | null;
+  extra_shift?: number | null;
 }
 
 export interface UploadResult {
@@ -162,5 +168,6 @@ export const pendingStepLabel = (plan: WeeklyShiftPlan) =>
 export const dayLabel = (day?: WeeklyShiftPlanDay) => {
   if (!day) return '—';
   const codes = [day.shift_detail?.code, day.shift_2_detail?.code].filter(Boolean);
+  if (day.extra_shift_detail) codes.push(`${day.extra_shift_detail.code} (online)`);
   return codes.length ? codes.join(' + ') : 'Nghỉ';
 };

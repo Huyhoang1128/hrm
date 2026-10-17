@@ -562,6 +562,7 @@ const ShiftCard: React.FC<{
               {shift.start_time} – {shift.end_time} · {shift.total_hours}h
               {shift.shift_type_display ? ` · ${shift.shift_type_display}` : ''}
               {shift.fixed_workday != null && shift.fixed_workday !== '' ? ` · ${Number(shift.fixed_workday)} công cố định` : ''}
+              {shift.no_attendance_required ? ' · Ca online, không chấm công' : ''}
             </p>
           </div>
         </div>

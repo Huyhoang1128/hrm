@@ -97,7 +97,9 @@ class EmployeeState:
     EVENT_RULE_CATEGORY_MAP = EVENT_RULE_CATEGORY_MAP
 
     # Fields in effects that are informational only and must not be committed to state
-    _INFORMATIONAL_EFFECT_FIELDS = frozenset({"late_minutes", "early_leave_minutes", "late_penalty", "early_leave_penalty"})
+    # cong_ca_online: phần công từ ca online cộng thêm — để lịch chấm công tách nhãn riêng.
+    _INFORMATIONAL_EFFECT_FIELDS = frozenset({"late_minutes", "early_leave_minutes", "late_penalty", "early_leave_penalty",
+                                              "cong_ca_online"})
 
     # Sanity threshold for annual leave balance (days). Values beyond this indicate bad data.
     _MAX_REASONABLE_ANNUAL_LEAVE_DAYS = 9999
@@ -372,6 +374,8 @@ class EmployeeState:
             return self._evaluate_explanation_approval_rule(event, rule)
         elif rule_type == "ONLINE_WORK_RULE":
             return self._evaluate_online_work_rule(event, rule)
+        elif rule_type == "ONLINE_SHIFT_RULE":
+            return self._evaluate_online_shift_rule(event, rule)
         else:
             return {}  # Unknown rule type, no effect
 
@@ -1561,6 +1565,15 @@ class EmployeeState:
             workday = conditions.get("workday", 1.0)
             return effects
 
+    def _evaluate_online_shift_rule(self, event: Event, rule: dict) -> dict:
+        """Ca online cộng thêm đã duyệt (hrm/online_shift.py): cộng đúng số công cố định của
+        ca — CỘNG THÊM vào công ca chính cùng ngày, không cần giờ vào / ra."""
+        if event.event_type != "registered_online_shift":
+            return {}
+        workday = float(event.data.get("workday") or 0)
+        print(f"[Online Shift Rule] {event.data.get('date')} ca {event.data.get('shift_code')} → +{workday} công")
+        return {"nua_ngay_cong": workday, "cong_ca_online": workday}
+
     def _evaluate_online_work_rule(self, event: Event, rule: dict) -> dict:
         """
         Evaluate online work rule effect.
@@ -2532,6 +2545,15 @@ class EmployeeState:
             })
             print("Added default ONLINE_WORK_RULE fallback rule")
 
+        # Ca online cộng thêm (kế hoạch ca tuần) — rule mặc định
+        if not any(r.get('rule_type', '') == 'ONLINE_SHIFT_RULE' for r in state.rules):
+            state.rules.append({
+                "rule_name": "Default Online Shift Rule",
+                "rule_type": "ONLINE_SHIFT_RULE",
+                "conditions": {},
+                "priority": 0,
+            })
+
         # Tăng ca / Làm thêm giờ default rule
         has_ot_rules = any(
             r.get('rule_type', '') == 'OVERTIME_RULE'
@@ -2899,6 +2921,21 @@ class EmployeeState:
             event_obj = Event(event.event_type, event_data)
             print(f"Applying rules for event: {event.event_type} on {event.event_date} (Status: {event_data.get('status')})")
             state.apply_rules(event_obj)
+
+        # Ca online cộng thêm đã duyệt: cộng công SAU mọi event của tháng, để phần "bù đủ
+        # công" của đơn giải trình (mục tiêu − công đã có) không tính nhầm công ca online
+        # vào ca chính (hrm/online_shift.py).
+        if employee_obj is not None:
+            from .online_shift import approved_online_shifts, online_shift_workday
+            _online = approved_online_shifts(employee_obj.id, year, month)
+            for _d in sorted(_online):
+                _sc = _online[_d]
+                state.apply_rules(Event("registered_online_shift", {
+                    "date": _d.isoformat(),
+                    "employee_id": employee_code,
+                    "shift_code": _sc.code,
+                    "workday": online_shift_workday(_sc),
+                }))
 
         # Lưu số ngày phép còn lại sau khi tính toán
         if employee_obj is not None:

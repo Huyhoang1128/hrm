@@ -62,13 +62,16 @@ class WeeklyShiftPlan(models.Model):
 
 class WeeklyShiftPlanDay(models.Model):
     """1 ngày trong kế hoạch: `shift` (ca chính) + `shift_2` (tuỳ chọn — vd ca chiều khi 1
-    ngày làm 2 ca sáng / chiều). Cả hai trống = nghỉ."""
+    ngày làm 2 ca sáng / chiều). Cả hai trống = nghỉ. `extra_shift`: ca online cộng thêm
+    (chỉ nhận ca no_attendance_required — hrm/online_shift.py), không ảnh hưởng chấm công."""
     plan = models.ForeignKey(WeeklyShiftPlan, on_delete=models.CASCADE, related_name='days')
     date = models.DateField(verbose_name="Ngày")
     shift = models.ForeignKey('hrm.ShiftConfig', null=True, blank=True, on_delete=models.PROTECT,
                               related_name='weekly_plan_days', verbose_name="Ca")
     shift_2 = models.ForeignKey('hrm.ShiftConfig', null=True, blank=True, on_delete=models.PROTECT,
                                 related_name='weekly_plan_days_second', verbose_name="Ca thứ 2")
+    extra_shift = models.ForeignKey('hrm.ShiftConfig', null=True, blank=True, on_delete=models.PROTECT,
+                                    related_name='weekly_plan_extra_days', verbose_name="Ca online thêm")
 
     class Meta:
         verbose_name = "Ngày trong kế hoạch ca"
@@ -78,7 +81,7 @@ class WeeklyShiftPlanDay(models.Model):
         indexes = [models.Index(fields=['date'])]
 
     def __str__(self):
-        names = [s.code for s in (self.shift, self.shift_2) if s] or ['Nghỉ']
+        names = [s.code for s in (self.shift, self.shift_2, self.extra_shift) if s] or ['Nghỉ']
         return f"{self.date:%d/%m/%Y}: {' + '.join(names)}"
 
 

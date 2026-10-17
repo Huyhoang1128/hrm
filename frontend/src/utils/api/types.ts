@@ -664,6 +664,8 @@ export interface ShiftConfig {
   working_hours: number;
   /** Số công cố định của ca; null = tự tính theo giờ làm */
   fixed_workday?: number | string | null;
+  /** Ca online không chấm công — chỉ chọn ở ô "Ca online thêm" của kế hoạch ca tuần */
+  no_attendance_required?: boolean;
   shift_type: string;
   shift_type_display: string;
   apply_scope?: 'CA_NHAN' | 'VI_TRI' | 'PHONG_BAN' | 'DEFAULT' | null;

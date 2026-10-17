@@ -2466,6 +2466,13 @@ class ShiftConfig(models.Model):
         verbose_name="Số công cố định",
         help_text="Để trống thì tự tính theo số giờ làm việc (> 5,5 giờ = 1 công, còn lại = 0,5 công).",
     )
+    # Ca online không chấm công (hrm/online_shift.py): chỉ chọn được ở ô "Ca online thêm" của
+    # kế hoạch ca tuần; đã duyệt là được fixed_workday công (trống = 0,5), không cần giờ vào / ra.
+    # Không bao giờ dùng để khớp giờ chấm công.
+    no_attendance_required = models.BooleanField(
+        default=False, verbose_name="Ca online, không cần chấm công",
+        help_text="Kế hoạch ca tuần đã duyệt là được cộng số công cố định của ca (để trống = 0,5 công).",
+    )
     
     # Loại ca
     shift_type = models.CharField(max_length=20, choices=[

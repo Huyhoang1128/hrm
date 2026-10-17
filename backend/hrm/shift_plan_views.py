@@ -11,6 +11,9 @@ xoá và nhập Excel. Nhập Excel (HCNS / Admin) ghi thẳng kế hoạch Đã
 
 Nhân viên đang thuộc phạm vi "Đăng ký ca" (ShiftRegistrationScopeConfig) không lập kế hoạch
 tuần — tránh 2 cơ chế chọn ca cùng lúc cho 1 người.
+
+Ca online (ShiftConfig.no_attendance_required) chỉ chọn ở ô "Ca online thêm" (extra_shift),
+không chọn làm ca chính / ca thứ 2 — xem hrm/online_shift.py.
 """
 import datetime as dt
 import io
@@ -52,16 +55,18 @@ class PlanError(Exception):
 class ShiftBriefSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShiftConfig
-        fields = ['id', 'code', 'name', 'start_time', 'end_time', 'shift_type']
+        fields = ['id', 'code', 'name', 'start_time', 'end_time', 'shift_type', 'no_attendance_required',
+                  'fixed_workday']
 
 
 class WeeklyShiftPlanDaySerializer(serializers.ModelSerializer):
     shift_detail = ShiftBriefSerializer(source='shift', read_only=True)
     shift_2_detail = ShiftBriefSerializer(source='shift_2', read_only=True)
+    extra_shift_detail = ShiftBriefSerializer(source='extra_shift', read_only=True)
 
     class Meta:
         model = WeeklyShiftPlanDay
-        fields = ['date', 'shift', 'shift_2', 'shift_detail', 'shift_2_detail']
+        fields = ['date', 'shift', 'shift_2', 'extra_shift', 'shift_detail', 'shift_2_detail', 'extra_shift_detail']
 
 
 def _name(employee):
@@ -146,12 +151,22 @@ def _check_overlap(first, second):
         raise PlanError(f'Ca {first.code} và {second.code} bị trùng giờ.')
 
 
+def _check_kinds(shift, shift_2, extra):
+    """Ca chính / ca thứ 2 phải là ca chấm công; ca online thêm phải là ca online."""
+    for main in (shift, shift_2):
+        if main and main.no_attendance_required:
+            raise PlanError(f'Ca {main.code} là ca online — chọn ở ô "Ca online thêm".')
+    if extra and not extra.no_attendance_required:
+        raise PlanError(f'Ca {extra.code} không phải ca online — chọn ở ô ca chính.')
+
+
 def _parse_days(raw_days, week_start):
-    """[(ngày, ca, ca thứ 2)] từ payload days=[{date, shift, shift_2?}]."""
+    """[(ngày, ca, ca thứ 2, ca online thêm)] từ payload days=[{date, shift, shift_2?, extra_shift?}]."""
     if not isinstance(raw_days, list):
         raise PlanError('days phải là danh sách.')
     week_end = week_start + dt.timedelta(days=6)
-    ids = {item.get(k) for item in raw_days if isinstance(item, dict) for k in ('shift', 'shift_2') if item.get(k)}
+    ids = {item.get(k) for item in raw_days if isinstance(item, dict)
+           for k in ('shift', 'shift_2', 'extra_shift') if item.get(k)}
     shifts = ShiftConfig.objects.in_bulk(list(ids))
     seen, parsed = set(), []
     for item in raw_days:
@@ -162,7 +177,7 @@ def _parse_days(raw_days, week_start):
             raise PlanError(f'Ngày {day:%d/%m/%Y} bị trùng.')
         seen.add(day)
         picked = []
-        for key in ('shift', 'shift_2'):
+        for key in ('shift', 'shift_2', 'extra_shift'):
             sid = item.get(key)
             if not sid:
                 picked.append(None)
@@ -172,16 +187,18 @@ def _parse_days(raw_days, week_start):
                 raise PlanError(f'Ca #{sid} không tồn tại hoặc đã ngừng dùng.')
             picked.append(shift)
         if picked[1] and not picked[0]:
-            picked = [picked[1], None]
-        _check_overlap(*picked)
-        parsed.append((day, picked[0], picked[1]))
+            picked = [picked[1], None, picked[2]]
+        _check_kinds(*picked)
+        _check_overlap(picked[0], picked[1])
+        parsed.append((day, *picked))
     return parsed
 
 
 def _replace_days(plan, parsed):
     plan.days.all().delete()
     WeeklyShiftPlanDay.objects.bulk_create([
-        WeeklyShiftPlanDay(plan=plan, date=day, shift=shift, shift_2=shift_2) for day, shift, shift_2 in parsed
+        WeeklyShiftPlanDay(plan=plan, date=day, shift=shift, shift_2=shift_2, extra_shift=extra)
+        for day, shift, shift_2, extra in parsed
     ])
 
 
@@ -226,7 +243,7 @@ def _approve(plan, request, actor):
 
 
 def _shift_label(day):
-    return ' + '.join(s.code for s in (day.shift, day.shift_2) if s)
+    return ' + '.join(s.code for s in (day.shift, day.shift_2, day.extra_shift) if s)
 
 
 # ── viewset ───────────────────────────────────────────────────────────────
@@ -240,7 +257,7 @@ class WeeklyShiftPlanViewSet(viewsets.ModelViewSet):
         actor = _actor(self.request)
         qs = WeeklyShiftPlan.objects.select_related(
             'employee__department', 'direct_manager_approved_by', 'approved_by', 'rejected_by',
-        ).prefetch_related('days__shift', 'days__shift_2')
+        ).prefetch_related('days__shift', 'days__shift_2', 'days__extra_shift')
         if not (_manage_all(self.request, actor) or _can_hr_step(actor)):
             if actor is None:
                 return qs.none()
@@ -479,7 +496,7 @@ class WeeklyShiftPlanViewSet(viewsets.ModelViewSet):
         statuses = [s for s in (request.query_params.get('status') or 'APPROVED').split(',') if s]
         days = (WeeklyShiftPlanDay.objects
                 .filter(plan__in=self.get_queryset().filter(status__in=statuses), date__gte=start, date__lt=end)
-                .select_related('plan__employee__department', 'shift', 'shift_2')
+                .select_related('plan__employee__department', 'shift', 'shift_2', 'extra_shift')
                 .order_by('plan__employee__employee_id', 'date'))
         if department := request.query_params.get('department_id'):
             days = days.filter(plan__employee__department_id=department)
@@ -489,7 +506,7 @@ class WeeklyShiftPlanViewSet(viewsets.ModelViewSet):
         ws.append(['STT', 'Mã NV', 'Họ tên', 'Phòng ban', 'Ngày', 'Thứ', 'Mã ca', 'Tên ca', 'Giờ vào', 'Giờ ra'])
         for i, day in enumerate(days, start=1):
             employee = day.plan.employee
-            shifts = [s for s in (day.shift, day.shift_2) if s]
+            shifts = [s for s in (day.shift, day.shift_2, day.extra_shift) if s]
             ws.append([
                 i, employee.employee_id, employee.full_name, employee.department.name if employee.department_id else '',
                 day.date.strftime('%d/%m/%Y'), WEEKDAY_LABELS[day.date.weekday()], _shift_label(day),
@@ -575,14 +592,17 @@ def _import_rows(rows, actor):
             failed.append({'row': line, 'error': f'Ngày "{date_text}" không đúng định dạng (dd/mm/yyyy).'})
             continue
         codes = [c.strip() for c in re.split(r'[+,]', shift_text) if c.strip()]
-        if len(codes) > 2:
-            failed.append({'row': line, 'error': 'Mỗi ngày tối đa 2 ca.'})
-            continue
         unknown = [c for c in codes if c not in shifts]
         if unknown:
             failed.append({'row': line, 'error': f'Không có ca {", ".join(unknown)} (hoặc ca đã ngừng dùng).'})
             continue
-        picked = [shifts[c] for c in codes] + [None] * (2 - len(codes))
+        # "CA_SANG + CA_ONLINE": ca online (no_attendance_required) vào ô ca online thêm
+        mains = [shifts[c] for c in codes if not shifts[c].no_attendance_required]
+        extras = [shifts[c] for c in codes if shifts[c].no_attendance_required]
+        if len(mains) > 2 or len(extras) > 1:
+            failed.append({'row': line, 'error': 'Mỗi ngày tối đa 2 ca chấm công + 1 ca online.'})
+            continue
+        picked = mains + [None] * (2 - len(mains))
         try:
             _check_overlap(*picked)
         except PlanError as exc:
@@ -590,11 +610,11 @@ def _import_rows(rows, actor):
             continue
         if (employee.id, day) in cells:
             warnings.append({'row': line, 'warning': f'{code} ngày {day:%d/%m/%Y} xuất hiện nhiều lần — lấy dòng này.'})
-        cells[(employee.id, day)] = (employee, picked[0], picked[1])
+        cells[(employee.id, day)] = (employee, picked[0], picked[1], extras[0] if extras else None)
 
     by_week = defaultdict(list)
-    for (employee_id, day), (employee, shift, shift_2) in cells.items():
-        by_week[(employee, day - dt.timedelta(days=day.weekday()))].append((day, shift, shift_2))
+    for (employee_id, day), (employee, shift, shift_2, extra) in cells.items():
+        by_week[(employee, day - dt.timedelta(days=day.weekday()))].append((day, shift, shift_2, extra))
     now = timezone.now()
     created = updated = 0
     for (employee, week_start), days in by_week.items():
@@ -607,8 +627,8 @@ def _import_rows(rows, actor):
         )
         created += int(was_created)
         updated += int(not was_created)
-        for day, shift, shift_2 in days:
-            WeeklyShiftPlanDay.objects.update_or_create(plan=plan, date=day,
-                                                        defaults={'shift': shift, 'shift_2': shift_2})
+        for day, shift, shift_2, extra in days:
+            WeeklyShiftPlanDay.objects.update_or_create(
+                plan=plan, date=day, defaults={'shift': shift, 'shift_2': shift_2, 'extra_shift': extra})
     return {'total_rows': len(rows), 'imported_days': len(cells), 'created_plans': created,
             'updated_plans': updated, 'failed': failed, 'warnings': warnings}
