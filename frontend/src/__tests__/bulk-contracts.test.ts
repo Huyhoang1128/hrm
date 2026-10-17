@@ -22,6 +22,11 @@ import { describe, it, expect } from 'vitest';
 // Helpers copy từ BulkContracts.tsx / Profile.tsx
 // ---------------------------------------------------------------------------
 
+// Ngày theo giờ máy (YYYY-MM-DD). Không dùng toISOString(): đó là ngày theo UTC, lệch
+// 1 ngày so với giờ Việt Nam từ 0h đến 7h sáng.
+const isoLocal = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 const fmtDate = (d: string | null | undefined): string => {
   if (!d) return '';
   const [y, m, day] = d.split('-');
@@ -134,24 +139,24 @@ describe('getDaysUntilExpiry', () => {
 
   it('ngày trong tương lai xa → dương', () => {
     const future = new Date(); future.setDate(future.getDate() + 30);
-    const d = future.toISOString().split('T')[0];
+    const d = isoLocal(future);
     expect(getDaysUntilExpiry(d)!).toBeGreaterThan(0);
   });
 
   it('ngày hôm nay → 0', () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = isoLocal(new Date());
     expect(getDaysUntilExpiry(today)).toBe(0);
   });
 
   it('ngày quá khứ → âm', () => {
     const past = new Date(); past.setDate(past.getDate() - 3);
-    const d = past.toISOString().split('T')[0];
+    const d = isoLocal(past);
     expect(getDaysUntilExpiry(d)!).toBeLessThan(0);
   });
 
   it('5 ngày tới → 5', () => {
     const d5 = new Date(); d5.setDate(d5.getDate() + 5);
-    const d = d5.toISOString().split('T')[0];
+    const d = isoLocal(d5);
     expect(getDaysUntilExpiry(d)).toBe(5);
   });
 });
@@ -163,12 +168,12 @@ describe('getDaysUntilExpiry', () => {
 describe('effectiveStatus', () => {
   it('SIGNED + end_date quá khứ → EXPIRED', () => {
     const past = new Date(); past.setDate(past.getDate() - 1);
-    expect(effectiveStatus('SIGNED', past.toISOString().split('T')[0])).toBe('EXPIRED');
+    expect(effectiveStatus('SIGNED', isoLocal(past))).toBe('EXPIRED');
   });
 
   it('SIGNED + end_date tương lai → SIGNED', () => {
     const future = new Date(); future.setDate(future.getDate() + 10);
-    expect(effectiveStatus('SIGNED', future.toISOString().split('T')[0])).toBe('SIGNED');
+    expect(effectiveStatus('SIGNED', isoLocal(future))).toBe('SIGNED');
   });
 
   it('SIGNED + no end_date → SIGNED (vô thời hạn)', () => {
@@ -177,7 +182,7 @@ describe('effectiveStatus', () => {
 
   it('DRAFT không bị ảnh hưởng', () => {
     const past = new Date(); past.setDate(past.getDate() - 5);
-    expect(effectiveStatus('DRAFT', past.toISOString().split('T')[0])).toBe('DRAFT');
+    expect(effectiveStatus('DRAFT', isoLocal(past))).toBe('DRAFT');
   });
 
   it('CANCELLED không bị ảnh hưởng', () => {
@@ -202,11 +207,11 @@ const baseContract = (overrides: Partial<MyContract> = {}): MyContract => ({
 
 const futureDate = (days: number) => {
   const d = new Date(); d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
+  return isoLocal(d);
 };
 const pastDate = (days: number) => {
   const d = new Date(); d.setDate(d.getDate() - days);
-  return d.toISOString().split('T')[0];
+  return isoLocal(d);
 };
 
 describe('getContractDisplayStatus', () => {
