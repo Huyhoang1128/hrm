@@ -24,8 +24,8 @@ const WorkProcedures: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      // Fetch work procedures (document_type = 'WORK_PROCEDURE')
-      const response = await companyDocumentAPI.getByType('WORK_PROCEDURE', {
+      // Fetch work procedures (document_type = 'PROCEDURE')
+      const response = await companyDocumentAPI.getByType('PROCEDURE', {
         page_size: 50
       });
       

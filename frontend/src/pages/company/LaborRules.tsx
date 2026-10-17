@@ -24,8 +24,8 @@ const LaborRules: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      // Fetch labor rules (document_type = 'LABOR_RULE')
-      const response = await companyDocumentAPI.getByType('LABOR_RULE', {
+      // Fetch labor rules (document_type = 'REGULATION')
+      const response = await companyDocumentAPI.getByType('REGULATION', {
         page_size: 50
       });
       
