@@ -1723,24 +1723,39 @@ def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
     }
 
 
-def get_salary_rows(year: int, month: int, department_id=None, legal_entity: str = '', employee_code=None) -> dict:
-    """Bảng lương tháng — đúng dữ liệu GET /hrm/salary/department/ trả về."""
+def get_salary_rows(year: int, month: int, department_id=None, legal_entity: str = '', employee_code=None,
+                    refresh: bool = False) -> dict:
+    """Bảng lương tháng — đúng dữ liệu GET /hrm/salary/department/ trả về.
+
+    Tháng đã chốt (salary/payroll_finalization.py) trả nguyên các dòng đã chốt, trừ khi
+    refresh=True (xem bản tính lại từ dữ liệu hiện tại để đối chiếu)."""
+    from salary.payroll_finalization import snapshot_salary_rows
+
     legal_entity = (legal_entity or '').strip()
-    employees = resolve_salary_employees(year, month, department_id, legal_entity, employee_code)
     department_name = None
-    if employees and department_id:
+    if department_id:
         dept = Department.objects.filter(id=department_id).first()
         department_name = dept.name if dept else None
-    results = []
-    if employees:
-        ctx = build_salary_context(employees, year, month)
-        results = [build_salary_row(employee, ctx) for employee in employees]
+    snapshot = snapshot_salary_rows(year, month, department_id, legal_entity, employee_code)
+    if snapshot is not None and not refresh:
+        results, finalized_at = snapshot
+    else:
+        finalized_at = snapshot[1] if snapshot is not None else None
+        employees = resolve_salary_employees(year, month, department_id, legal_entity, employee_code)
+        results = []
+        if employees:
+            ctx = build_salary_context(employees, year, month)
+            results = [build_salary_row(employee, ctx) for employee in employees]
     return {
         "year": year,
         "month": month,
         "department_id": int(department_id) if department_id else None,
         "legal_entity": legal_entity or None,
         "department_name": department_name,
+        # Tháng đã chốt lương chưa / lúc nào; from_snapshot: các dòng là bản đã chốt
+        "is_finalized": snapshot is not None,
+        "finalized_at": finalized_at,
+        "from_snapshot": snapshot is not None and not refresh,
         "total": len(results),
         "results": results,
     }
@@ -1777,6 +1792,7 @@ class SalaryDepartmentView(APIView):
       - legal_entity (optional)
       - employee_code (optional)
       - employment_filter (optional) — working | left, mặc định trả tất cả
+      - refresh (optional) — 1: tháng đã chốt vẫn tính lại từ dữ liệu hiện tại để đối chiếu
     """
 
     permission_classes = [IsAuthenticated]
@@ -1811,6 +1827,7 @@ class SalaryDepartmentView(APIView):
             department_id=request.query_params.get("department_id"),
             legal_entity=request.query_params.get("legal_entity") or "",
             employee_code=request.query_params.get("employee_code"),
+            refresh=(request.query_params.get("refresh") or "").lower() in ("1", "true"),
         )
         working_rows, left_rows = split_rows_by_employment(data["results"], year, month)
         if employment_filter == "working":

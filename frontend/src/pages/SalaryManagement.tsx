@@ -23,6 +23,7 @@ import { employeesAPI } from '../utils/api';
 import type { Department, Employee } from '../utils/api';
 import { salaryService, SalaryFormulaUpdateData, SalaryRecord, PenaltyRecord, CommissionRecord, type BulkSalaryConfigRecord, type PayslipEmailBatchStatus, type DepartmentPayslipRecipientsResponse, type CompanyPayslipRecipientsResponse, type MonthlySalaryInputRecord } from '../services/salary.service';
 import { SelectBox } from '../components/LandingLayout/SelectBox';
+import PayrollFinalizeBar from '../components/PayrollFinalizeBar';
 import { useLockBodyScroll } from '../hooks/useLockBodyScroll';
 import { BRAND } from '@/config/brand';
 import type { Row, Workbook, Worksheet } from 'exceljs';
@@ -48,6 +49,17 @@ function getStandardWorkDays(year: number, month: number): number {
   }
   return Math.max(daysInMonth - sundays - 1, 1);
 }
+
+/**
+ * Tháng đã chốt lương: dùng cấu hình lương của nhân viên LÚC CHỐT (đi kèm dòng —
+ * record.employee_snapshot) thay cho cấu hình hiện tại, để phiếu lương / Excel của tháng
+ * đã chốt không đổi khi chính sách phụ cấp, thuế, mức đóng BH thay đổi sau đó.
+ */
+const employeeForRecord = (record: SalaryRecord, employee?: Employee): Employee | undefined => {
+  const snapshot = record.employee_snapshot;
+  if (!snapshot) return employee;
+  return { ...(employee ?? {}), ...snapshot } as Employee;
+};
 
 const getStandardWorkDaysFromRecord = (record: SalaryRecord): number => {
   const backendStandardDays = toNumber((record as unknown as Record<string, unknown>)['cong_chuan'], 0);
@@ -307,7 +319,7 @@ const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose
   const tongLuongIII = luongNgayCongThucTe + luongDoanhSo + luongOt + banSanPham + phuMo + trucCa + thuNhapKhac;
 
   // Deductions: use saved payroll config if available, otherwise calculate from standard rates
-  const savedAdjustments = employee ? (employee.salary_adjustments as Record<string, unknown> | undefined) : undefined;
+  const savedAdjustments = employeeForRecord(record, employee)?.salary_adjustments as Record<string, unknown> | undefined;
   const savedConfig = savedAdjustments?.payroll_config as Record<string, unknown> | undefined;
 
   // Parking allowance: recalculate from policy if configured, else use stored value
@@ -1395,7 +1407,7 @@ const getProbationRatePercent = (record: SalaryRecord, employee?: Employee) => {
   const fromRecord = toNumber((record as unknown as Record<string, number>)['probation_rate_percent'], 0);
   if (fromRecord > 0) return fromRecord;
 
-  const rateCode = String(employee?.probation_rate ?? '').toUpperCase();
+  const rateCode = String(employeeForRecord(record, employee)?.probation_rate ?? '').toUpperCase();
   if (rateCode === 'OPTION_3') return 100;
   if (rateCode === 'OPTION_1' || rateCode === 'OPTION_2') return 85;
   return 85;
@@ -1468,11 +1480,11 @@ const getGrossIncomeForTaxFromRecord = (record: SalaryRecord, employee?: Employe
 };
 
 const calculatePayrollTaxFromRecord = (record: SalaryRecord, employee?: Employee, commissions?: CommissionRecord[]): PayrollTaxComputation => {
-  const savedAdjustments = employee ? (employee.salary_adjustments as Record<string, unknown> | undefined) : undefined;
+  const savedAdjustments = employeeForRecord(record, employee)?.salary_adjustments as Record<string, unknown> | undefined;
   const savedOutput = savedAdjustments?.payroll_output_preview as Record<string, number> | undefined;
   const savedConfig = savedAdjustments?.payroll_config as Record<string, unknown> | undefined;
   const savedTaxPolicy = savedConfig?.taxPolicy as Record<string, unknown> | undefined;
-  const mucLuongDongBHFromEmployee = Math.max(toNumber(employee?.social_insurance_contribution_level), 0);
+  const mucLuongDongBHFromEmployee = Math.max(toNumber(employeeForRecord(record, employee)?.social_insurance_contribution_level), 0);
 
   const mucLuongDongBH = (record as unknown as Record<string, number>)['muc_luong_dong_bh']
     ?? savedOutput?.insuranceSalaryBase
@@ -1577,7 +1589,7 @@ const calculatePayslipNetPayable = (record: SalaryRecord, employee?: Employee, c
   const tongLuongIII = luongNgayCongThucTe + luongDoanhSo + luongOt + banSanPham + phuMo + trucCa + thuNhapKhac;
 
   const payrollTax = calculatePayrollTaxFromRecord(record, employee, commissions);
-  const savedAdjustments = employee ? (employee.salary_adjustments as Record<string, unknown> | undefined) : undefined;
+  const savedAdjustments = employeeForRecord(record, employee)?.salary_adjustments as Record<string, unknown> | undefined;
   const savedConfig = savedAdjustments?.payroll_config as Record<string, unknown> | undefined;
 
   const savedParkingPolicyRaw = savedConfig?.parkingAllowancePolicy as Record<string, unknown> | undefined;
@@ -3034,7 +3046,8 @@ const mergeMonthlyInputs = (records: SalaryRecord[], monthlyInputs: MonthlySalar
 
   const mergedResults = records.map((record) => {
     const monthlyInput = monthlyInputMap.get(record.employee_id);
-    if (!monthlyInput) return record;
+    // Dòng của tháng đã chốt đã ghép dữ liệu lương tháng lúc chốt
+    if (!monthlyInput || record.payroll_finalized) return record;
     return {
       ...record,
       luong_doanh_so_input: monthlyInput.luong_doanh_so,
@@ -3071,7 +3084,7 @@ const buildPayrollExcelRow = (
   const thuong = incomeBreakdown.thuong;
   const tongLuongIII = luongNgayCongThucTe + luongDoanhSo + luongOt + banSanPham + phuMo + trucCa + thuNhapKhac;
 
-  const savedAdjustments = employee ? (employee.salary_adjustments as Record<string, unknown> | undefined) : undefined;
+  const savedAdjustments = employeeForRecord(record, employee)?.salary_adjustments as Record<string, unknown> | undefined;
   const savedConfig = savedAdjustments?.payroll_config as Record<string, unknown> | undefined;
 
   const savedParkingPolicyRaw = savedConfig?.parkingAllowancePolicy as Record<string, unknown> | undefined;
@@ -3284,6 +3297,12 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
   const [employmentFilterView, setEmploymentFilterView] = useState<'' | 'working' | 'left'>('');
   // Người đã nghỉ giữa tháng vẫn còn lương phải trả; giữ lại để cảnh báo khi lọc.
   const [leftPayable, setLeftPayable] = useState<{ count: number; amount: number }>({ count: 0, amount: 0 });
+  // Chốt lương tháng: trạng thái của tháng đang xem + đang xem bản tính lại (refresh=1)
+  const [payrollFinalize, setPayrollFinalize] = useState<{ isFinalized: boolean; finalizedAt: string | null }>({
+    isFinalized: false,
+    finalizedAt: null,
+  });
+  const [payrollLiveMode, setPayrollLiveMode] = useState(false);
   const [searchSalary, setSearchSalary] = useState('');
 
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -3544,7 +3563,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
       const thuong = incomeBreakdown.thuong;
       const tongLuongIII = luongNgayCongThucTe + luongDoanhSo + luongOt + banSanPham + phuMo + trucCa + thuNhapKhac;
 
-      const savedAdjustments = employee ? (employee.salary_adjustments as Record<string, unknown> | undefined) : undefined;
+      const savedAdjustments = employeeForRecord(record, employee)?.salary_adjustments as Record<string, unknown> | undefined;
       const savedConfig = savedAdjustments?.payroll_config as Record<string, unknown> | undefined;
 
       const savedParkingPolicyRaw = savedConfig?.parkingAllowancePolicy as Record<string, unknown> | undefined;
@@ -3779,6 +3798,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
           department_id: deptFilterView ? parseInt(deptFilterView, 10) : undefined,
           legal_entity: legalEntityFilterView || undefined,
           employment_filter: employmentFilterView || undefined,
+          refresh: payrollLiveMode ? 1 : undefined,
         }),
         salaryService.listCommissions({ year: selectedYear, month: selectedMonth }),
         salaryService.listMonthlyInputs({ year: selectedYear, month: selectedMonth }),
@@ -3797,6 +3817,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
       const monthlyInputs = monthlyInputRes.status === 'fulfilled' ? monthlyInputRes.value : [];
       setSalaryRecords(mergeMonthlyInputs(res.results ?? [], monthlyInputs));
       setLeftPayable({ count: res.left_payable_count ?? 0, amount: res.left_payable_amount ?? 0 });
+      setPayrollFinalize({ isFinalized: !!res.is_finalized, finalizedAt: res.finalized_at ?? null });
       setSalaryCommissions(commissionRes.status === 'fulfilled' ? commissionRes.value : []);
 
       if (emailStatusRes.status === 'fulfilled') {
@@ -3823,7 +3844,12 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
     } finally {
       setLoadingSalary(false);
     }
-  }, [selectedYear, selectedMonth, deptFilterView, legalEntityFilterView, employmentFilterView]);
+  }, [selectedYear, selectedMonth, deptFilterView, legalEntityFilterView, employmentFilterView, payrollLiveMode]);
+
+  // Đổi tháng thì về xem bản đã chốt (nếu có)
+  useEffect(() => {
+    setPayrollLiveMode(false);
+  }, [selectedYear, selectedMonth]);
 
   useEffect(() => {
     setSalaryPage(1);
@@ -4500,6 +4526,19 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                   </div>
                 </div>
               )}
+
+              <PayrollFinalizeBar
+                year={selectedYear}
+                month={selectedMonth}
+                isFinalized={payrollFinalize.isFinalized}
+                finalizedAt={payrollFinalize.finalizedAt}
+                liveMode={payrollLiveMode}
+                onToggleLiveMode={() => setPayrollLiveMode((v) => !v)}
+                onChanged={() => {
+                  setPayrollLiveMode(false);
+                  void loadSalary();
+                }}
+              />
 
               {/* Người đã nghỉ giữa tháng vẫn còn lương phải trả cho những ngày đã làm.
                   Cảnh báo để HR không vô tình ẩn mất khoản phải thanh toán. */}

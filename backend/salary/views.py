@@ -19,6 +19,8 @@ from users.utils import get_user_role
 from .models import MonthlySalaryRecord, SalaryComponent, SalaryFormula, SalaryComponentOverride
 from .salary_data_models import EmployeeSalaryHistory, EmployeeKPIRecord, TaxBracketConfig, TaxBracket, DisciplinaryPenalty, SalesCommission, OvertimeRateConfig, SalaryAdvance, OtherAllowance, ParkingAllowanceOverride, LunchAllowanceOverride, EmployeeMonthlySalaryInput, MissingWorkdayPenalty
 from .salary_engine import SalaryRuleEngine
+from .period_lock import LockedPeriodMixin, locked_response_if_finalized
+from .payroll_finalization import FINALIZED_ROW_FLAG, payslip_send_block
 from .serializers import (
     ApproveSalarySerializer,
     BulkCalculateSalarySerializer,
@@ -431,7 +433,8 @@ def _merge_monthly_inputs_into_salary_rows(rows: list[dict], year: int, month: i
 
     for row in rows:
         employee_id = row.get('employee_id')
-        if not employee_id:
+        # Dòng của tháng đã chốt đã ghép dữ liệu lương tháng lúc chốt — không ghép số hiện tại
+        if not employee_id or row.get(FINALIZED_ROW_FLAG):
             continue
 
         monthly_input = monthly_input_map.get(employee_id)
@@ -698,7 +701,7 @@ class EmployeeKPIRecordViewSet(viewsets.ModelViewSet):
 # SalesCommission ViewSet
 # ---------------------------------------------------------------------------
 
-class SalesCommissionViewSet(viewsets.ModelViewSet):
+class SalesCommissionViewSet(LockedPeriodMixin, viewsets.ModelViewSet):
     """
     CRUD cho hoa hồng doanh số (SalesCommission).
     Hỗ trợ filter: ?year=<y>&month=<m>
@@ -725,6 +728,8 @@ class SalesCommissionViewSet(viewsets.ModelViewSet):
         ser.is_valid(raise_exception=True)
         data = ser.validated_data
         year, month, records = data['year'], data['month'], data['records']
+        if locked := locked_response_if_finalized(year, month):
+            return locked
         codes = [r['employee_code'] for r in records]
         emp_map = {e.employee_id: e for e in Employee.objects.filter(employee_id__in=codes)}
         results = {'success': [], 'errors': []}
@@ -763,7 +768,7 @@ class SalesCommissionViewSet(viewsets.ModelViewSet):
 # EmployeeMonthlySalaryInput ViewSet
 # ---------------------------------------------------------------------------
 
-class EmployeeMonthlySalaryInputViewSet(viewsets.ModelViewSet):
+class EmployeeMonthlySalaryInputViewSet(LockedPeriodMixin, viewsets.ModelViewSet):
     """
     CRUD cho dữ liệu lương tháng theo nhân viên.
     Hỗ trợ filter: ?year=<y>&month=<m>&employee=<id>
@@ -792,6 +797,8 @@ class EmployeeMonthlySalaryInputViewSet(viewsets.ModelViewSet):
         ser.is_valid(raise_exception=True)
         data = ser.validated_data
         year, month, records = data['year'], data['month'], data['records']
+        if locked := locked_response_if_finalized(year, month):
+            return locked
         codes = [r['employee_code'] for r in records]
         emp_map = {e.employee_id: e for e in Employee.objects.filter(employee_id__in=codes)}
         results = {'success': [], 'errors': []}
@@ -839,7 +846,7 @@ class EmployeeMonthlySalaryInputViewSet(viewsets.ModelViewSet):
 # DisciplinaryPenalty ViewSet
 # ---------------------------------------------------------------------------
 
-class DisciplinaryPenaltyViewSet(viewsets.ModelViewSet):
+class DisciplinaryPenaltyViewSet(LockedPeriodMixin, viewsets.ModelViewSet):
     """
     CRUD cho phạt biên bản (DisciplinaryPenalty).
     Hỗ trợ filter: ?year=<y>&month=<m>&employee=<id>
@@ -1058,6 +1065,8 @@ class DisciplinaryPenaltyViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         year, month, records = data['year'], data['month'], data['records']
+        if locked := locked_response_if_finalized(year, month):
+            return locked
         codes = [r['employee_code'] for r in records]
         emp_map = {e.employee_id: e for e in Employee.objects.filter(employee_id__in=codes)}
         results = {'success': [], 'errors': []}
@@ -1109,7 +1118,7 @@ class DisciplinaryPenaltyViewSet(viewsets.ModelViewSet):
 # SalaryAdvance ViewSet
 # ---------------------------------------------------------------------------
 
-class SalaryAdvanceViewSet(viewsets.ModelViewSet):
+class SalaryAdvanceViewSet(LockedPeriodMixin, viewsets.ModelViewSet):
     """
     CRUD cho tạm ứng lương (SalaryAdvance).
     Hỗ trợ filter: ?year=<y>&month=<m>&employee=<id>
@@ -1151,6 +1160,8 @@ class SalaryAdvanceViewSet(viewsets.ModelViewSet):
         ser.is_valid(raise_exception=True)
         data = ser.validated_data
         year, month, records = data['year'], data['month'], data['records']
+        if locked := locked_response_if_finalized(year, month):
+            return locked
         codes = [r['employee_code'] for r in records]
         emp_map = {e.employee_id: e for e in Employee.objects.filter(employee_id__in=codes)}
         results = {'success': [], 'errors': []}
@@ -1180,7 +1191,7 @@ class SalaryAdvanceViewSet(viewsets.ModelViewSet):
 # OtherAllowance ViewSet
 # ---------------------------------------------------------------------------
 
-class OtherAllowanceViewSet(viewsets.ModelViewSet):
+class OtherAllowanceViewSet(LockedPeriodMixin, viewsets.ModelViewSet):
     """
     CRUD cho phụ cấp khác (OtherAllowance).
     Hỗ trợ filter: ?year=<y>&month=<m>&employee=<id>
@@ -1209,6 +1220,8 @@ class OtherAllowanceViewSet(viewsets.ModelViewSet):
         ser.is_valid(raise_exception=True)
         data = ser.validated_data
         year, month, records = data['year'], data['month'], data['records']
+        if locked := locked_response_if_finalized(year, month):
+            return locked
         codes = [r['employee_code'] for r in records]
         emp_map = {e.employee_id: e for e in Employee.objects.filter(employee_id__in=codes)}
         results = {'success': [], 'errors': []}
@@ -1239,7 +1252,7 @@ class OtherAllowanceViewSet(viewsets.ModelViewSet):
 # ParkingAllowanceOverride ViewSet
 # ---------------------------------------------------------------------------
 
-class _AllowanceOverrideViewSetBase(viewsets.ModelViewSet):
+class _AllowanceOverrideViewSetBase(LockedPeriodMixin, viewsets.ModelViewSet):
     """
     Phần dùng chung của các bảng phụ cấp nhập tay theo kỳ (gửi xe, ăn trưa):
     filter ?year=&month=&employee=, import hàng loạt từ Excel và tạo bản ghi
@@ -1266,6 +1279,8 @@ class _AllowanceOverrideViewSetBase(viewsets.ModelViewSet):
         ser.is_valid(raise_exception=True)
         data = ser.validated_data
         year, month, records = data['year'], data['month'], data['records']
+        if locked := locked_response_if_finalized(year, month):
+            return locked
         codes = [r['employee_code'] for r in records]
         emp_map = {e.employee_id: e for e in Employee.objects.filter(employee_id__in=codes)}
         results = {'success': [], 'errors': []}
@@ -1304,6 +1319,8 @@ class _AllowanceOverrideViewSetBase(viewsets.ModelViewSet):
             return Response({'detail': 'Thiếu hoặc sai định dạng year/month.'}, status=status.HTTP_400_BAD_REQUEST)
         if not (2000 <= year <= 2100 and 1 <= month <= 12):
             return Response({'detail': 'Thiếu hoặc sai định dạng year/month.'}, status=status.HTTP_400_BAD_REQUEST)
+        if locked := locked_response_if_finalized(year, month):
+            return locked
 
         created_by = Employee.objects.filter(user=request.user).only('id').first()
         existing_employee_ids = set(
@@ -1532,6 +1549,8 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = CalculateSalarySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        if locked := locked_response_if_finalized(data['year'], data['month']):
+            return locked
 
         try:
             employee = Employee.objects.get(pk=data['employee_id'])
@@ -1574,6 +1593,8 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = UpdateSalaryStandardWorkDaysSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        if locked := locked_response_if_finalized(data['year'], data['month']):
+            return locked
 
         try:
             employee = Employee.objects.get(pk=data['employee_id'])
@@ -1628,6 +1649,8 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
         data = serializer.validated_data
 
         year, month = data['year'], data['month']
+        if locked := locked_response_if_finalized(year, month):
+            return locked
 
         employees = Employee.objects.filter(employment_status='ACTIVE').filter(
             models.Q(end_date__isnull=True) | models.Q(end_date__gte=date(year, month, 1))
@@ -1904,6 +1927,8 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
             employee = Employee.objects.select_related('user').get(id=employee_id)
         except Employee.DoesNotExist:
             return Response({'detail': 'Không tìm thấy nhân viên.'}, status=status.HTTP_404_NOT_FOUND)
+        if blocked := payslip_send_block(year, month, employee_ids={employee.id}):
+            return blocked
 
         batch_id = f"PAYSLIP_{year}{str(month).zfill(2)}_{employee_id}_{_uuid.uuid4().hex[:8]}"
         html_body = _build_payslip_email_html(subject, body)
@@ -2154,6 +2179,8 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
         department = Department.objects.filter(id=department_id).first()
         if not department:
             return Response({'detail': 'Không tìm thấy phòng ban.'}, status=status.HTTP_404_NOT_FOUND)
+        if blocked := payslip_send_block(year, month, department_id=department_id):
+            return blocked
 
         try:
             salary_data = get_salary_rows(year, month, department_id=department_id)
@@ -2381,6 +2408,9 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
                 {'detail': 'year và month phải là số nguyên.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        if blocked := payslip_send_block(year, month, legal_entity=legal_entity):
+            return blocked
 
         try:
             salary_data = get_salary_rows(year, month, legal_entity=legal_entity)
