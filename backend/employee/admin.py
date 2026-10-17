@@ -21,6 +21,7 @@ from .models import (
     EmployeeAssignmentHistory, EmployeeStatusHistory,
     EmployeeDependent,
     Position,
+    SocialInsurancePeriod,
     SOCIAL_INSURANCE_PARTICIPATION_STATUS,
 )
 
@@ -1081,3 +1082,13 @@ class EmployeeDependentAdmin(admin.ModelAdmin):
         n = queryset.filter(is_deleted=False).update(
             is_deleted=True, deleted_at=tz.now(), deleted_by=request.user)
         self.message_user(request, f'Đã xoá mềm {n} người phụ thuộc.')
+
+
+
+@admin.register(SocialInsurancePeriod)
+class SocialInsurancePeriodAdmin(admin.ModelAdmin):
+    list_display = ('employee', 'from_month', 'to_month', 'contribution_level', 'employee_rate', 'employer_rate', 'updated_at')
+    search_fields = ('employee__employee_id', 'employee__full_name')
+    raw_id_fields = ('employee',)
+    readonly_fields = ('created_by', 'created_at', 'updated_at')
+

@@ -265,6 +265,16 @@ class PositionSerializer(serializers.ModelSerializer):
 
 
 class EmployeeSerializer(serializers.ModelSerializer):
+    def validate_social_insurance_contribution_level(self, value):
+        # BHXH theo kỳ (employee/social_insurance.py): mức đóng trên hồ sơ tự cập nhật theo kỳ
+        # hiện hành, sửa trực tiếp sẽ bị ghi đè và bảng lương cũng không dùng.
+        from employee.social_insurance import has_periods
+        instance = getattr(self, 'instance', None)
+        if (instance is not None and value != instance.social_insurance_contribution_level
+                and has_periods(instance)):
+            raise serializers.ValidationError('Nhân viên đang quản lý BHXH theo kỳ đóng — sửa mức đóng trong "Kỳ đóng BHXH" thay vì trên hồ sơ.')
+        return value
+
     user = UserSerializer(read_only=True)
     position = PositionSerializer(read_only=True)
     department = DepartmentSerializer(read_only=True)

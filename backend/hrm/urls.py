@@ -83,6 +83,7 @@ from .finalization_lock_views import (
 from employee.birthday_views import BirthdayWishListCreateView, BirthdayWishDetailView, BirthdayWishLikeView
 from employee.import_views import EmployeeImportView, EmployeeSocialInsuranceImportView, DepartmentImportView, PositionImportView
 from employee.dependent_views import EmployeeDependentViewSet
+from employee.social_insurance_views import SocialInsurancePeriodViewSet
 from .payment_document_views import PaymentDocumentViewSet
 from .important_alerts_views import ImportantAlertsView
 from .views import BulkSalaryConfigImportView
@@ -95,6 +96,7 @@ from .meeting_room_views import (
 router = DefaultRouter()
 router.register(r'employees', views.EmployeeViewSet, basename='employee')
 router.register(r'employee-dependents', EmployeeDependentViewSet, basename='employee-dependent')
+router.register(r'social-insurance-periods', SocialInsurancePeriodViewSet, basename='social-insurance-period')
 router.register(r'payment-documents', PaymentDocumentViewSet, basename='payment-document')
 router.register(r'company-units', views.CompanyUnitViewSet, basename='company-unit')
 router.register(r'branch-locations', views.BranchLocationViewSet, basename='branch-location')

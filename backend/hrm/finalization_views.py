@@ -41,6 +41,7 @@ from salary.salary_data_models import (
 )
 from django.utils import timezone
 from employee.models import NON_OFFICIAL_CONTRACT_TYPES
+from employee.social_insurance import contribution_levels_for_month
 
 
 MAX_LUNCH_ALLOWANCE_CAP = Decimal("500000")
@@ -1439,6 +1440,7 @@ class SalaryMonthContext:
     bien_ban_penalties: dict  # employee_id -> tổng phạt biên bản
     sales_commissions: dict   # employee_id -> tổng hoa hồng
     missing_workday_bases: dict = field(default_factory=dict)  # employee_id -> mốc lương phạt thiếu công
+    insurance_levels: dict = field(default_factory=dict)  # employee_id -> mức đóng BHXH theo kỳ (NV đã có kỳ)
 
 
 def resolve_salary_employees(year: int, month: int, department_id=None, legal_entity: str = '',
@@ -1495,6 +1497,7 @@ def build_salary_context(employees: list, year: int, month: int) -> SalaryMonthC
         bien_ban_penalties=sums_by_employee(DisciplinaryPenalty),
         sales_commissions=sums_by_employee(SalesCommission),
         missing_workday_bases=active_penalty_bases(employee_ids, year, month),
+        insurance_levels=contribution_levels_for_month(employee_ids, year, month),
     )
 
 
@@ -1585,8 +1588,10 @@ def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
         )
         ot_pay = _to_decimal(round(float(tang_ca_hours) * ot_rate, 2))
 
-    # Compute insurance base salary from Employee field (Mức đóng BHXH)
-    ins_base = max(_to_decimal(employee.social_insurance_contribution_level), Decimal('0'))
+    # Mức đóng BHXH: theo kỳ đóng có hiệu lực tháng này (employee/social_insurance.py),
+    # nhân viên chưa có kỳ nào thì lấy trường trên hồ sơ.
+    ins_base = max(_to_decimal(ctx.insurance_levels.get(employee.id, employee.social_insurance_contribution_level)),
+                   Decimal('0'))
 
     adjustments = _as_dict(employee.salary_adjustments)
     tax_policy = _as_dict(_as_dict(adjustments.get('payroll_config')).get('taxPolicy'))

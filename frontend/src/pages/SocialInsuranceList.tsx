@@ -13,6 +13,7 @@ import { employeesAPI } from '../utils/api/hrm.api';
 import { managementApi } from '../utils/api/client';
 import type { Employee } from '../utils/api/types';
 import Pagination from '../components/Pagination';
+import SocialInsurancePeriodsModal from '../components/SocialInsurancePeriodsModal';
 
 const PAGE_SIZE = 20;
 
@@ -86,6 +87,8 @@ const SocialInsuranceList: React.FC = () => {
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // Kỳ đóng BHXH của 1 nhân viên (mở từ nút "Kỳ đóng" trên mỗi dòng)
+  const [periodsEmployee, setPeriodsEmployee] = useState<Employee | null>(null);
   const [formData, setFormData] = useState<InsuranceForm>({
     social_insurance_number: '',
     tax_code: '',
@@ -409,13 +412,22 @@ const SocialInsuranceList: React.FC = () => {
                         <td className="px-4 py-3 text-sm text-gray-700">{toDate(item.social_insurance_start_date)}</td>
                         <td className="px-4 py-3 text-sm text-gray-700">{toDate(item.social_insurance_end_date)}</td>
                         <td className="px-4 py-3 text-sm">
-                          <button
-                            type="button"
-                            onClick={() => openEditModal(item)}
-                            className="inline-flex items-center rounded-lg border border-primary-300 px-3 py-1.5 text-xs font-medium text-primary-700 hover:bg-primary-50"
-                          >
-                            Cập nhật
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(item)}
+                              className="inline-flex items-center rounded-lg border border-primary-300 px-3 py-1.5 text-xs font-medium text-primary-700 hover:bg-primary-50"
+                            >
+                              Cập nhật
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPeriodsEmployee(item)}
+                              className="inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                              Kỳ đóng
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -441,6 +453,17 @@ const SocialInsuranceList: React.FC = () => {
           </>
         )}
       </div>
+
+      {periodsEmployee && (
+        <SocialInsurancePeriodsModal
+          employee={periodsEmployee}
+          onClose={(changed) => {
+            setPeriodsEmployee(null);
+            // Mức đóng trên hồ sơ tự cập nhật theo kỳ hiện hành
+            if (changed) loadData({ page, search });
+          }}
+        />
+      )}
 
       {isModalOpen && selectedEmployee && (
         <div
