@@ -7,11 +7,96 @@ import {
   UsersIcon,
   TrashIcon,
   ExclamationCircleIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { positionsAPI, departmentsAPI, Position, Department } from '../utils/api';
 import { SelectBox } from '../components/LandingLayout/SelectBox';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ImportFileDialog from '../components/ImportFileDialog';
+
+// ── Dialog xem chi tiết vị trí (không có trang chi tiết riêng — giống Phòng ban) ──
+const PositionDetailDialog: React.FC<{
+  position: Position | null;
+  getDepartmentName: (depts?: Position['department']) => string;
+  getParentName: (id?: number | null) => string | null;
+  onClose: () => void;
+  onEdit: (position: Position) => void;
+}> = ({ position, getDepartmentName, getParentName, onClose, onEdit }) => {
+  if (!position) return null;
+
+  const InfoRow: React.FC<{ label: string; value?: string | null }> = ({ label, value }) => (
+    <div className="flex items-baseline justify-between py-2.5 border-b border-gray-100 last:border-0">
+      <span className="text-xs text-gray-400 shrink-0 mr-3">{label}</span>
+      <span className={`text-sm text-right break-words ${value ? 'font-medium text-gray-800' : 'text-gray-300 italic'}`}>
+        {value || 'Chưa có'}
+      </span>
+    </div>
+  );
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-9 w-9 shrink-0 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center">
+              <BriefcaseIcon className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold text-gray-900 break-words">{position.title}</h2>
+              <p className="text-xs text-gray-400">{position.code}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+          >
+            <XMarkIcon className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-4 sm:px-6 py-4">
+          <InfoRow label="Mã vị trí" value={position.code} />
+          <InfoRow label="Tên vị trí" value={position.title} />
+          <InfoRow label="Phòng ban" value={position.department?.length ? getDepartmentName(position.department) : null} />
+          <InfoRow label="Cấp bậc" value={`Cấp ${position.level}`} />
+          <InfoRow label="Vị trí cha" value={getParentName(position.parent_position)} />
+          <InfoRow label="Loại" value={position.is_management ? 'Quản lý' : 'Nhân viên'} />
+          <InfoRow label="Mô tả" value={position.description || null} />
+          <InfoRow
+            label="Ngày tạo"
+            value={position.created_at ? new Date(position.created_at).toLocaleDateString('vi-VN') : null}
+          />
+          <InfoRow
+            label="Cập nhật lần cuối"
+            value={position.updated_at ? new Date(position.updated_at).toLocaleDateString('vi-VN') : null}
+          />
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-2 px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+          <button onClick={onClose} className="btn-secondary">
+            Đóng
+          </button>
+          <button
+            onClick={() => { onClose(); onEdit(position); }}
+            className="btn-primary flex items-center gap-1.5"
+          >
+            <PencilSquareIcon className="w-4 h-4" />
+            Chỉnh sửa
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const PositionList: React.FC = () => {
   const navigate = useNavigate();
@@ -24,6 +109,7 @@ const PositionList: React.FC = () => {
   const [isManagementFilter, setIsManagementFilter] = useState<string>('all');
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
   const [positionToDelete, setPositionToDelete] = useState<Position | null>(null);
+  const [viewPosition, setViewPosition] = useState<Position | null>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -280,7 +366,7 @@ const PositionList: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
                           <button
-                            onClick={() => navigate(`/dashboard/positions/${position.id}`)}
+                            onClick={() => setViewPosition(position)}
                             className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-primary-600 bg-white border border-primary-200 rounded-lg hover:bg-primary-50 transition-colors"
                           >
                             <EyeIcon className="w-3.5 h-3.5" />
@@ -317,6 +403,19 @@ const PositionList: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Dialog xem chi tiết */}
+      <PositionDetailDialog
+        position={viewPosition}
+        getDepartmentName={getDepartmentName}
+        getParentName={(id) => {
+          if (!id) return null;
+          const parent = positions.find((p) => p.id === id);
+          return parent ? `${parent.title} (${parent.code})` : `#${id}`;
+        }}
+        onClose={() => setViewPosition(null)}
+        onEdit={(pos) => navigate(`/dashboard/positions/${pos.id}/edit`)}
+      />
 
       <ConfirmDialog
         open={positionToDelete !== null}
