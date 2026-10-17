@@ -82,5 +82,4 @@ Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 
     có thể khác số hiển thị trên phiếu lương. Cần chọn 1 quy tắc rồi sửa phía còn lại.
 - **Địa điểm làm việc** đang là danh sách cố định (`WORK_LOCATION` trong `employee/models.py` và
   `frontend/src/constants/onboarding.ts`). Nên chuyển thành dữ liệu cấu hình.
-- Bundle FE ~5 MB trong một chunk; nên lazy-load theo route.
 - Migration mới chỉ kiểm tra trên SQLite, **chưa chạy thử trên PostgreSQL**.
