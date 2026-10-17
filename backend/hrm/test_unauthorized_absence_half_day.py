@@ -15,15 +15,27 @@ không được kết hợp với end_date (chọn khoảng nhiều ngày) — n
 nghĩa cho đúng 1 ngày — và BẮT BUỘC phải chọn half_day_period (sáng hoặc
 chiều). Ngược lại, half_day_period chỉ được set khi expected_status=HALF_DAY.
 """
+import datetime as dt
+
 from django.contrib.auth.models import User
 from django.test import TestCase
+from django.utils import timezone
 
 from employee.models import Employee
 from hrm.registration_serializers import RegistrationRequestCreateSerializer
 
 
+def _upcoming_monday():
+    """Thứ Hai cách hôm nay ít nhất 7 ngày — còn trong hạn tạo đơn, khoảng 3 ngày
+    (thứ Hai → thứ Tư) không dính Chủ nhật."""
+    day = timezone.localdate() + dt.timedelta(days=7)
+    return day + dt.timedelta(days=(7 - day.weekday()) % 7)
+
+
 class UnauthorizedAbsenceHalfDaySerializerTests(TestCase):
     def setUp(self):
+        self.day = _upcoming_monday()
+        self.day_plus_2 = (self.day + dt.timedelta(days=2)).isoformat()
         user = User.objects.create_user(username="ta_halfday_test", password="x")
         self.employee = Employee.objects.create(
             user=user,
@@ -34,7 +46,7 @@ class UnauthorizedAbsenceHalfDaySerializerTests(TestCase):
     def _base_payload(self, **overrides):
         payload = {
             "employee_id": self.employee.id,
-            "attendance_date": "2026-09-15",
+            "attendance_date": self.day.isoformat(),
             "registration_type": "UNAUTHORIZED_ABSENCE",
             "reason": "Nghỉ đột xuất",
         }
@@ -87,7 +99,8 @@ class UnauthorizedAbsenceHalfDaySerializerTests(TestCase):
         # sớm hơn bởi rule khoá hạn tạo đơn (deadline_utils) — chỉ muốn kiểm tra
         # riêng validation của expected_status='HALF_DAY'.
         serializer = RegistrationRequestCreateSerializer(
-            data=self._base_payload(registration_type="LIVE", expected_status="HALF_DAY")
+            data=self._base_payload(registration_type="LIVE", expected_status="HALF_DAY",
+                                     start_time="20:00", end_time="22:00")
         )
         self.assertFalse(serializer.is_valid())
         self.assertIn("expected_status", serializer.errors)
@@ -95,7 +108,7 @@ class UnauthorizedAbsenceHalfDaySerializerTests(TestCase):
     def test_half_day_rejected_when_combined_with_date_range(self):
         serializer = RegistrationRequestCreateSerializer(
             data=self._base_payload(
-                expected_status="HALF_DAY", half_day_period="MORNING", end_date="2026-09-17"
+                expected_status="HALF_DAY", half_day_period="MORNING", end_date=self.day_plus_2
             )
         )
         self.assertFalse(serializer.is_valid())
@@ -103,7 +116,7 @@ class UnauthorizedAbsenceHalfDaySerializerTests(TestCase):
 
     def test_multi_day_range_without_half_day_defaults_to_absent_each_day(self):
         serializer = RegistrationRequestCreateSerializer(
-            data=self._base_payload(end_date="2026-09-17")
+            data=self._base_payload(end_date=self.day_plus_2)
         )
         self.assertTrue(serializer.is_valid(), serializer.errors)
         result = serializer.save()

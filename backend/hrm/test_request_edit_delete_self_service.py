@@ -651,6 +651,7 @@ class RegistrationRequestGroupCancelUpdateTests(SimpleTestCase):
              patch("hrm.registration_views._is_hr", return_value=False), \
              patch("hrm.registration_views._has_approve_permission", return_value=False), \
              patch("hrm.deadline_exception_models.has_deadline_exception", return_value=False), \
+             patch("hrm.models._is_hr_or_admin_strict", return_value=False), \
              patch("hrm.registration_views._check_approve_deadline", return_value=None):
             response = view.cancel_group(request)
 
@@ -676,6 +677,7 @@ class RegistrationRequestGroupCancelUpdateTests(SimpleTestCase):
              patch("hrm.registration_views._is_hr", return_value=False), \
              patch("hrm.registration_views._has_approve_permission", return_value=False), \
              patch("hrm.deadline_exception_models.has_deadline_exception", return_value=False), \
+             patch("hrm.models._is_hr_or_admin_strict", return_value=False), \
              patch("hrm.registration_views._check_approve_deadline", side_effect=deadline_side_effect):
             response = view.cancel_group(request)
 

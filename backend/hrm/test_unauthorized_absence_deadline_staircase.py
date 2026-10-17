@@ -129,6 +129,7 @@ class CreateDeadlineUsesLeaveStyleDeadlineTests(SimpleTestCase):
              patch("hrm.deadline_utils.in_backlog_grace_period", return_value=False), \
              patch("hrm.deadline_exception_models.has_deadline_exception", return_value=False), \
              patch("hrm.deadline_utils.leave_style_deadline", return_value=leave_style_deadline_return) as mock_lsd, \
+             patch("hrm.violation_models.log_blocked_attempt"), \
              patch("django.utils.timezone.now", return_value=now):
             mock_employee_cls.objects.filter.return_value.exists.return_value = True
             mock_employee_cls.objects.filter.return_value.first.return_value = MagicMock()
@@ -146,10 +147,12 @@ class CreateDeadlineUsesLeaveStyleDeadlineTests(SimpleTestCase):
 
         self.assertFalse(is_valid)
         self.assertIn('attendance_date', errors)
-        mock_lsd.assert_called_once()
+        # 2 lần: snapshot mốc hạn vào đơn (data['_advance_deadline']) + kiểm tra quá hạn.
+        self.assertEqual(mock_lsd.call_count, 2)
         # (attendance_date, last_date, employee, ...) — attendance_date == last_date khi không có end_date
-        self.assertEqual(mock_lsd.call_args.args[0], dt.date(2026, 9, 25))
-        self.assertEqual(mock_lsd.call_args.args[1], dt.date(2026, 9, 25))
+        for call in mock_lsd.call_args_list:
+            self.assertEqual(call.args[0], dt.date(2026, 9, 25))
+            self.assertEqual(call.args[1], dt.date(2026, 9, 25))
 
     def test_con_kip_han_thi_tao_duoc(self):
         tz_now = timezone.make_aware(dt.datetime(2026, 9, 20, 9, 0))
