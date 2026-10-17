@@ -54,6 +54,7 @@ class _FakeShiftConfig:
         self._department_ids = set(department_ids)
         self.is_default = is_default
         self.detection_only = detection_only
+        self.no_attendance_required = False
         # Hàm lọc ngày hiệu lực bằng Python trên list đã cache -> cần 2 trường này.
         self.effective_from = datetime.date(2026, 1, 1)
         self.effective_to = None
