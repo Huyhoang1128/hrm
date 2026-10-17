@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 
 from employee.models import Department, Employee
 from hrm.models import WorkFinalization
-from salary.comparison_report import parse_period
+from salary.comparison_report import parse_period, row_metrics
 
 URL = '/api/v1/salary/records/comparison-report/'
 
@@ -89,3 +89,7 @@ class SalaryComparisonReportTests(APITestCase):
         self.assertEqual(parse_period('09/2026'), (2026, 9))
         self.assertIsNone(parse_period('2026'))
         self.assertIsNone(parse_period('1999-01'))
+
+    def test_gross_adds_back_union_fee(self):
+        row = {'luong_thuc_linh': 9_000_000, 'bh_deduction': 1_050_000, 'cong_doan': 50_000, 'tam_ung': 0}
+        self.assertEqual(row_metrics(row)['tong_thu_nhap'], Decimal('10100000'))
