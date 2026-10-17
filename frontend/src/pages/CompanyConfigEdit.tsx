@@ -173,7 +173,7 @@ const CompanyConfigEdit: React.FC = () => {
 
   if (loadingData) {
     return (
-      <div className="py-6 px-4 sm:px-6 lg:px-8">
+      <div className="py-4 sm:py-6 sm:px-6 lg:px-8">
         <div className="text-center py-16">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
           <p className="mt-4 text-sm text-gray-400">Đang tải dữ liệu...</p>
@@ -183,7 +183,7 @@ const CompanyConfigEdit: React.FC = () => {
   }
 
   return (
-    <div className="py-6 px-4 sm:px-6 lg:px-8">
+    <div className="py-4 sm:py-6 sm:px-6 lg:px-8">
       {/* Back button */}
       <button
         onClick={() => navigate('/dashboard/company-configs')}
@@ -216,7 +216,7 @@ const CompanyConfigEdit: React.FC = () => {
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Section: Thông tin cơ bản */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
           <div className="flex items-center gap-2 mb-5">
             <div className="h-9 w-9 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center">
               <Cog6ToothIcon className="h-5 w-5" />
@@ -275,7 +275,7 @@ const CompanyConfigEdit: React.FC = () => {
         </div>
 
         {/* Section: Giờ & ngày làm việc */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
           <div className="flex items-center gap-2 mb-5">
             <div className="h-9 w-9 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
               <ClockIcon className="h-5 w-5" />
@@ -423,7 +423,7 @@ const CompanyConfigEdit: React.FC = () => {
         </div>
 
         {/* Section: Chính sách nghỉ phép */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
           <div className="flex items-center gap-2 mb-5">
             <div className="h-9 w-9 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center">
               <CalendarDaysIcon className="h-5 w-5" />
@@ -502,7 +502,7 @@ const CompanyConfigEdit: React.FC = () => {
         </div>
 
         {/* Section: Chính sách bổ sung & hiệu lực */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
           <div className="flex items-center gap-2 mb-5">
             <div className="h-9 w-9 bg-violet-100 text-violet-600 rounded-xl flex items-center justify-center">
               <BriefcaseIcon className="h-5 w-5" />

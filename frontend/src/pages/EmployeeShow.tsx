@@ -806,7 +806,7 @@ const EmployeeShow: React.FC = () => {
           <div>
             Ngày tạo: {formatDate(employee.created_at)}
             {employee.updated_at !== employee.created_at && (
-              <span className="ml-4">
+              <span className="block sm:inline sm:ml-4">
                 Cập nhật lần cuối: {formatDate(employee.updated_at)}
               </span>
             )}

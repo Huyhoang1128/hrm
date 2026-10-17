@@ -1375,7 +1375,7 @@ const WorkFinalizationApprovals: React.FC = () => {
           <button
             onClick={handleSendAll}
             disabled={sendingAll || departments.length === 0}
-            className="btn-primary flex items-center gap-2 disabled:opacity-50"
+            className="btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
           >
             <PaperAirplaneIcon className="w-4 h-4" />
             {sendingAll ? 'Đang gửi...' : `Gửi phê duyệt tất cả (Tháng ${selectedMonth}/${selectedYear})`}
@@ -1602,9 +1602,9 @@ const WorkFinalizationApprovals: React.FC = () => {
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div className="px-4 sm:px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
           <span className="text-sm font-bold text-gray-900">Danh sách phê duyệt theo phòng ban</span>
-          <span className="text-xs text-gray-400">{visibleDepartments.length} bản ghi</span>
+          <span className="text-xs text-gray-400 whitespace-nowrap">{visibleDepartments.length} bản ghi</span>
         </div>
 
         {loading ? (
@@ -1639,7 +1639,9 @@ const WorkFinalizationApprovals: React.FC = () => {
                       key={dept.id}
                       className={`hover:bg-gray-50 transition-colors ${isMyDept && approval?.status === 'PENDING' ? 'bg-amber-50' : ''}`}
                     >
-                      <td className="table-cell">
+                      {/* Mobile: cho tên phòng xuống dòng để cột Trạng thái lộ ra
+                          ngay trong khung, không phải vuốt ngang mới thấy. */}
+                      <td className="table-cell whitespace-normal min-w-[9rem] sm:whitespace-nowrap sm:min-w-0">
                         <div className="font-medium text-gray-900">
                           {dept.name}
                           {isMyDept && (

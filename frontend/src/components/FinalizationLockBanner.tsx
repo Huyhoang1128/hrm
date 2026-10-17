@@ -118,8 +118,10 @@ const FinalizationLockBanner: React.FC<Props> = ({ year, month, bypassRoles = []
   if (lockInfo.lock_start_at && countdown) {
     const deadline = new Date(lockInfo.lock_start_at);
 
+    // flex-wrap: trên điện thoại ô đếm ngược (khá dài) tự xuống hàng thay vì
+    // ép dòng hạn chót thành cột hẹp.
     return (
-      <div className={`flex items-center justify-between p-3 text-sm rounded-lg border ${
+      <div className={`flex flex-wrap items-center justify-between gap-2 p-3 text-sm rounded-lg border ${
         countdown.urgent
           ? 'bg-red-50 border-red-200 text-red-800'
           : 'bg-amber-50 border-amber-200 text-amber-800'
@@ -131,7 +133,7 @@ const FinalizationLockBanner: React.FC<Props> = ({ year, month, bypassRoles = []
             <strong>{formatDateTime(deadline)}</strong>
           </span>
         </div>
-        <span className={`flex-shrink-0 font-semibold px-2.5 py-1 rounded-full text-xs ${
+        <span className={`flex-shrink-0 ml-auto font-semibold px-2.5 py-1 rounded-full text-xs ${
           countdown.urgent
             ? 'bg-red-100 text-red-700 animate-pulse'
             : 'bg-amber-100 text-amber-700'

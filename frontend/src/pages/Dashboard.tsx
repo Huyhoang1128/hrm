@@ -359,7 +359,7 @@ const DonutCard = ({
   const { endAngle, startAngle, animationDuration } = usePieAnimation();
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 border-l-4 border-l-primary-500 shadow-sm p-5">
+    <div className="bg-white rounded-2xl border border-gray-100 border-l-4 border-l-primary-500 shadow-sm p-4 sm:p-5">
       <div className="mb-4 flex items-start justify-between gap-2">
         <div>
           <h3 className="text-sm font-bold text-gray-900">{title}</h3>
@@ -367,7 +367,7 @@ const DonutCard = ({
         </div>
         {headerAction}
       </div>
-      <div className="flex items-center gap-5">
+      <div className="flex flex-col sm:flex-row items-center gap-5">
         {/* Donut */}
         <div className="flex-shrink-0">
           <ResponsiveContainer width={160} height={160}>
@@ -406,7 +406,7 @@ const DonutCard = ({
         </div>
 
         {/* Legend */}
-        <div className="flex-1 space-y-2.5 min-w-0">
+        <div className="w-full sm:w-auto sm:flex-1 space-y-2.5 min-w-0">
           {data.filter(d => d.value > 0).map((item) => {
             const pct = total > 0 ? (item.value / total) * 100 : 0;
             return (
@@ -470,7 +470,7 @@ const StatCard = ({
         )}
       </div>
       <p className="text-[11px] font-medium text-gray-600 uppercase tracking-wide">{name}</p>
-      <p className="text-2xl font-extrabold text-gray-900 tracking-tight mt-0.5 truncate">
+      <p className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight mt-0.5 break-words sm:truncate">
         {formatter(rawValue)}
       </p>
       <p className="text-xs text-gray-600 mt-1">{subtext}</p>
@@ -490,7 +490,7 @@ const StatCard = ({
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 border-l-4 border-l-primary-500 shadow-sm p-5">
+    <div className="bg-white rounded-2xl border border-gray-100 border-l-4 border-l-primary-500 shadow-sm p-4 sm:p-5">
       {content}
     </div>
   );
@@ -844,7 +844,7 @@ const Dashboard = () => {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg transition-all ${
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-xs font-semibold whitespace-nowrap px-2 sm:px-4 py-2 rounded-lg transition-all ${
                 active
                   ? 'bg-white text-primary-600 shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
@@ -860,7 +860,7 @@ const Dashboard = () => {
       {/* ── Tab: Tổng quan ── */}
       {activeTab === 'overview' && (
         <div className="flex flex-col gap-5 flex-1">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <StatCard name="Tổng nhân viên" rawValue={stats.employee_stats.active + stats.employee_stats.probation} formatter={formatNumber}
               subtext={`${formatNumber(stats.employee_stats.active)} đang làm việc`}
               icon={UsersIcon} iconBg="bg-primary-100 text-primary-600" trend={stats.trends.employee_growth} />
@@ -884,7 +884,7 @@ const Dashboard = () => {
       {activeTab === 'employee' && (
         <div className="space-y-5">
           {statsFilterPanel}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <StatCard name="Đang làm việc" rawValue={stats.employee_stats.active} formatter={formatNumber}
               subtext={`Tổng ${formatNumber(stats.employee_stats.active + stats.employee_stats.probation)} nhân viên`}
               icon={UsersIcon} iconBg="bg-primary-100 text-primary-600" trend={stats.trends.employee_growth} />
@@ -934,7 +934,7 @@ const Dashboard = () => {
                 centerValue={totalActivities} centerLabel="Hoạt động" />
             </div>
           )}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <StatCard name="Tỷ lệ nghỉ việc" rawValue={attritionStats.summary.turnover_rate} formatter={formatPercent}
               subtext={`${formatNumber(attritionStats.summary.departures)} nghỉ / trung bình 12 tháng ${formatNumber(Math.round(attritionStats.summary.average_headcount))} nhân sự có phòng ban`}
               icon={UserMinusIcon} iconBg="bg-red-100 text-red-600" trend={null} />
@@ -948,7 +948,7 @@ const Dashboard = () => {
               subtext="Nhân sự có phòng ban còn làm cuối kỳ"
               icon={UsersIcon} iconBg="bg-cyan-100 text-cyan-600" trend={null} />
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <StatCard name="Nghỉ sớm 3 tháng" rawValue={attritionStats.summary.early_attrition_3m_rate} formatter={formatPercent}
               subtext={`${formatNumber(attritionStats.summary.early_departures_3m)} nghỉ sớm / ${formatNumber(attritionStats.summary.hires)} tuyển`}
               icon={UserMinusIcon} iconBg="bg-rose-100 text-rose-600" trend={null} />
@@ -962,7 +962,7 @@ const Dashboard = () => {
               subtext="Tỷ lệ trong kỳ quy đổi theo năm"
               icon={ChartPieIcon} iconBg="bg-violet-100 text-violet-600" trend={null} />
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 border-l-4 border-l-primary-500 shadow-sm p-5">
+          <div className="bg-white rounded-2xl border border-gray-100 border-l-4 border-l-primary-500 shadow-sm p-4 sm:p-5">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h3 className="text-sm font-bold text-gray-900">Thống kê biến động theo tháng</h3>
@@ -1101,7 +1101,7 @@ const Dashboard = () => {
               onClick={() => openRecruitmentList('left_after_7_days', 'Danh sách nghỉ sau 7 ngày')} />
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <StatCard name="Qua 7 ngày" rawValue={recruitmentStats.passed_7_days} formatter={formatNumber}
               subtext="Không nghỉ trong tuần đầu"
               icon={CheckCircleIcon} iconBg="bg-cyan-100 text-cyan-600" trend={null}
@@ -1389,7 +1389,7 @@ const Dashboard = () => {
         <div className="space-y-5">
           {statsFilterPanel}
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <StatCard
               name="Đang tham gia BHXH"
               rawValue={socialInsuranceStats.summary.participating}
@@ -1428,7 +1428,7 @@ const Dashboard = () => {
             />
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <StatCard
               name="Căn cứ đóng BHXH"
               rawValue={socialInsuranceStats.summary.contribution_level_total}
@@ -1705,7 +1705,7 @@ const Dashboard = () => {
       {/* ── Tab: Tài sản ── */}
       {activeTab === 'asset' && (
         <div className="space-y-5">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <StatCard name="Đang sử dụng" rawValue={stats.asset_stats.in_use} formatter={formatNumber}
               subtext={`Tổng ${formatNumber(stats.asset_stats.total)} tài sản`}
               icon={ComputerDesktopIcon} iconBg="bg-emerald-100 text-emerald-600" trend={stats.trends.asset_growth} />

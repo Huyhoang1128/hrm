@@ -226,9 +226,9 @@ export default function PasswordReset() {
       )}
 
       {/* Main card */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6">
         {/* Filter section */}
-        <div className="mb-6 bg-gray-50/50 p-5 rounded-2xl border border-gray-100">
+        <div className="mb-6 bg-gray-50/50 p-4 sm:p-5 rounded-2xl border border-gray-100">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-sm font-bold text-gray-900">Tìm kiếm nhân viên</h3>
             {loading && (
@@ -308,7 +308,7 @@ export default function PasswordReset() {
             <p className="mt-4 text-gray-600">Đang tải danh sách nhân viên...</p>
           </div>
         ) : filteredEmployees.length === 0 ? (
-          <div className="border border-gray-100 rounded-2xl overflow-hidden">
+          <div className="border border-gray-100 rounded-2xl overflow-x-auto">
             <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">

@@ -251,14 +251,14 @@ const RecruitmentJobs: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Quản lý JD</h1>
           <p className="text-gray-900 mt-1 text-sm">Quản lý nội dung Job Description</p>
         </div>
         <button
           onClick={openCreateJob}
-          className="btn-primary flex items-center gap-2"
+          className="btn-primary flex items-center gap-2 whitespace-nowrap"
         >
           <PlusIcon className="h-4 w-4" />
           Tạo JD mới
@@ -337,7 +337,7 @@ const RecruitmentJobs: React.FC = () => {
       {showJobModal && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
               <h2 className="text-base font-bold text-gray-900">
                 {editingJobId ? 'Cập nhật tin tuyển dụng' : 'Tạo tin tuyển dụng mới'}
               </h2>
@@ -348,7 +348,7 @@ const RecruitmentJobs: React.FC = () => {
                 <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleJobSubmit} className="px-6 py-5 space-y-4">
+            <form onSubmit={handleJobSubmit} className="px-4 sm:px-6 py-5 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Vị trí tuyển dụng
@@ -462,8 +462,8 @@ const RecruitmentJobs: React.FC = () => {
       {/* Add Channel Modal */}
       {showChannelModal && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
               <h2 className="text-base font-bold text-gray-900">Thêm kênh đăng tuyển</h2>
               <button
                 onClick={() => setShowChannelModal(false)}
@@ -472,7 +472,7 @@ const RecruitmentJobs: React.FC = () => {
                 <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleChannelSubmit} className="px-6 py-5 space-y-4">
+            <form onSubmit={handleChannelSubmit} className="px-4 sm:px-6 py-5 space-y-4">
               <SelectBox
                 label="Kênh"
                 value={channelForm.channel_type}

@@ -174,7 +174,7 @@ const DocumentTemplateFormDialog: React.FC<FormDialogProps> = ({ open, editing, 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Modal header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
           <h3 className="text-lg font-semibold text-gray-900">
             {editing ? 'Chỉnh sửa template tài liệu' : 'Thêm template tài liệu mới'}
           </h3>
@@ -183,7 +183,7 @@ const DocumentTemplateFormDialog: React.FC<FormDialogProps> = ({ open, editing, 
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl">
               {error}
@@ -286,7 +286,7 @@ const DocumentTemplateFormDialog: React.FC<FormDialogProps> = ({ open, editing, 
         </div>
 
         {/* Modal footer */}
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex justify-end gap-2">
+        <div className="px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex justify-end gap-2">
           <button onClick={onClose} disabled={submitting} className="btn-secondary disabled:opacity-50">
             Huỷ
           </button>
@@ -420,14 +420,14 @@ const DocumentTemplates: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">
             Template tài liệu Onboarding
           </h1>
           <p className="text-gray-900 text-sm mt-0.5">Tổng: {totalCount} template</p>
         </div>
-        <button onClick={openCreate} className="btn-primary flex items-center gap-2">
+        <button onClick={openCreate} className="btn-primary flex items-center gap-2 whitespace-nowrap">
           <PlusIcon className="w-4 h-4" />
           Thêm template
         </button>
@@ -435,7 +435,7 @@ const DocumentTemplates: React.FC = () => {
 
       {/* Filter bar */}
       <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-wrap items-end gap-3">
-        <div className="w-52">
+        <div className="w-full sm:w-52">
           <SelectBox
             label="Loại tài liệu"
             value={filterType}
@@ -443,13 +443,13 @@ const DocumentTemplates: React.FC = () => {
             onChange={(v) => { setFilterType(v); setCurrentPage(1); }}
           />
         </div>
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <label className="block text-sm font-medium mb-1 text-gray-700">Tìm kiếm</label>
           <div className="relative">
             <input type="text" value={filterSearch}
               onChange={(e) => { setFilterSearch(e.target.value); setCurrentPage(1); }}
               placeholder="Tên hoặc mô tả..."
-              className="input-field pl-8 w-52"
+              className="input-field pl-8 w-full sm:w-52"
             />
             <svg className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -596,13 +596,13 @@ const DocumentTemplates: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
             {/* Modal header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
               <h3 className="text-lg font-semibold text-gray-900">Chi tiết template</h3>
               <button onClick={() => setDetailTemplate(null)} className="text-gray-400 hover:text-gray-600 transition-colors">
                 <XMarkIcon className="w-6 h-6" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
               <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
                 <div className="sm:col-span-3">
                   <dt className="text-gray-500 font-medium">Tên template</dt>
@@ -657,7 +657,7 @@ const DocumentTemplates: React.FC = () => {
               </dl>
             </div>
             {/* Modal footer */}
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex justify-end gap-2">
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex flex-wrap justify-end gap-2">
               {detailTemplate.file_url && (
                 <a
                   href={detailTemplate.file_url}

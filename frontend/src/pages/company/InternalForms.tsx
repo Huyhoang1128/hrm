@@ -152,8 +152,8 @@ const InternalForms: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center space-x-2 sm:space-x-4">
           <button
             onClick={() => navigate(-1)}
             className="p-2 rounded-lg hover:bg-gray-100"
@@ -209,7 +209,7 @@ const InternalForms: React.FC = () => {
         <div className="space-y-6">
           {/* Quick Actions */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button className="flex flex-col items-center justify-center p-6 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+            <button className="flex flex-col items-center justify-center p-4 sm:p-6 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
               <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
                 <PrinterIcon className="h-6 w-6 text-blue-600" />
               </div>
@@ -217,7 +217,7 @@ const InternalForms: React.FC = () => {
               <p className="text-sm text-gray-500 text-center mt-2">In trực tiếp các mẫu đơn thông dụng</p>
             </button>
 
-            <button className="flex flex-col items-center justify-center p-6 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
+            <button className="flex flex-col items-center justify-center p-4 sm:p-6 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
               <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
                 <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -227,7 +227,7 @@ const InternalForms: React.FC = () => {
               <p className="text-sm text-gray-500 text-center mt-2">Tải về để chỉnh sửa và điền thông tin</p>
             </button>
 
-            <button className="flex flex-col items-center justify-center p-6 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors">
+            <button className="flex flex-col items-center justify-center p-4 sm:p-6 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors">
               <div className="h-12 w-12 bg-purple-100 rounded-full flex items-center justify-center mb-4">
                 <svg className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -240,11 +240,11 @@ const InternalForms: React.FC = () => {
 
           {/* Forms List */}
           <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center justify-between">
+            <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-lg font-medium text-gray-900">Danh sách mẫu giấy tờ</h2>
                 <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-500">Sắp xếp theo:</span>
+                  <span className="text-sm text-gray-500 whitespace-nowrap">Sắp xếp theo:</span>
                   <select className="border border-gray-300 rounded-md px-3 py-1 text-sm">
                     <option>Phổ biến nhất</option>
                     <option>Mới nhất</option>
@@ -266,22 +266,22 @@ const InternalForms: React.FC = () => {
                   const formCode = getFormCode(form);
                   
                   return (
-                    <div key={form.id} className="px-6 py-4 hover:bg-gray-50">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
+                    <div key={form.id} className="px-4 sm:px-6 py-4 hover:bg-gray-50">
+                      <div className="flex flex-col gap-3 sm:gap-0 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-3">
-                            <div className="h-10 w-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                            <div className="h-10 w-10 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
                               <DocumentDuplicateIcon className="h-6 w-6 text-yellow-600" />
                             </div>
                             <div>
                               <div className="flex items-center space-x-2">
                                 <h3 className="font-medium text-gray-900">{form.title}</h3>
-                                <span className="text-xs font-medium px-2 py-1 bg-gray-100 text-gray-800 rounded">
+                                <span className="text-xs font-medium px-2 py-1 bg-gray-100 text-gray-800 rounded whitespace-nowrap">
                                   {formCode}
                                 </span>
                               </div>
                               <p className="text-sm text-gray-600 mt-1">{form.description}</p>
-                              <div className="flex items-center space-x-4 mt-2">
+                              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                   {category}
                                 </span>
@@ -291,7 +291,7 @@ const InternalForms: React.FC = () => {
                             </div>
                           </div>
                         </div>
-                        <div className="ml-4 flex-shrink-0 flex space-x-2">
+                        <div className="sm:ml-4 flex-shrink-0 flex space-x-2">
                           <button 
                             onClick={() => handlePrint(form)}
                             className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"

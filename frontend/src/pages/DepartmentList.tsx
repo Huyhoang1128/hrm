@@ -37,7 +37,7 @@ const DepartmentDetailDialog: React.FC<{
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col"
+        className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -205,7 +205,7 @@ const DepartmentList: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
         {/* Search */}
         <div className="mb-5 bg-gray-50 p-4 rounded-2xl border border-gray-100">
           <div className="flex justify-between items-center mb-3">
@@ -232,14 +232,14 @@ const DepartmentList: React.FC = () => {
         </div>
 
         {/* List header */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4">
           <div>
             <h2 className="text-sm font-bold text-gray-900">Danh sách phòng ban</h2>
             <p className="text-xs text-gray-400 mt-0.5">Tổng số: {departments.length} phòng ban</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
-              className="bg-amber-500 text-white px-4 py-2 rounded-xl hover:bg-amber-600 transition-colors flex items-center"
+              className="bg-amber-500 text-white px-4 py-2 rounded-xl hover:bg-amber-600 transition-colors flex items-center whitespace-nowrap"
               onClick={() => setShowImportDialog(true)}
             >
               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -248,7 +248,7 @@ const DepartmentList: React.FC = () => {
               Nhập từ file
             </button>
             <button
-              className="btn-primary"
+              className="btn-primary whitespace-nowrap"
               onClick={() => navigate('/dashboard/departments/create')}
             >
               + Thêm phòng ban

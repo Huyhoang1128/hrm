@@ -332,7 +332,7 @@ const Offboarding: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-6 flex-1 min-h-0">
+    <div className="flex flex-col gap-6 flex-none lg:flex-1 lg:min-h-0">
       {/* Page header */}
       <div className="flex items-center">
         <div>
@@ -397,7 +397,7 @@ const Offboarding: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col flex-1 min-h-0">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 flex flex-col flex-1 min-h-0">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-sm font-bold text-gray-900">Đơn nghỉ việc & yêu cầu cần xử lý</h2>
@@ -407,7 +407,7 @@ const Offboarding: React.FC = () => {
 
         {/* Filter bar */}
         <div className="flex flex-wrap items-end gap-3 mb-4">
-          <div className="w-52">
+          <div className="w-full sm:w-52">
             <SelectBox
               label="Trạng thái"
               value={filterStatus}
@@ -421,7 +421,7 @@ const Offboarding: React.FC = () => {
               onChange={(v) => { setFilterStatus(v as GenericRequestStatus | ''); setCurrentPage(1); }}
             />
           </div>
-          <div className="w-40">
+          <div className="w-full sm:w-40">
             <SelectBox
               label="Tháng"
               value={filterMonth}
@@ -433,7 +433,7 @@ const Offboarding: React.FC = () => {
             />
           </div>
           {filterMonth > 0 && (
-            <div className="w-32">
+            <div className="w-full sm:w-32">
               <SelectBox
                 label="Năm"
                 value={filterYear}
@@ -445,7 +445,7 @@ const Offboarding: React.FC = () => {
               />
             </div>
           )}
-          <div>
+          <div className="w-full sm:w-auto">
             <label className="block text-xs font-medium mb-1 text-gray-500">Tìm kiếm</label>
             <div className="relative">
               <input
@@ -453,7 +453,7 @@ const Offboarding: React.FC = () => {
                 value={filterSearch}
                 onChange={(e) => { setFilterSearch(e.target.value); setCurrentPage(1); }}
                 placeholder="Tên NV, mã đơn, lý do..."
-                className="input-field pl-8 w-60"
+                className="input-field pl-8 w-full sm:w-60"
               />
               <svg className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />

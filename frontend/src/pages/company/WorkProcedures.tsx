@@ -168,8 +168,8 @@ const WorkProcedures: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center space-x-2 sm:space-x-4">
           <button
             onClick={() => navigate(-1)}
             className="p-2 rounded-lg hover:bg-gray-100"
@@ -224,7 +224,7 @@ const WorkProcedures: React.FC = () => {
       {!loading && !error && (
         <div className="space-y-6">
           {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <div className="bg-purple-50 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -277,7 +277,7 @@ const WorkProcedures: React.FC = () => {
 
           {/* Procedures List */}
           <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
+            <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
               <h2 className="text-lg font-medium text-gray-900">Danh sách quy trình</h2>
             </div>
             <div className="divide-y divide-gray-200">
@@ -294,22 +294,22 @@ const WorkProcedures: React.FC = () => {
                   const version = getVersion(procedure);
                   
                   return (
-                    <div key={procedure.id} className="px-6 py-4 hover:bg-gray-50">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
+                    <div key={procedure.id} className="px-4 sm:px-6 py-4 hover:bg-gray-50">
+                      <div className="flex flex-col gap-3 sm:gap-0 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-3">
-                            <div className="h-10 w-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <div className="h-10 w-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
                               <DocumentTextIcon className="h-6 w-6 text-purple-600" />
                             </div>
                             <div>
                               <div className="flex items-center space-x-2">
                                 <h3 className="font-medium text-gray-900">{procedure.title}</h3>
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 whitespace-nowrap">
                                   Đang áp dụng
                                 </span>
                               </div>
                               <p className="text-sm text-gray-600 mt-1">{procedure.description}</p>
-                              <div className="flex items-center space-x-4 mt-2">
+                              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                   {department}
                                 </span>
@@ -320,7 +320,7 @@ const WorkProcedures: React.FC = () => {
                             </div>
                           </div>
                         </div>
-                        <div className="ml-4 flex-shrink-0">
+                        <div className="sm:ml-4 flex-shrink-0">
                           <button 
                             onClick={() => handleViewDetails(procedure)}
                             className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
@@ -350,7 +350,7 @@ const WorkProcedures: React.FC = () => {
                     <span className="text-sm font-medium text-gray-900">{dept.name}</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <div className="h-2 w-32 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="h-2 w-20 sm:w-32 bg-gray-200 rounded-full overflow-hidden">
                       <div className={`h-full ${dept.color.replace('100', '500')} rounded-full`} style={{ width: '100%' }}></div>
                     </div>
                     <span className="text-xs text-gray-500">{dept.count} quy trình</span>

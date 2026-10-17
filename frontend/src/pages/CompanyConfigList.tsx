@@ -265,7 +265,7 @@ const CompanyConfigList: React.FC = () => {
 
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center flex-shrink-0">
                 <InformationCircleIcon className="h-5 w-5" />
@@ -277,7 +277,7 @@ const CompanyConfigList: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
                 <CheckCircleIcon className="h-5 w-5" />
@@ -291,7 +291,7 @@ const CompanyConfigList: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center flex-shrink-0">
                 <ClockIcon className="h-5 w-5" />
@@ -305,7 +305,7 @@ const CompanyConfigList: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center flex-shrink-0">
                 <CalendarIcon className="h-5 w-5" />
@@ -540,7 +540,7 @@ const CompanyConfigList: React.FC = () => {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => handleTabChange('company-configs')}
-              className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${
+              className={`inline-flex items-center justify-center px-2 sm:px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${
                 currentTab === 'company-configs'
                   ? 'border-primary-500 bg-primary-50 text-primary-700'
                   : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
@@ -550,7 +550,7 @@ const CompanyConfigList: React.FC = () => {
             </button>
             <button
               onClick={() => handleTabChange('attendance-rules')}
-              className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${
+              className={`inline-flex items-center justify-center px-2 sm:px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${
                 currentTab === 'attendance-rules'
                   ? 'border-primary-500 bg-primary-50 text-primary-700'
                   : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
@@ -560,7 +560,7 @@ const CompanyConfigList: React.FC = () => {
             </button>
             <button
               onClick={() => handleTabChange('leave-policies')}
-              className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${
+              className={`inline-flex items-center justify-center px-2 sm:px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${
                 currentTab === 'leave-policies'
                   ? 'border-primary-500 bg-primary-50 text-primary-700'
                   : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'

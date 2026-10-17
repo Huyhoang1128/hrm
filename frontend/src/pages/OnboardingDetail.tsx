@@ -920,10 +920,10 @@ const OnboardingDetail: React.FC = () => {
       const borderColors: Record<string, string> = { blue: 'border-primary-300', indigo: 'border-primary-300', amber: 'border-amber-300', emerald: 'border-emerald-300', rose: 'border-rose-300', purple: 'border-violet-300', gray: 'border-gray-300' };
       const textColors: Record<string, string> = { blue: 'text-primary-700', indigo: 'text-primary-700', amber: 'text-amber-700', emerald: 'text-emerald-700', rose: 'text-rose-700', purple: 'text-violet-700', gray: 'text-gray-700' };
       return (
-        <div className={`flex items-center justify-between pb-3 mb-4 border-b-2 ${borderColors[color] || 'border-gray-200'}`}>
+        <div className={`flex items-center justify-between gap-3 pb-3 mb-4 border-b-2 ${borderColors[color] || 'border-gray-200'}`}>
           <h3 className={`text-sm font-bold uppercase tracking-wide ${textColors[color] || 'text-gray-700'}`}>{title}</h3>
           {onEdit && userRole === 'ADMIN' && (
-            <button onClick={onEdit} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-primary-50 hover:text-primary-600 rounded-lg transition-colors">
+            <button onClick={onEdit} className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-primary-50 hover:text-primary-600 rounded-lg transition-colors">
               <PencilIcon className="w-3.5 h-3.5" />
               Chỉnh sửa
             </button>
@@ -1850,7 +1850,7 @@ const OnboardingDetail: React.FC = () => {
     <div className="bg-slate-50 min-h-screen">
       {/* Header — compact, full width */}
       <div className="bg-white border-b">
-        <div className="px-6 py-4">
+        <div className="px-4 py-4 sm:px-6">
           <button
             onClick={() => navigate('/dashboard/onboarding')}
             className="flex items-center text-sm text-gray-500 hover:text-gray-900 mb-3 transition-colors"
@@ -1866,7 +1866,7 @@ const OnboardingDetail: React.FC = () => {
               </div>
               <div>
                 <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-bold text-gray-900">{onboarding.candidate_name}</h1>
+                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{onboarding.candidate_name}</h1>
                   {getStatusBadge(onboarding.status)}
                 </div>
                 <p className="text-gray-500 mt-0.5">
@@ -2036,11 +2036,11 @@ const OnboardingDetail: React.FC = () => {
         <div className="flex-1 min-w-0">
           {/* Tabs */}
           <div className="bg-white border-b sticky top-0 z-10">
-            <nav className="flex space-x-1 px-4">
+            <nav className="flex space-x-1 px-4 overflow-x-auto">
               {!isEmployee && (
                 <button
                   onClick={() => setActiveTab('info')}
-                  className={`py-3 px-4 text-sm font-medium rounded-t-lg transition-colors ${
+                  className={`py-3 px-4 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap shrink-0 ${
                     activeTab === 'info'
                       ? 'bg-slate-50 text-primary-600 border-b-2 border-primary-500'
                       : 'text-gray-500 hover:text-gray-700'
@@ -2052,7 +2052,7 @@ const OnboardingDetail: React.FC = () => {
               {!isEmployee && (
                 <button
                   onClick={() => setActiveTab('tasks')}
-                  className={`py-3 px-4 text-sm font-medium rounded-t-lg transition-colors ${
+                  className={`py-3 px-4 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap shrink-0 ${
                     activeTab === 'tasks'
                       ? 'bg-slate-50 text-primary-600 border-b-2 border-primary-500'
                       : 'text-gray-500 hover:text-gray-700'
@@ -2063,7 +2063,7 @@ const OnboardingDetail: React.FC = () => {
               )}
               <button
                 onClick={() => setActiveTab('documents')}
-                className={`py-3 px-4 text-sm font-medium rounded-t-lg transition-colors ${
+                className={`py-3 px-4 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap shrink-0 ${
                   activeTab === 'documents'
                     ? 'bg-slate-50 text-primary-600 border-b-2 border-primary-500'
                     : 'text-gray-500 hover:text-gray-700'
@@ -2074,7 +2074,7 @@ const OnboardingDetail: React.FC = () => {
               {userRole === 'ADMIN' && (
                 <button
                   onClick={() => setActiveTab('contracts')}
-                  className={`py-3 px-4 text-sm font-medium rounded-t-lg transition-colors ${
+                  className={`py-3 px-4 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap shrink-0 ${
                     activeTab === 'contracts'
                       ? 'bg-slate-50 text-primary-600 border-b-2 border-primary-500'
                       : 'text-gray-500 hover:text-gray-700'
@@ -2086,7 +2086,7 @@ const OnboardingDetail: React.FC = () => {
             </nav>
           </div>
 
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {activeTab === 'info' && renderInfoTab()}
             {activeTab === 'tasks' && (
               <TasksSection

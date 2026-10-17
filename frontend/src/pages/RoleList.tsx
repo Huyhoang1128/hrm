@@ -218,12 +218,12 @@ const RoleList: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex border-b border-gray-200">
+      <div className="flex border-b border-gray-200 overflow-x-auto">
         {MAIN_TABS.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-2 py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-2 py-3 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap shrink-0 ${
               activeTab === tab.key
                 ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -236,25 +236,25 @@ const RoleList: React.FC = () => {
       </div>
 
       {activeTab === 'online_quota' && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
           <OnlineWorkQuotaTab />
         </div>
       )}
 
       {activeTab === 'child_care' && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
           <ChildCareRegimeTab />
         </div>
       )}
 
       {activeTab === 'manager_explanation_quota' && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
           <ManagerExplanationQuotaTab />
         </div>
       )}
 
       {activeTab === 'employees' && (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col gap-6">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-6 p-4 sm:p-5">
         {/* Statistics */}
         <div>
           <div className="flex items-center gap-2 mb-4">
@@ -368,7 +368,7 @@ const RoleList: React.FC = () => {
             <p className="text-xs text-gray-400 mt-0.5">Tổng số: {total} phân quyền</p>
           </div>
           <button
-            className="btn-primary"
+            className="btn-primary self-start sm:self-auto whitespace-nowrap shrink-0"
             onClick={() => navigate('/dashboard/roles/create')}
           >
             + Thêm phân quyền

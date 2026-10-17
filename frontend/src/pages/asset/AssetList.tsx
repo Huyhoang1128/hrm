@@ -1415,7 +1415,7 @@ export default function AssetList() {
                   </div>
                 </div>
               </div>
-              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex flex-row-reverse gap-3">
+              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex flex-row-reverse flex-wrap gap-3">
                 <button
                   type="button"
                   className="btn-danger inline-flex justify-center"

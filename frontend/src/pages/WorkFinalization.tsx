@@ -230,7 +230,7 @@ const EmployeeListItem = React.memo(({
             }}
             disabled={isBeingFinalized || (isLocked && !canBypassLock)}
             title={isLocked ? 'Tháng này đã khóa chốt công' : undefined}
-            className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded disabled:opacity-50 disabled:cursor-not-allowed ${
+            className={`inline-flex items-center px-2 py-1 sm:py-0.5 text-xs font-medium rounded disabled:opacity-50 disabled:cursor-not-allowed ${
               rec
                 ? 'text-primary-700 bg-primary-50 hover:bg-primary-100'
                 : 'text-white bg-primary-600 hover:bg-primary-700'
@@ -1529,7 +1529,8 @@ const WorkFinalization: React.FC = () => {
             Quản lý bảng tính công hàng tháng và xuất báo cáo tính lương
           </p>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
+        {/* Mobile: các nút giãn đều lấp kín từng hàng (grow) thay vì so le. */}
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {/* Trưởng phòng (is_manager) chỉ được XEM trang này — ẩn toàn bộ nút
               Khóa/Chốt/Phê duyệt (mang tính thao tác/thay đổi dữ liệu lương). */}
           {!isManagerRestricted && (
@@ -1544,7 +1545,7 @@ const WorkFinalization: React.FC = () => {
                 <button
                   onClick={() => openLockConfirm(period)}
                   disabled={togglingLock}
-                  className={`inline-flex items-center px-3 py-2 border rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  className={`grow sm:grow-0 justify-center inline-flex items-center px-3 py-2 border rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
                     locked
                       ? 'border-red-300 text-red-700 bg-red-50 hover:bg-red-100 focus:ring-red-500'
                       : 'border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 focus:ring-emerald-500'
@@ -1582,7 +1583,7 @@ const WorkFinalization: React.FC = () => {
 
           <Link
             to="/dashboard/work-finalization/approvals"
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            className="grow sm:grow-0 justify-center inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
           >
             <ClipboardDocumentCheckIcon className="w-4 h-4 mr-2" />
             Phê duyệt chốt công
@@ -1591,7 +1592,7 @@ const WorkFinalization: React.FC = () => {
             onClick={handleFinalizeAll}
             disabled={!bothLocked || finalizingAll || finalizingDepartment || finalizing !== null || exporting}
             title={!bothLocked ? 'Cần khóa cả 2 nửa tháng trước khi chốt tất cả' : undefined}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="grow sm:grow-0 justify-center inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <BoltIcon className="w-4 h-4 mr-2" />
             {finalizingAll ? 'Đang chốt...' : `Chốt tất cả (Tháng ${selectedMonth}/${selectedYear})`}
@@ -1601,7 +1602,7 @@ const WorkFinalization: React.FC = () => {
               onClick={handleFinalizeDepartment}
               disabled={!bothLocked || finalizingDepartment || finalizingAll || finalizing !== null || exporting}
               title={!bothLocked ? 'Cần khóa cả 2 nửa tháng trước khi chốt phòng ban' : undefined}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="grow sm:grow-0 justify-center inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <BoltIcon className="w-4 h-4 mr-2" />
               {finalizingDepartment
@@ -1614,7 +1615,7 @@ const WorkFinalization: React.FC = () => {
           <button
             onClick={() => setShowPreviewModal(true)}
             disabled={records.length === 0}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="grow sm:grow-0 justify-center inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <EyeIcon className="w-4 h-4 mr-2" />
             Xem trước
@@ -1622,7 +1623,7 @@ const WorkFinalization: React.FC = () => {
           <button
             onClick={() => setShowDailyPreviewModal(true)}
             disabled={dailyPivotRecords.length === 0}
-            className="inline-flex items-center px-4 py-2 border border-primary-300 rounded-md shadow-sm text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="grow sm:grow-0 justify-center inline-flex items-center px-4 py-2 border border-primary-300 rounded-md shadow-sm text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <TableCellsIcon className="w-4 h-4 mr-2" />
             {`Bảng công chi tiết (${dailyPivotRecords.length})`}
@@ -1630,7 +1631,7 @@ const WorkFinalization: React.FC = () => {
           <button
             onClick={handleOpenViolationReport}
             disabled={loadingViolation}
-            className="inline-flex items-center px-4 py-2 border border-amber-300 rounded-md shadow-sm text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="grow sm:grow-0 justify-center inline-flex items-center px-4 py-2 border border-amber-300 rounded-md shadow-sm text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ShieldExclamationIcon className="w-4 h-4 mr-2" />
             {loadingViolation ? 'Đang tải...' : 'Báo cáo vi phạm'}
@@ -1648,7 +1649,7 @@ const WorkFinalization: React.FC = () => {
           <button
             onClick={handleExport}
             disabled={exporting || records.length === 0}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="grow sm:grow-0 justify-center inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
             {exporting ? 'Đang xuất...' : `Xuất Excel (${records.length} đã chốt)`}
@@ -1693,7 +1694,7 @@ const WorkFinalization: React.FC = () => {
 
       {/* Lock banner — chỉ hiện khi có ít nhất 1 nửa khóa */}
       {anyLocked && (
-        <div className="flex items-center justify-between p-4 text-sm bg-red-50 rounded-2xl border border-red-200">
+        <div className="flex items-center justify-between gap-3 p-4 text-sm bg-red-50 rounded-2xl border border-red-200">
           <div className="flex items-center gap-2 text-red-800">
             <LockClosedIcon className="w-5 h-5 flex-shrink-0" />
             <div>
@@ -1801,20 +1802,24 @@ const WorkFinalization: React.FC = () => {
             options={years.map((y) => ({ value: y, label: String(y) }))}
             onChange={(v) => setSelectedYear(v)}
           />
-          <SelectBox
-            label="Phòng Ban"
-            value={selectedDepartment}
-            options={[
-              { value: '', label: 'Chưa chọn phòng ban' },
-              { value: 'all', label: 'Tất cả phòng ban' },
-              ...departments.map((d) => ({ value: String(d.id), label: d.name })),
-            ]}
-            onChange={(v) => {
-              setSelectedDepartment(v);
-              setSelectedEmployee(null);
-            }}
-          />
-          <div>
+          {/* Mobile: Phòng ban + Tìm kiếm chiếm trọn hàng — nửa ô thì tên phòng
+              và placeholder bị cắt ("Phòng Kinh...", "Tên hoặc n"). */}
+          <div className="col-span-2 md:col-span-1">
+            <SelectBox
+              label="Phòng Ban"
+              value={selectedDepartment}
+              options={[
+                { value: '', label: 'Chưa chọn phòng ban' },
+                { value: 'all', label: 'Tất cả phòng ban' },
+                ...departments.map((d) => ({ value: String(d.id), label: d.name })),
+              ]}
+              onChange={(v) => {
+                setSelectedDepartment(v);
+                setSelectedEmployee(null);
+              }}
+            />
+          </div>
+          <div className="col-span-2 md:col-span-1">
             <label className="block text-xs font-medium text-gray-700 mb-1">Tìm kiếm</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -1908,7 +1913,9 @@ const WorkFinalization: React.FC = () => {
           ) : (
             <>
               {/* Employee info bar */}
-              <div className="bg-white shadow-sm rounded-2xl border border-gray-100 px-5 py-4 flex items-center justify-between">
+              {/* Mobile: thông tin NV 1 hàng, trạng thái + nút "Chốt công" xuống
+                  hàng dưới — trước đây 3 khối ép nhau, tên/phòng ban bẻ từng chữ. */}
+              <div className="bg-white shadow-sm rounded-2xl border border-gray-100 px-4 sm:px-5 py-4 flex flex-col gap-3 sm:gap-0 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
                     <UserIcon className="h-5 w-5 text-primary-600" />
@@ -1922,7 +1929,7 @@ const WorkFinalization: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3">
                   {finalizedRec ? (
                     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-emerald-100 text-emerald-700">
                       <CheckCircleIcon className="w-4 h-4 mr-1" />
@@ -1968,7 +1975,7 @@ const WorkFinalization: React.FC = () => {
 
               {/* Finalization details if finalized */}
               {finalizedRec && (
-                <div className="bg-white shadow-sm rounded-2xl border border-gray-100 p-5">
+                <div className="bg-white shadow-sm rounded-2xl border border-gray-100 p-4 sm:p-5">
                   <h3 className="text-sm font-semibold text-gray-800 mb-4">
                     Kết quả chốt công tháng {selectedMonth}/{selectedYear}
                   </h3>
@@ -2079,9 +2086,9 @@ const WorkFinalization: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+            <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-100 flex-shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-9 w-9 shrink-0 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
                   <EyeIcon className="h-5 w-5" />
                 </div>
                 <div>
@@ -2095,7 +2102,7 @@ const WorkFinalization: React.FC = () => {
               </div>
               <button
                 onClick={() => setShowPreviewModal(false)}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-gray-100"
+                className="shrink-0 text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-gray-100"
               >
                 <XMarkIcon className="w-5 h-5" />
               </button>
@@ -2164,11 +2171,11 @@ const WorkFinalization: React.FC = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 sm:px-6 py-3 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
               <span className="text-xs text-gray-500">
                 Hiển thị {records.length} bản ghi · Tháng {selectedMonth}/{selectedYear}
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-end gap-2">
                 <button
                   onClick={handlePreviewExport}
                   disabled={exporting}
@@ -2194,9 +2201,9 @@ const WorkFinalization: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
+            <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-100 flex-shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-9 w-9 shrink-0 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
                   <ShieldExclamationIcon className="h-5 w-5" />
                 </div>
                 <div>
@@ -2213,7 +2220,7 @@ const WorkFinalization: React.FC = () => {
               </div>
               <button
                 onClick={() => setShowViolationModal(false)}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-gray-100"
+                className="shrink-0 text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-gray-100"
               >
                 <XMarkIcon className="w-5 h-5" />
               </button>
@@ -2273,13 +2280,13 @@ const WorkFinalization: React.FC = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 sm:px-6 py-3 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
               <span className="text-xs text-gray-500">
                 {violationReport
                   ? `${violationReport.total_violations} vi phạm · Tháng ${violationReport.month}/${violationReport.year}`
                   : ''}
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-end gap-2">
                 <button
                   onClick={handleExportViolation}
                   disabled={exportingViolation || !violationReport || violationReport.data.length === 0}
@@ -2306,8 +2313,8 @@ const WorkFinalization: React.FC = () => {
         const willLock = !periodConfirmLocked;
         return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className={`px-6 py-4 flex items-center gap-3 ${!willLock ? 'bg-emerald-50 border-b border-emerald-200' : 'bg-red-50 border-b border-red-200'}`}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className={`py-4 flex items-center gap-3 ${!willLock ? 'bg-emerald-50 border-b border-emerald-200' : 'bg-red-50 border-b border-red-200'} px-4 sm:px-6`}>
               {!willLock ? (
                 <LockOpenIcon className="w-6 h-6 text-emerald-600" />
               ) : (
@@ -2323,7 +2330,7 @@ const WorkFinalization: React.FC = () => {
               </div>
             </div>
 
-            <div className="px-6 py-4 space-y-4">
+            <div className="px-4 sm:px-6 py-4 space-y-4">
               <div className="text-sm text-gray-700">
                 {!willLock ? (
                   <p>
@@ -2434,7 +2441,7 @@ const WorkFinalization: React.FC = () => {
               )}
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex justify-end gap-2">
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex justify-end gap-2">
               <button
                 onClick={() => { setLockConfirmPeriod(null); setLockNote(''); }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
@@ -2825,9 +2832,9 @@ const WorkFinalization: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[98vw] max-h-[90vh] flex flex-col overflow-hidden">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-primary-100 flex items-center justify-center text-primary-600">
+            <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-100 flex-shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-9 w-9 shrink-0 rounded-xl bg-primary-100 flex items-center justify-center text-primary-600">
                   <TableCellsIcon className="h-5 w-5" />
                 </div>
                 <div>
@@ -2841,7 +2848,7 @@ const WorkFinalization: React.FC = () => {
               </div>
               <button
                 onClick={() => setShowDailyPreviewModal(false)}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-gray-100"
+                className="shrink-0 text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-gray-100"
               >
                 <XMarkIcon className="w-5 h-5" />
               </button>
@@ -2932,11 +2939,11 @@ const WorkFinalization: React.FC = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 sm:px-6 py-3 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
               <span className="text-xs text-gray-500">
                 {dailyPivotRecords.length} nhân viên · Tháng {selectedMonth}/{selectedYear}
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-end gap-2">
                 <button
                   onClick={handleExportDailyPivot}
                   disabled={exportingDaily}

@@ -129,7 +129,7 @@ const HRStats: React.FC = () => {
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 bg-gray-100 rounded-xl" />
             <div className="space-y-1.5">
-              <div className="h-4 w-56 bg-gray-100 rounded" />
+              <div className="h-4 w-40 sm:w-56 bg-gray-100 rounded" />
               <div className="h-3 w-36 bg-gray-100 rounded" />
             </div>
           </div>
@@ -141,7 +141,7 @@ const HRStats: React.FC = () => {
           <div className="col-span-2 h-72 bg-gray-100 rounded-2xl" />
         </div>
         {/* bottom cards skeleton */}
-        <div className="flex gap-3">
+        <div className="flex gap-3 overflow-hidden">
           {[1,2,3,4,5].map(i => <div key={i} className="h-28 w-36 flex-shrink-0 bg-gray-100 rounded-2xl" />)}
         </div>
       </div>
@@ -167,7 +167,7 @@ const HRStats: React.FC = () => {
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col gap-4 h-full">
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center flex-shrink-0">
             <BuildingOffice2Icon className="h-5 w-5" />
@@ -177,7 +177,7 @@ const HRStats: React.FC = () => {
             <p className="text-xs text-gray-600 mt-0.5">Nhân viên đang làm việc tại các phòng ban</p>
           </div>
         </div>
-        <span className="text-[11px] font-semibold text-gray-500 bg-white border border-gray-100 rounded-lg px-3 py-1.5">
+        <span className="shrink-0 text-[11px] font-semibold text-gray-500 bg-white border border-gray-100 rounded-lg px-3 py-1.5">
           {new Date().getFullYear()}
         </span>
       </div>
@@ -310,7 +310,7 @@ const HRStats: React.FC = () => {
         <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-3">
           Top phòng ban
         </p>
-        <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {cardDepts.map((dept, idx) => (
             <DeptMiniCard key={dept.id} dept={dept} idx={idx} active={active} />
           ))}

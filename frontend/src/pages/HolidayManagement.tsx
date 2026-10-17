@@ -255,11 +255,11 @@ const HolidayManagement: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <FinalizationLockBanner year={year} month={month} />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-3">
               <CalendarDaysIcon className="w-8 h-8 text-primary-600" />
               Quản lý ngày nghỉ lễ
             </h1>
@@ -292,13 +292,13 @@ const HolidayManagement: React.FC = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
           {/* Calendar */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg shadow-sm border border-gray-100">
               {/* Calendar header */}
-              <div className="p-6 border-b border-gray-100">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+              <div className="p-4 sm:p-6 border-b border-gray-100">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
                   <h2 className="text-xl font-bold text-gray-800">
                     {monthNames[month - 1]} {year}
                   </h2>
@@ -365,7 +365,7 @@ const HolidayManagement: React.FC = () => {
                         <button
                           key={idx}
                           onClick={() => day > 0 && handleDateClick(day)}
-                          className={`h-20 rounded-lg border-2 flex flex-col items-center justify-center text-sm font-medium transition-all ${
+                          className={`h-14 sm:h-20 rounded-lg border-2 flex flex-col items-center justify-center text-sm font-medium transition-all ${
                             day <= 0
                               ? 'bg-gray-50 border-transparent text-gray-300'
                               : holiday
@@ -391,7 +391,7 @@ const HolidayManagement: React.FC = () => {
               </div>
 
               {/* Legend */}
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-wrap gap-4 text-sm">
+              <div className="px-4 sm:px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-wrap gap-4 text-sm">
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 bg-red-50 border border-red-300 rounded"></div>
                   <span className="text-gray-600">Có ngày lễ</span>
@@ -410,7 +410,7 @@ const HolidayManagement: React.FC = () => {
 
           {/* Holidays list for this month */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 sticky top-6">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 sm:p-6 sticky top-6">
               <h3 className="text-lg font-bold text-gray-800 mb-4">
                 Ngày lễ
               </h3>
@@ -480,7 +480,7 @@ const HolidayManagement: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
             {/* Modal header */}
-            <div className="sticky top-0 px-6 py-4 border-b border-gray-100 bg-white flex items-center justify-between">
+            <div className="sticky top-0 px-4 sm:px-6 py-4 border-b border-gray-100 bg-white flex items-center justify-between">
               <h2 className="text-xl font-bold text-gray-800">
                 {selectedHoliday ? 'Sửa ngày lễ' : 'Thêm ngày lễ'}
               </h2>
@@ -496,7 +496,7 @@ const HolidayManagement: React.FC = () => {
             </div>
 
             {/* Modal body */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
               {/* Ngày lễ */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

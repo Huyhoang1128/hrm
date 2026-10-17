@@ -341,12 +341,12 @@ const OvertimeRateConfigPage: React.FC = () => {
       )}
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-200">
+      <div className="flex border-b border-gray-200 overflow-x-auto">
         {TABS.map(tab => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-2 py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-2 py-3 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
               activeTab === tab.key
                 ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -392,7 +392,7 @@ const OvertimeRateConfigPage: React.FC = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-100">
+            <table className="min-w-[920px] sm:min-w-full divide-y divide-gray-100">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="table-header text-left">Áp dụng cho</th>
@@ -482,7 +482,7 @@ const OvertimeRateConfigPage: React.FC = () => {
             onClick={e => e.stopPropagation()}
           >
             {/* ── Header ── */}
-            <div className="shrink-0 flex items-center gap-4 px-6 py-4 border-b border-gray-100">
+            <div className="shrink-0 flex items-center gap-4 px-4 sm:px-6 py-4 border-b border-gray-100">
               <div className="h-10 w-10 rounded-xl bg-primary-100 flex items-center justify-center shrink-0">
                 <AdjustmentsHorizontalIcon className="h-5 w-5 text-primary-600" />
               </div>
@@ -505,7 +505,7 @@ const OvertimeRateConfigPage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-gray-100 min-h-full">
 
                 {/* ── Cột trái: Áp dụng cho ── */}
-                <div className="col-span-full sm:col-span-2 p-5 flex flex-col gap-3">
+                <div className="col-span-full sm:col-span-2 flex flex-col gap-3 p-4 sm:p-5">
                   <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Áp dụng cho</p>
 
                   {activeTab === 'all' ? (
@@ -597,7 +597,7 @@ const OvertimeRateConfigPage: React.FC = () => {
                 </div>
 
                 {/* ── Cột phải: Cấu hình ── */}
-                <div className="col-span-full sm:col-span-3 p-5 space-y-4">
+                <div className="col-span-full sm:col-span-3 space-y-4 p-4 sm:p-5">
 
                   {/* Đơn giá tăng ca */}
                   <div className="rounded-xl border border-gray-100 p-4 space-y-3">
@@ -838,7 +838,7 @@ const OvertimeRateConfigPage: React.FC = () => {
             </div>
 
             {/* ── Footer ── */}
-            <div className="shrink-0 flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100">
+            <div className="shrink-0 flex items-center justify-end gap-2 px-4 sm:px-6 py-4 border-t border-gray-100">
               <button
                 onClick={() => setShowModal(false)}
                 className="btn-secondary"

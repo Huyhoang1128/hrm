@@ -90,8 +90,8 @@ const TrainingDocuments: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center space-x-2 sm:space-x-4">
           <button
             onClick={() => navigate(-1)}
             className="p-2 rounded-lg hover:bg-gray-100"
@@ -188,7 +188,7 @@ const TrainingDocuments: React.FC = () => {
 
           {/* Documents List */}
           <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
+            <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
               <h2 className="text-lg font-medium text-gray-900">Danh sách tài liệu</h2>
             </div>
             <div className="divide-y divide-gray-200">
@@ -200,17 +200,17 @@ const TrainingDocuments: React.FC = () => {
                 </div>
               ) : (
                 documents.map((doc) => (
-                  <div key={doc.id} className="px-6 py-4 hover:bg-gray-50">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
+                  <div key={doc.id} className="px-4 sm:px-6 py-4 hover:bg-gray-50">
+                    <div className="flex flex-col gap-3 sm:gap-0 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-3">
-                          <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                          <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
                             <DocumentTextIcon className="h-6 w-6 text-blue-600" />
                           </div>
                           <div>
                             <h3 className="font-medium text-gray-900">{doc.title}</h3>
                             <p className="text-sm text-gray-600 mt-1">{doc.description}</p>
-                            <div className="flex items-center space-x-4 mt-2">
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                 {companyDocumentAPI.getDocumentTypeDisplay(doc.document_type)}
                               </span>
@@ -226,7 +226,7 @@ const TrainingDocuments: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="ml-4 flex-shrink-0">
+                      <div className="sm:ml-4 flex-shrink-0">
                         <button 
                           onClick={() => handleDownload(doc)}
                           className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"

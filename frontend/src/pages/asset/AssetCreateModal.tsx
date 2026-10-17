@@ -386,9 +386,9 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
               leaveFrom="opacity-100 translate-y-0 sm:scale-100"
               leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
             >
-              <DialogPanel className="relative transform rounded-2xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+              <DialogPanel className="relative transform rounded-2xl bg-white text-left shadow-xl transition-all w-full sm:my-8 sm:w-full sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Modal Header */}
-                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+                <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
                   <DialogTitle as="h3" className="text-lg font-semibold leading-6 text-gray-900">
                     Thêm tài sản mới
                   </DialogTitle>
@@ -403,7 +403,7 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
                 </div>
 
                 {/* Modal Body */}
-                <div className="overflow-y-auto flex-1 px-6 py-5">
+                <div className="overflow-y-auto flex-1 px-4 sm:px-6 py-5">
                   <form onSubmit={handleSubmit} className="space-y-5">
 
                     {/* ── Section 1: Thông tin thiết bị ── */}
@@ -767,7 +767,7 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
                 </div>
 
                 {/* Modal Footer */}
-                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex items-center justify-end gap-3 shrink-0">
+                <div className="px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex items-center justify-end gap-3 shrink-0">
                   <button
                     type="button"
                     className="btn-secondary"

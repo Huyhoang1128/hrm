@@ -751,7 +751,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
       // ── BƯỚC 1: Thông tin cơ bản ──
       case 0: return (
         <div className="flex-1 flex flex-col gap-5 justify-evenly">
-          <h3 className="text-4xl font-bold text-gray-900 text-center">Thông tin cơ bản</h3>
+          <h3 className="text-2xl sm:text-4xl font-bold text-gray-900 text-center">Thông tin cơ bản</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <TF label="Họ và tên" value={values.candidate_name} onChange={handleChange('candidate_name')} required placeholder="Nguyễn Văn A" error={getFieldError('candidate_name', values.candidate_name)} maxLength={50} />
             <TF label="Email" value={values.candidate_email} onChange={handleChange('candidate_email')} disabled />
@@ -791,7 +791,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
         </div>
       ) : (
         <div className="flex-1 flex flex-col gap-5 justify-evenly">
-          <h3 className="text-3xl font-bold text-gray-900 text-center">Thông tin công việc chi tiết</h3>
+          <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center">Thông tin công việc chi tiết</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
             <SF label="Đơn vị làm việc" value={values.company_unit} onChange={handleSelect('company_unit')}
               options={companyUnits.map(cu => ({ value: cu.code, label: cu.name }))} />
@@ -821,7 +821,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
       // ── BƯỚC 3: CCCD ──
       case 2: return (
         <div className="flex-1 flex flex-col gap-5 justify-evenly">
-          <h3 className="text-3xl font-bold text-gray-900 text-center">Thông tin CCCD</h3>
+          <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center">Thông tin CCCD</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <TF label="Số CCCD" value={values.citizen_id} onChange={handleChange('citizen_id')} required placeholder="001234567890" error={getFieldError('citizen_id', values.citizen_id)} maxLength={12} />
             <TF label="Số CMND cũ (nếu có)" value={values.old_id_number} onChange={handleChange('old_id_number')} placeholder="123456789" error={getFieldError('old_id_number', values.old_id_number)} maxLength={9} />
@@ -875,7 +875,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
       // ── BƯỚC 4: Địa chỉ & BHXH ──
       case 3: return (
         <div className="flex-1 flex flex-col gap-5 justify-evenly">
-          <h3 className="text-3xl font-bold text-gray-900 text-center">Địa chỉ & BHXH</h3>
+          <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center">Địa chỉ & BHXH</h3>
           <TF label="Địa chỉ thường trú" value={values.permanent_address} onChange={handleChange('permanent_address')} multiline rows={2} required placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" />
           <p className="text-xs text-gray-500 px-1 -mt-2">(Vui lòng tra cứu địa chỉ mới bằng cách đăng nhập ứng dụng VNeID để kiểm tra)</p>
           <TF label="Địa chỉ hiện tại" value={values.current_address} onChange={handleChange('current_address')} multiline rows={2} required placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" />
@@ -913,7 +913,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
       // ── BƯỚC 5: Người liên hệ khẩn cấp ──
       case 4: return (
         <div className="flex-1 flex flex-col gap-5 justify-evenly">
-          <h3 className="text-3xl font-bold text-gray-900 text-center">Người liên hệ khẩn cấp</h3>
+          <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center">Người liên hệ khẩn cấp</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <TF label="Họ và tên" value={values.emergency_contact_name} onChange={handleChange('emergency_contact_name')} required placeholder="Nguyễn Văn B" error={getFieldError('emergency_contact_name', values.emergency_contact_name)} maxLength={50} />
             <TF label="Mối quan hệ" value={values.emergency_contact_relationship} onChange={handleChange('emergency_contact_relationship')} required placeholder="Bố, mẹ, vợ, chồng..." error={getFieldError('emergency_contact_relationship', values.emergency_contact_relationship)} maxLength={30} />
@@ -932,7 +932,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
       // ── BƯỚC 6: Thông tin lương ──
       case 5: return (
         <div className="flex-1 flex flex-col gap-5 justify-evenly">
-          <h3 className="text-3xl font-bold text-gray-900 text-center">{isSelfUpdate ? 'Thông tin ngân hàng' : 'Thông tin lương'}</h3>
+          <h3 className="font-bold text-gray-900 text-center text-2xl sm:text-3xl">{isSelfUpdate ? 'Thông tin ngân hàng' : 'Thông tin lương'}</h3>
           {!isSelfUpdate && (
             <>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1060,7 +1060,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
         return (
           <div className="flex-1 flex flex-col gap-5">
             <div className="text-center mb-2">
-              <h3 className="text-3xl font-bold text-gray-900">Xác nhận thông tin</h3>
+              <h3 className="text-2xl sm:text-3xl font-bold text-gray-900">Xác nhận thông tin</h3>
               <p className="text-gray-500 mt-2">Vui lòng kiểm tra lại trước khi gửi. Bấm vào bước bên trái để chỉnh sửa.</p>
             </div>
 
@@ -1092,7 +1092,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
     <div className="notranslate min-h-screen bg-slate-50 flex flex-col" translate="no">
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-2xl text-white text-sm max-w-sm flex items-center gap-2 animate-in slide-in-from-top
+        <div className={`fixed top-4 left-4 right-4 sm:left-auto z-50 px-4 py-3 rounded-xl shadow-2xl text-white text-sm max-w-sm flex items-center gap-2 animate-in slide-in-from-top
           ${toast.type === 'success' ? 'bg-green-500' : toast.type === 'error' ? 'bg-red-500' : 'bg-amber-500'}`}>
           <span className="flex-1">{toast.msg}</span>
           <button onClick={() => setToast(null)} className="text-white/80 hover:text-white">
@@ -1209,14 +1209,14 @@ export const EmployeeOnboardingForm: React.FC = () => {
               </div>
 
               {/* Form body */}
-              <div className="p-6 sm:p-8 flex-1 flex flex-col">
+              <div className="p-4 sm:p-8 flex-1 flex flex-col">
                 <div className="flex-1 flex flex-col justify-evenly gap-4">
                   {renderStep()}
                 </div>
               </div>
 
               {/* Navigation */}
-              <div className="px-6 sm:px-8 py-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
+              <div className="px-4 sm:px-8 py-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center gap-3">
                 {currentStep > 0 ? (
                   <button
                     onClick={handlePrevious}
@@ -1236,7 +1236,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
                       Tiếp theo →
                     </button>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 px-6 py-2.5 text-sm text-gray-400 italic">
+                    <span className="inline-flex items-center gap-1.5 px-2 sm:px-6 py-2.5 text-sm text-gray-400 italic text-right">
                       Vui lòng điền đầy đủ thông tin
                     </span>
                   )
