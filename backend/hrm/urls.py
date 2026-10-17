@@ -8,6 +8,7 @@ from . import shift_registration_views
 from . import deadline_exception_views
 from . import feedback_views
 from .employee_change_views import EmployeeChangeRecordViewSet
+from .shift_plan_views import WeeklyShiftPlanViewSet
 from salary.payroll_finalization_views import (
     FinalizeSalaryMonthView, SalaryFinalizeStateView, UnfinalizeSalaryMonthView,
 )
@@ -126,6 +127,7 @@ router.register(r'deadline-exceptions', deadline_exception_views.DeadlineExcepti
 router.register(r'feedbacks', feedback_views.FeedbackViewSet, basename='feedback')
 router.register(r'employee-permissions', views.EmployeePermissionViewSet, basename='employee-permission')
 router.register(r'employee-changes', EmployeeChangeRecordViewSet, basename='employee-change')
+router.register(r'weekly-shift-plans', WeeklyShiftPlanViewSet, basename='weekly-shift-plan')
 router.register(r'onboardings', OnboardingProcessViewSet, basename='onboardings')
 router.register(r'online-work-quota-overrides', views.OnlineWorkQuotaOverrideViewSet, basename='online-work-quota-override')
 router.register(r'child-care-regimes', views.ChildCareRegimeViewSet, basename='child-care-regime')
