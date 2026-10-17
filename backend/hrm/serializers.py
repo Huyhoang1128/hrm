@@ -1926,6 +1926,7 @@ class CompanyConfigSerializer(serializers.ModelSerializer):
             'maternity_leave_days', 'paternity_leave_days',
             'max_explanation_count_per_month', 'supplement_work_hours_per_month',
             'max_leave_count_per_month', 'max_online_work_count_per_month',
+            'lock_employee_self_edit',
             'is_active', 'effective_from', 'effective_to',
             'created_at', 'updated_at', 'created_by', 'created_by_name', 'created_by_id',
             'is_current'
