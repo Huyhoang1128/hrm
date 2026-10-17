@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from .models import MonthlySalaryRecord, SalaryComponent, SalaryFormula, SalaryComponentOverride
-from .salary_data_models import EmployeeSalaryHistory, EmployeeKPIRecord, TaxBracketConfig, TaxBracket, DisciplinaryPenalty, SalesCommission, OvertimeRateConfig, SalaryAdvance, OtherAllowance, EmployeeMonthlySalaryInput, MissingWorkdayPenalty
+from .salary_data_models import EmployeeSalaryHistory, EmployeeKPIRecord, TaxBracketConfig, TaxBracket, DisciplinaryPenalty, SalesCommission, OvertimeRateConfig, SalaryAdvance, OtherAllowance, EmployeeMonthlySalaryInput, MissingWorkdayPenalty, MonthlyPayrollSnapshot
 
 
 class SalaryComponentInline(admin.TabularInline):
@@ -143,3 +143,18 @@ class MissingWorkdayPenaltyAdmin(admin.ModelAdmin):
     list_display = ('employee', 'from_month', 'to_month', 'base_amount', 'note', 'updated_at')
     search_fields = ('employee__employee_id', 'employee__full_name')
     raw_id_fields = ('employee',)
+
+
+@admin.register(MonthlyPayrollSnapshot)
+class MonthlyPayrollSnapshotAdmin(admin.ModelAdmin):
+    """Chỉ xem — chốt / bỏ chốt qua trang Bảng lương (API /api-hrm/salary/finalize/)."""
+    list_display = ('employee_code', 'ho_va_ten', 'year', 'month', 'phong_ban', 'con_phai_thanh_toan', 'finalized_at')
+    list_filter = ('year', 'month')
+    search_fields = ('employee_code', 'ho_va_ten')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+

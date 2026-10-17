@@ -7,6 +7,9 @@ from . import registration_views
 from . import shift_registration_views
 from . import deadline_exception_views
 from . import feedback_views
+from salary.payroll_finalization_views import (
+    FinalizeSalaryMonthView, SalaryFinalizeStateView, UnfinalizeSalaryMonthView,
+)
 from .attendance_views import AttendanceCalendarView
 from .finalization_views import (
     FinalizeAttendanceView,
@@ -209,6 +212,10 @@ urlpatterns = [
     # Work Finalization (Chốt công) API endpoints
     path('work-finalization/', WorkFinalizationListView.as_view(), name='work-finalization-list'),
     path('salary/department/', SalaryDepartmentView.as_view(), name='salary-department-list'),
+    # Chốt lương tháng (salary/payroll_finalization.py)
+    path('salary/finalize/', FinalizeSalaryMonthView.as_view(), name='salary-finalize'),
+    path('salary/unfinalize/', UnfinalizeSalaryMonthView.as_view(), name='salary-unfinalize'),
+    path('salary/finalize-state/', SalaryFinalizeStateView.as_view(), name='salary-finalize-state'),
     path('work-finalization/finalize/', FinalizeAttendanceView.as_view(), name='work-finalization-finalize'),
     path('work-finalization/finalize-all/', FinalizeAllAttendanceView.as_view(), name='work-finalization-finalize-all'),
     path('work-finalization/finalize-department/', FinalizeDepartmentAttendanceView.as_view(), name='work-finalization-finalize-department'),

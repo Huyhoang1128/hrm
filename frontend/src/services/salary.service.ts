@@ -41,6 +41,14 @@ export interface SalaryRecord {
   cong_chuan?: number;
   tong_phat: number;
   tong_phat_bienban: number;
+  /** Dòng đọc từ bản đã chốt (tháng đã chốt lương) */
+  payroll_finalized?: boolean;
+  /** Cấu hình lương của nhân viên lúc chốt — phiếu lương tháng đã chốt dùng thay cho cấu hình hiện tại */
+  employee_snapshot?: {
+    salary_adjustments?: Record<string, unknown> | null;
+    social_insurance_contribution_level?: number | string | null;
+    probation_rate?: string | null;
+  };
   /** Phạt thiếu công: số công thiếu so với công chuẩn và tiền phạt (0 nếu không trong danh sách) */
   cong_thieu?: number;
   phat_thieu_cong?: number;
@@ -76,8 +84,36 @@ export interface SalaryListResponse {
   /** Số người đã nghỉ nhưng VẪN còn lương phải trả của những ngày đã làm trong tháng */
   left_payable_count?: number;
   left_payable_amount?: number;
+  /** Tháng đã chốt lương chưa / lúc nào; from_snapshot: các dòng là bản đã chốt (không phải bản tính lại) */
+  is_finalized?: boolean;
+  finalized_at?: string | null;
+  from_snapshot?: boolean;
   total: number;
   results: SalaryRecord[];
+}
+
+/** Trạng thái chốt lương tháng — GET /api-hrm/salary/finalize-state/ */
+export interface SalaryFinalizeState {
+  year: number;
+  month: number;
+  is_finalized: boolean;
+  finalized_at: string | null;
+  finalized_by: string | null;
+  total_finalized: number;
+  /** Dữ liệu hiện tại khác bản đã chốt (cần chốt lại trước khi gửi phiếu lương) */
+  is_stale: boolean;
+  changed_count: number;
+  changed: Array<{ employee_code: string; ho_va_ten: string; reason: string; fields?: string[] }>;
+}
+
+export interface FinalizeSalaryResponse {
+  year: number;
+  month: number;
+  total: number;
+  created: number;
+  updated: number;
+  removed: number;
+  finalized_at: string | null;
 }
 
 export interface SalaryFormulaUpdateData {
@@ -497,8 +533,28 @@ class SalaryService {
     employee_code?: string;
     /** working = chỉ người đang làm việc | left = chỉ người đã nghỉ | bỏ trống = tất cả */
     employment_filter?: 'working' | 'left';
+    /** 1: tháng đã chốt vẫn tính lại từ dữ liệu hiện tại để đối chiếu */
+    refresh?: 1;
   }): Promise<SalaryListResponse> {
     const response = await managementApi.get('/api-hrm/salary/department/', { params });
+    return response.data;
+  }
+
+  /** Trạng thái chốt lương tháng (tính lại để so — có thể mất vài giây). */
+  async getSalaryFinalizeState(params: { year: number; month: number }): Promise<SalaryFinalizeState> {
+    const response = await managementApi.get('/api-hrm/salary/finalize-state/', { params, timeout: 300000 });
+    return response.data;
+  }
+
+  /** Chốt (hoặc chốt lại) lương cả công ty của tháng. */
+  async finalizeSalaryMonth(data: { year: number; month: number }): Promise<FinalizeSalaryResponse> {
+    const response = await managementApi.post('/api-hrm/salary/finalize/', data, { timeout: 300000 });
+    return response.data;
+  }
+
+  /** Bỏ chốt: mở khoá dữ liệu lương của tháng. */
+  async unfinalizeSalaryMonth(data: { year: number; month: number }): Promise<{ removed: number }> {
+    const response = await managementApi.post('/api-hrm/salary/unfinalize/', data);
     return response.data;
   }
 

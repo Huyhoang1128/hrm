@@ -750,3 +750,54 @@ class TaxBracket(models.Model):
     def __str__(self):
         upper = f"{float(self.max_income):,.0f}" if self.max_income else "∞"
         return f"[{float(self.min_income):,.0f} – {upper}] × {float(self.rate)*100:.0f}%"
+
+
+# ---------------------------------------------------------------------------
+# MonthlyPayrollSnapshot – Bảng lương tháng đã chốt
+# ---------------------------------------------------------------------------
+
+class MonthlyPayrollSnapshot(models.Model):
+    """
+    Một dòng bảng lương đã CHỐT của 1 nhân viên / 1 tháng — xem
+    salary/payroll_finalization.py. Tháng có ít nhất 1 dòng là tháng đã chốt:
+    bảng lương, phiếu lương, báo cáo đọc lại đúng `row` này thay vì tính lại, và
+    các API ghi dữ liệu lương của tháng đó bị khoá (salary/period_lock.py).
+
+    `row` là nguyên dòng lương lúc chốt (build_salary_row + dữ liệu lương tháng
+    nhập tay + phần cấu hình lương của nhân viên mà giao diện cần để dựng phiếu
+    lương). Các cột phẳng chỉ để lọc / tổng hợp.
+    """
+    employee = models.ForeignKey(
+        'employee.Employee', on_delete=models.PROTECT,
+        related_name='payroll_snapshots', verbose_name="Nhân viên",
+    )
+    year = models.IntegerField(verbose_name="Năm")
+    month = models.IntegerField(verbose_name="Tháng (1-12)")
+
+    # Thông tin tổ chức tại thời điểm chốt (lọc theo đúng lúc chốt, không theo hiện tại)
+    employee_code = models.CharField(max_length=50, verbose_name="Mã nhân viên")
+    ho_va_ten = models.CharField(max_length=255, verbose_name="Họ và tên")
+    department_id_snapshot = models.IntegerField(null=True, blank=True, verbose_name="Phòng ban (id lúc chốt)")
+    phong_ban = models.CharField(max_length=255, blank=True, default='', verbose_name="Phòng ban")
+    phap_nhan_con = models.CharField(max_length=255, blank=True, default='', verbose_name="Pháp nhân con")
+
+    luong_thuc_linh = models.DecimalField(max_digits=16, decimal_places=2, default=Decimal('0'), verbose_name="Lương thực lĩnh")
+    con_phai_thanh_toan = models.DecimalField(max_digits=16, decimal_places=2, default=Decimal('0'), verbose_name="Còn phải thanh toán")
+    row = models.JSONField(default=dict, verbose_name="Dòng bảng lương")
+
+    finalized_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='payroll_snapshots_finalized', verbose_name="Người chốt",
+    )
+    finalized_at = models.DateTimeField(auto_now=True, verbose_name="Thời điểm chốt")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Bảng lương đã chốt"
+        verbose_name_plural = "Bảng lương đã chốt"
+        unique_together = ['employee', 'year', 'month']
+        ordering = ['-year', '-month', 'employee_code']
+        indexes = [models.Index(fields=['year', 'month'])]
+
+    def __str__(self):
+        return f"Lương đã chốt {self.employee_code} – {self.month:02d}/{self.year}"
