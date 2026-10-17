@@ -263,14 +263,14 @@ const RequestDetailDialog: React.FC<Props> = ({ request, onClose, onPreviewPdf }
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b">
           <h3 className="text-lg font-semibold text-gray-900">Chi tiết đơn</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <XMarkIcon className="w-6 h-6" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-6 py-4">
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+          <dl className="grid grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-4 text-sm">
             <div>
               <dt className="text-gray-500 font-medium">Mã đơn</dt>
               <dd className="text-gray-900 mt-1 font-mono">{request.request_code || '—'}</dd>
@@ -279,7 +279,7 @@ const RequestDetailDialog: React.FC<Props> = ({ request, onClose, onPreviewPdf }
               <dt className="text-gray-500 font-medium">Loại đơn</dt>
               <dd className="text-gray-900 mt-1">{request.request_type_display}</dd>
             </div>
-            <div className="sm:col-span-2">
+            <div className="col-span-2">
               <dt className="text-gray-500 font-medium">Tiêu đề</dt>
               <dd className="text-gray-900 mt-1">{request.title}</dd>
             </div>
@@ -326,7 +326,7 @@ const RequestDetailDialog: React.FC<Props> = ({ request, onClose, onPreviewPdf }
               <dt className="text-gray-500 font-medium">Ngày gửi duyệt</dt>
               <dd className="text-gray-900 mt-1">{formatDate(request.submitted_at)}</dd>
             </div>
-            <div className="sm:col-span-2">
+            <div className="col-span-2">
               <dt className="text-gray-500 font-medium">Lý do</dt>
               <dd className="text-gray-900 mt-1 whitespace-pre-wrap">
                 {request.reason || <span className="text-gray-400 italic">Không có</span>}
@@ -336,13 +336,13 @@ const RequestDetailDialog: React.FC<Props> = ({ request, onClose, onPreviewPdf }
             {request.request_type === 'RESIGNATION' && (
               <>
                 {request.extra_data?.handover_to && (
-                  <div className="sm:col-span-2">
+                  <div className="col-span-2">
                     <dt className="text-gray-500 font-medium">Người tiếp nhận bàn giao</dt>
                     <dd className="text-gray-900 mt-1">{request.extra_data.handover_to}</dd>
                   </div>
                 )}
                 {request.extra_data?.feedback && (
-                  <div className="sm:col-span-2">
+                  <div className="col-span-2">
                     <dt className="text-gray-500 font-medium">Góp ý / Phản hồi</dt>
                     <dd className="text-gray-900 mt-1 whitespace-pre-wrap">
                       {request.extra_data.feedback}
@@ -366,7 +366,7 @@ const RequestDetailDialog: React.FC<Props> = ({ request, onClose, onPreviewPdf }
             )}
           </div>
         </div>
-        <div className="px-6 py-4 border-t flex justify-end gap-2 bg-gray-50">
+        <div className="px-4 sm:px-6 py-4 border-t flex flex-wrap justify-end gap-2 bg-gray-50">
           {onPreviewPdf && request.request_type === 'RESIGNATION' && (
             <button
               onClick={() => onPreviewPdf(request)}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
+  Bars3Icon,
   BellIcon,
   ChatBubbleLeftRightIcon,
   MagnifyingGlassIcon,
@@ -16,6 +17,7 @@ import { useNotificationDrawer } from '@/contexts/NotificationDrawerContext';
 import { useFeedbackNotice } from '@/contexts/FeedbackNoticeContext';
 import { internalChatAPI } from '@/utils/api';
 import { useNavigate } from 'react-router-dom';
+import { BRAND } from '@/config/brand';
 import FeedbackBoxModal from '@/components/FeedbackBoxModal';
 import { FEEDBACK_FEATURE_NAME } from '@/services/feedback.service';
 
@@ -42,7 +44,12 @@ const TYPE_BADGE: Record<string, string> = {
   OTHER: 'bg-gray-100 text-gray-600',
 };
 
-export default function Header() {
+interface HeaderProps {
+  /** Mở menu trượt (chỉ hiện nút trên điện thoại/tablet, < lg). */
+  onOpenMobileNav: () => void;
+}
+
+export default function Header({ onOpenMobileNav }: HeaderProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
   const [announcements, setAnnouncements] = useState<any[]>([]);
@@ -154,9 +161,25 @@ export default function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-100 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6">
-        <div className="flex flex-1 items-center gap-x-4 lg:gap-x-6">
-          <form className="relative flex flex-1 items-center" action="#" method="GET">
+      {/* Dưới lg: 1 thanh duy nhất màu thương hiệu (menu + logo + chuông + tài khoản) —
+          trước đây có 2 thanh chồng nhau (thanh logo + thanh tìm kiếm) chiếm ~128px
+          đầu màn hình điện thoại, mà ô tìm kiếm ở đây chưa có chức năng. */}
+      <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-x-3 border-b border-primary-800/60 bg-primary-900 px-3 shadow-sm sm:gap-x-6 sm:px-6 lg:h-16 lg:border-gray-100 lg:bg-white">
+        <button
+          type="button"
+          className="-ml-1 p-1.5 text-primary-200 hover:text-white transition-colors lg:hidden"
+          onClick={onOpenMobileNav}
+        >
+          <span className="sr-only">Mở menu</span>
+          <Bars3Icon className="h-6 w-6" aria-hidden="true" />
+        </button>
+        <img
+          src={BRAND.logoUrl}
+          alt={BRAND.appName}
+          className="h-8 w-auto max-w-[110px] object-contain brightness-[400] lg:hidden"
+        />
+        <div className="flex flex-1 items-center justify-end gap-x-4 lg:justify-start lg:gap-x-6">
+          <form className="relative hidden flex-1 items-center lg:flex" action="#" method="GET">
             <label htmlFor="search-field" className="sr-only">
               Tìm kiếm
             </label>
@@ -273,19 +296,19 @@ export default function Header() {
               <button
                 type="button"
                 onClick={() => setBellOpen((o) => !o)}
-                className="p-1.5 text-gray-500 hover:text-primary-600 transition-colors relative"
+                className="p-1.5 text-primary-100 hover:text-white lg:text-gray-500 lg:hover:text-primary-600 transition-colors relative"
               >
                 <span className="sr-only">Xem thông báo</span>
                 <BellIcon className="h-6 w-6" aria-hidden="true" />
                 {unreadIds.size > 0 && (
-                  <span className="absolute top-1.5 right-1.5 h-4 w-4 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold ring-2 ring-white">
+                  <span className="absolute top-1.5 right-1.5 h-4 w-4 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold ring-2 ring-primary-900 lg:ring-white">
                     {unreadIds.size > 9 ? '9+' : unreadIds.size}
                   </span>
                 )}
               </button>
 
               {bellOpen && (
-                <div className="absolute right-0 z-30 mt-2 w-80 origin-top-right rounded-xl bg-white shadow-xl ring-1 ring-gray-200 overflow-hidden">
+                <div className="fixed inset-x-3 top-14 z-30 mt-2 origin-top-right rounded-xl bg-white shadow-xl ring-1 ring-gray-200 overflow-hidden sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:w-80">
                   {/* Header */}
                   <div className="flex items-center justify-between px-4 py-3 border-b border-primary-100 bg-primary-50">
                     <span className="text-sm font-semibold text-primary-900">Thông báo</span>
@@ -370,7 +393,7 @@ export default function Header() {
                   />
                 ) : (
                   <UserCircleIcon
-                    className="h-8 w-8 text-gray-400"
+                    className="h-8 w-8 text-primary-200 lg:text-gray-400"
                     aria-hidden="true"
                   />
                 )}
@@ -382,12 +405,12 @@ export default function Header() {
                     className="fixed inset-0 z-10"
                     onClick={() => setUserMenuOpen(false)}
                   />
-                  <div className="absolute right-0 z-20 mt-2.5 w-56 origin-top-right rounded-lg bg-white py-1 shadow-lg ring-1 ring-gray-900/5">
+                  <div className="absolute right-0 z-20 mt-2.5 w-56 max-w-[calc(100vw-1.5rem)] origin-top-right rounded-lg bg-white py-1 shadow-lg ring-1 ring-gray-900/5">
                     <div className="px-4 py-3 border-b border-gray-100">
-                      <div className="font-medium text-sm text-gray-900">
+                      <div className="font-medium text-sm text-gray-900 break-words">
                         {user?.firstName} {user?.lastName}
                       </div>
-                      <div className="text-xs text-gray-500 mt-0.5">{user?.email}</div>
+                      <div className="text-xs text-gray-500 mt-0.5 break-all">{user?.email}</div>
                     </div>
                     <div className="py-1">
                       <button

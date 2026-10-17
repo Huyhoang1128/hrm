@@ -73,7 +73,7 @@ export default function Pagination({
       className={`flex flex-col sm:flex-row items-center justify-between gap-4 ${className}`}
     >
       {/* Items info and per page selector */}
-      <div className="flex flex-col sm:flex-row items-center gap-4">
+      <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
         <div className="text-sm text-gray-700">
           Hiển thị <span className="font-medium">{startItem}</span> -{' '}
           <span className="font-medium">{endItem}</span> /{' '}
@@ -108,7 +108,7 @@ export default function Pagination({
 
       {/* Pagination controls */}
       {totalPages > 1 && (
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center justify-center gap-1 sm:flex-nowrap sm:gap-0 sm:space-x-2">
           {/* Previous button */}
           <button
             onClick={() => onPageChange(currentPage - 1)}
@@ -128,12 +128,12 @@ export default function Pagination({
             return (
               <div key={page} className="flex items-center">
                 {showEllipsisBefore && (
-                  <span className="px-3 py-2 text-sm text-gray-500">...</span>
+                  <span className="px-1.5 py-2 text-sm text-gray-500 sm:px-3">...</span>
                 )}
 
                 <button
                   onClick={() => onPageChange(page)}
-                  className={`relative inline-flex items-center px-3 py-2 text-sm font-medium border ${
+                  className={`relative inline-flex items-center px-2.5 py-2 text-sm font-medium border sm:px-3 ${
                     currentPage === page
                       ? 'z-10 bg-primary-50 border-primary-500 text-primary-600'
                       : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
@@ -143,7 +143,7 @@ export default function Pagination({
                 </button>
 
                 {showEllipsisAfter && (
-                  <span className="px-3 py-2 text-sm text-gray-500">...</span>
+                  <span className="px-1.5 py-2 text-sm text-gray-500 sm:px-3">...</span>
                 )}
               </div>
             );

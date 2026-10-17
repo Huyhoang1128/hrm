@@ -58,7 +58,7 @@ const ApprovalActionModals: React.FC<ApprovalActionModalsProps> = ({
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100] transition-all">
           <div className="bg-white rounded-lg shadow-lg max-w-md w-full overflow-hidden">
             {/* Header */}
-            <div className={`px-6 py-4 flex items-center gap-3 border-b ${actionType === 'APPROVE' ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
+            <div className={`px-4 sm:px-6 py-4 flex items-center gap-3 border-b ${actionType === 'APPROVE' ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
               <div className={`p-2 rounded-full ${actionType === 'APPROVE' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
                 {actionType === 'APPROVE' ? (
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
@@ -72,7 +72,7 @@ const ApprovalActionModals: React.FC<ApprovalActionModalsProps> = ({
             </div>
 
             {/* Content */}
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {targetItem._groupedIds?.length > 1 && (
                 <div className="mb-4 px-3 py-2.5 bg-violet-50 border border-violet-100 rounded-lg text-sm text-violet-700">
                   Đây là đơn nghỉ không phép nhiều ngày liên tiếp — hành động này sẽ áp dụng cho
@@ -95,14 +95,14 @@ const ApprovalActionModals: React.FC<ApprovalActionModalsProps> = ({
                 <button
                   disabled={isProcessing}
                   onClick={() => setActionModalOpen(false)}
-                  className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-100 transition-all text-base"
+                  className="flex-1 px-3 sm:px-4 py-2.5 bg-white border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-100 transition-all text-sm sm:text-base"
                 >
                   Hủy
                 </button>
                 <button
                   disabled={isProcessing}
                   onClick={confirmAction}
-                  className={`flex-1 px-4 py-2.5 text-white font-bold rounded-lg shadow-lg transition-all text-base flex items-center justify-center gap-2 ${actionType === 'APPROVE' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200/50' : 'bg-red-600 hover:bg-red-700 shadow-red-200/50'}`}
+                  className={`flex-1 px-3 sm:px-4 py-2.5 text-white font-bold rounded-lg shadow-lg transition-all text-sm sm:text-base flex items-center justify-center gap-2 ${actionType === 'APPROVE' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200/50' : 'bg-red-600 hover:bg-red-700 shadow-red-200/50'}`}
                 >
                   {isProcessing ? (
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -197,13 +197,13 @@ const ApprovalActionModals: React.FC<ApprovalActionModalsProps> = ({
       {bulkConfirmModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[110]">
           <div className="bg-white rounded-lg shadow-lg max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="bg-emerald-600 px-6 py-4 flex items-center gap-3 flex-shrink-0">
+            <div className="bg-emerald-600 px-4 sm:px-6 py-4 flex items-center gap-3 flex-shrink-0">
               <div className="p-2 bg-white/20 rounded-lg text-white">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
               </div>
               <h3 className="text-lg font-bold text-white">Xác nhận duyệt nhanh</h3>
             </div>
-            <div className="p-6 overflow-y-auto flex-1">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
               <p className="text-gray-600 mb-2 leading-relaxed">
                 Bạn đang thực hiện duyệt nhanh cho <span className="font-semibold text-gray-900">{(bulkConfirmModal as any).name}</span>.
               </p>
@@ -321,7 +321,7 @@ const ApprovalActionModals: React.FC<ApprovalActionModalsProps> = ({
                 </div>
               </div>
             </div>
-            <div className="px-6 pb-6 flex-shrink-0">
+            <div className="px-4 sm:px-6 pb-4 sm:pb-6 flex-shrink-0">
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   onClick={() => setBulkConfirmModal(null)}
@@ -345,7 +345,7 @@ const ApprovalActionModals: React.FC<ApprovalActionModalsProps> = ({
       {bulkActionResult && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[120]">
           <div className="bg-white rounded-lg shadow-lg max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden">
-            <div className={`px-6 py-4 flex items-center gap-3 flex-shrink-0 ${bulkActionResult.backendErrors?.length > 0 ? 'bg-amber-600' : 'bg-emerald-600'}`}>
+            <div className={`px-4 sm:px-6 py-4 flex items-center gap-3 flex-shrink-0 ${bulkActionResult.backendErrors?.length > 0 ? 'bg-amber-600' : 'bg-emerald-600'}`}>
               <div className="p-2 bg-white/20 rounded-lg text-white">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
               </div>
@@ -353,7 +353,7 @@ const ApprovalActionModals: React.FC<ApprovalActionModalsProps> = ({
                 {bulkActionResult.backendErrors?.length > 0 ? 'Xử lý xong — có đơn KHÔNG duyệt được' : 'Xử lý hoàn tất!'}
               </h3>
             </div>
-            <div className="p-6 overflow-y-auto flex-1">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
               <p className="text-gray-600 mb-2 leading-relaxed">
                 Kết quả duyệt nhanh tại <span className="font-semibold text-gray-900">{bulkActionResult.groupName}</span>.
               </p>
@@ -474,7 +474,7 @@ const ApprovalActionModals: React.FC<ApprovalActionModalsProps> = ({
                 </div>
               )}
             </div>
-            <div className="px-6 pb-6 flex-shrink-0">
+            <div className="px-4 sm:px-6 pb-4 sm:pb-6 flex-shrink-0">
               <button
                 onClick={() => setBulkActionResult(null)}
                 className="w-full py-3 bg-gray-900 text-white font-bold rounded-lg hover:bg-black transition-colors"

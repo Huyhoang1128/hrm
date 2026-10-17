@@ -66,7 +66,7 @@ Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 
 | 3.4 | ✅ **Kế hoạch ca theo tuần**: chọn ca tự do, duyệt 2 bước, khoá, nhập / xuất Excel | L | Model `WeeklyShiftPlan` (tách khỏi `ShiftRegistration`); kế hoạch đã duyệt được ưu tiên khi chấm công. |
 | 3.5 | ✅ **Ca online cộng thêm** (không cần chấm công) | M | Ca có cờ `no_attendance_required`, chọn ở ô "Ca online thêm" của kế hoạch ca tuần; được cộng số công cố định của ca. |
 | 3.6 | Cấu hình lương theo mốc hiệu lực | L | Hoãn, vì chủ yếu là nợ kỹ thuật. |
-| 3.7 | Tối ưu giao diện cho điện thoại | L | Làm dần theo từng trang. |
+| 3.7 | Tối ưu giao diện cho điện thoại | L | Làm dần theo từng đợt. Đợt 1 ✅: khung chung (1 thanh đầu trang, menu tự đóng, SelectBox, phân trang) + Trang chủ, Hồ sơ, Chấm công, Đơn từ, Duyệt đơn. |
 
 ---
 

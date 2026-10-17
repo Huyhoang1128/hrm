@@ -16,6 +16,17 @@
   }
 }
 
+/* Điện thoại cảm ứng: ô nhập chữ < 16px khiến iPhone tự phóng to trang khi chạm vào
+   (gõ xong trang bị lệch). Đặt 16px cho ô nhập thay vì khoá zoom bằng maximum-scale —
+   vẫn giữ được thao tác chụm 2 ngón để phóng to. Đặt ngoài @layer để thắng text-sm. */
+@media (pointer: coarse) and (max-width: 639px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 @layer components {
   .btn-primary {
     @apply bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-medium py-2 px-4 rounded-xl transition-all duration-200 tracking-tight shadow-sm;

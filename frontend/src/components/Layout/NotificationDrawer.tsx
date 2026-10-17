@@ -250,7 +250,7 @@ export default function NotificationDrawer({ open, onClose, initialItem, unreadI
                     key={att.id}
                     type="button"
                     onClick={() => setAttachmentPreview(att)}
-                    className="inline-flex items-center gap-2 px-3 py-2 bg-gray-50 text-gray-700 border border-gray-200 rounded-lg text-sm hover:bg-gray-100 transition-colors"
+                    className="inline-flex items-center gap-2 px-3 py-2 bg-gray-50 text-gray-700 border border-gray-200 rounded-lg text-sm hover:bg-gray-100 transition-colors max-w-full text-left [overflow-wrap:anywhere]"
                   >
                     <PaperClipIcon className="w-4 h-4 flex-shrink-0 text-gray-400" />
                     {att.file_name}

@@ -30,6 +30,13 @@ interface SelectBoxProps<T> {
   disabled?: boolean;
 }
 
+// Danh sách thả xuống: trên điện thoại rộng bằng đúng ô chọn và cho nhãn dài
+// xuống dòng (trước đây w-max khiến danh sách tràn khỏi mép phải màn hình, nhãn
+// dài như tên ca kèm giờ bị cắt). Từ sm trở lên giữ như cũ: rộng theo nhãn dài nhất.
+const OPTIONS_PANEL_CLS =
+  "absolute z-50 mt-1 max-h-60 w-full sm:w-max sm:min-w-full sm:max-w-[min(32rem,90vw)] overflow-auto";
+const OPTION_TEXT_CLS = "block break-words sm:truncate";
+
 function SelectBoxInner<T>({
   label,
   value,
@@ -101,12 +108,15 @@ function SelectBoxInner<T>({
     ? " opacity-50 cursor-not-allowed bg-gray-50 pointer-events-none"
     : "";
 
-  const optionsCls = "max-h-60 min-w-full w-max max-w-[min(32rem,90vw)] overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm";
+  const panelSkinCls = "rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm";
+  // portal: vị trí / độ rộng tối thiểu do menuStyle tính theo ô chọn
+  const optionsCls = `max-h-60 min-w-full w-max max-w-[min(32rem,90vw)] overflow-auto ${panelSkinCls}`;
+  const inlineOptionsCls = `${OPTIONS_PANEL_CLS} ${panelSkinCls}`;
 
   // COMBOBOX MODE (Searchable)
   if (searchable) {
     const optionsContent = (
-      <Combobox.Options className={portal ? optionsCls : `absolute z-50 mt-1 ${optionsCls}`} style={portal ? menuStyle : undefined}>
+      <Combobox.Options className={portal ? optionsCls : inlineOptionsCls} style={portal ? menuStyle : undefined}>
         {filteredOptions.length === 0 && query !== "" ? (
           <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
             Không tìm thấy kết quả.
@@ -122,7 +132,7 @@ function SelectBoxInner<T>({
             >
               {({ selected, active }) => (
                 <>
-                  <span className={`block truncate ${selected ? "font-medium" : "font-normal"}`}>{option.label}</span>
+                  <span className={`${OPTION_TEXT_CLS} ${selected ? "font-medium" : "font-normal"}`}>{option.label}</span>
                   {selected && (
                     <span className={`absolute inset-y-0 left-0 flex items-center pl-3 ${active ? "text-white" : "text-blue-600"}`}>
                       <CheckIcon className="h-5 w-5" aria-hidden="true" />
@@ -174,7 +184,7 @@ function SelectBoxInner<T>({
   const fallbackSelected = selected || (placeholder ? { value, label: placeholder } : options[0]);
 
   const listboxOptions = (
-    <Listbox.Options className={portal ? optionsCls : `absolute z-50 mt-1 ${optionsCls}`} style={portal ? menuStyle : undefined}>
+    <Listbox.Options className={portal ? optionsCls : inlineOptionsCls} style={portal ? menuStyle : undefined}>
       {options.map((option) => (
         <Listbox.Option
           key={String(option.value)}
@@ -185,7 +195,7 @@ function SelectBoxInner<T>({
         >
           {({ selected }) => (
             <>
-              <span className={`block truncate ${selected ? "font-medium" : "font-normal"}`}>{option.label}</span>
+              <span className={`${OPTION_TEXT_CLS} ${selected ? "font-medium" : "font-normal"}`}>{option.label}</span>
               {selected && (
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-blue-600">
                   <CheckIcon className="h-5 w-5" aria-hidden="true" />
@@ -267,7 +277,7 @@ function MultiSelectBoxInner<T extends string>({
               <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
             </span>
           </Listbox.Button>
-          <Listbox.Options className="absolute z-50 mt-1 max-h-60 min-w-full w-max max-w-[min(32rem,90vw)] overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+          <Listbox.Options className={`${OPTIONS_PANEL_CLS} rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm`}>
             {/* "Tất cả" option */}
             <div
               onClick={() => onChange([])}
@@ -288,7 +298,7 @@ function MultiSelectBoxInner<T extends string>({
                   onClick={() => toggle(option.value)}
                   className={`relative cursor-pointer select-none py-2 pl-10 pr-4 hover:bg-blue-50 ${isSelected ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`}
                 >
-                  <span className={`block truncate ${isSelected ? 'font-medium' : 'font-normal'}`}>
+                  <span className={`${OPTION_TEXT_CLS} ${isSelected ? 'font-medium' : 'font-normal'}`}>
                     {option.label}
                   </span>
                   {isSelected && (

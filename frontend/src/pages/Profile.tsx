@@ -591,7 +591,7 @@ const Profile: React.FC = () => {
                   Họ và tên
                 </label>
                 <div className="flex items-center px-3 py-2.5 bg-gray-50 rounded-xl">
-                  <UserIcon className="h-5 w-5 text-gray-400 mr-2" />
+                  <UserIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
                   <span className="text-gray-900">{employee.full_name}</span>
                 </div>
               </div>
@@ -610,7 +610,7 @@ const Profile: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Ngày sinh</label>
                 <div className="flex items-center px-3 py-2.5 bg-gray-50 rounded-xl">
-                  <CalendarIcon className="h-5 w-5 text-gray-400 mr-2" />
+                  <CalendarIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
                   <span className="text-gray-900">{employee.date_of_birth ? formatDate(employee.date_of_birth) : 'Chưa cập nhật'}</span>
                 </div>
               </div>
@@ -620,7 +620,7 @@ const Profile: React.FC = () => {
                   Ngày vào làm
                 </label>
                 <div className="flex items-center px-3 py-2.5 bg-gray-50 rounded-xl">
-                  <CalendarIcon className="h-5 w-5 text-gray-400 mr-2" />
+                  <CalendarIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
                   <span className="text-gray-900">
                     {employee.start_date
                       ? formatDate(employee.start_date)
@@ -634,7 +634,7 @@ const Profile: React.FC = () => {
                   Số điện thoại
                 </label>
                 <div className="flex items-center px-3 py-2.5 bg-gray-50 rounded-xl">
-                  <PhoneIcon className="h-5 w-5 text-gray-400 mr-2" />
+                  <PhoneIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
                   <span className="text-gray-900">
                     {employee.phone_number || 'Chưa cập nhật'}
                   </span>
@@ -646,8 +646,8 @@ const Profile: React.FC = () => {
                   Email cá nhân
                 </label>
                 <div className="flex items-center px-3 py-2.5 bg-gray-50 rounded-xl">
-                  <EnvelopeIcon className="h-5 w-5 text-gray-400 mr-2" />
-                  <span className="text-gray-900">
+                  <EnvelopeIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
+                  <span className="text-gray-900 min-w-0 break-all">
                     {employee.personal_email || 'Chưa cập nhật'}
                   </span>
                 </div>
@@ -721,7 +721,7 @@ const Profile: React.FC = () => {
                   Tên ngân hàng
                 </label>
                 <div className="flex items-center px-3 py-2.5 bg-gray-50 rounded-xl">
-                  <BanknotesIcon className="h-5 w-5 text-gray-400 mr-2" />
+                  <BanknotesIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
                   <span className="text-gray-900">
                     {employee.bank_name || 'Chưa cập nhật'}
                   </span>
@@ -733,7 +733,7 @@ const Profile: React.FC = () => {
                   Số tài khoản
                 </label>
                 <div className="flex items-center px-3 py-2.5 bg-gray-50 rounded-xl">
-                  <BanknotesIcon className="h-5 w-5 text-gray-400 mr-2" />
+                  <BanknotesIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
                   <span className="text-gray-900">
                     {employee.bank_account || 'Chưa cập nhật'}
                   </span>
@@ -763,7 +763,7 @@ const Profile: React.FC = () => {
                   Phòng ban
                 </label>
                 <div className="flex items-center px-3 py-2.5 bg-gray-50 rounded-xl">
-                  <BuildingOfficeIcon className="h-5 w-5 text-gray-400 mr-2" />
+                  <BuildingOfficeIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
                   <span className="text-gray-900">
                     {department?.name ||
                       employee.department?.name ||
@@ -815,7 +815,7 @@ const Profile: React.FC = () => {
                     Họ tên
                   </label>
                   <div className="flex items-center px-3 py-2.5 bg-gray-50 rounded-xl">
-                    <UserIcon className="h-5 w-5 text-gray-400 mr-2" />
+                    <UserIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
                     <span className="text-gray-900">
                       {manager?.full_name || employee.manager_name}
                     </span>
@@ -850,7 +850,7 @@ const Profile: React.FC = () => {
                       Số điện thoại
                     </label>
                     <div className="flex items-center px-3 py-2.5 bg-gray-50 rounded-xl">
-                      <PhoneIcon className="h-5 w-5 text-gray-400 mr-2" />
+                      <PhoneIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
                       <span className="text-gray-900">
                         {manager.phone_number}
                       </span>
@@ -891,7 +891,7 @@ const Profile: React.FC = () => {
                 Loại hợp đồng
               </label>
               <div className="flex items-center px-3 py-2.5 bg-gray-50 rounded-xl">
-                <DocumentTextIcon className="h-5 w-5 text-gray-400 mr-2" />
+                <DocumentTextIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
                 <span className="text-gray-900">
                   {employee.contract_type_display ||
                     (employee.contract_type ? CONTRACT_TYPE_MAP[employee.contract_type] : undefined) ||
@@ -946,7 +946,7 @@ const Profile: React.FC = () => {
                 Ngày kết thúc thử việc
               </label>
               <div className="flex items-center px-3 py-2.5 bg-gray-50 rounded-xl">
-                <ClockIcon className="h-5 w-5 text-gray-400 mr-2" />
+                <ClockIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
                 <span className="text-gray-900">
                   {employee.probation_end_date
                     ? formatDate(employee.probation_end_date)
@@ -1274,7 +1274,7 @@ const Profile: React.FC = () => {
                 Ảnh chụp thông tin VNEID
               </label>
               <div className="flex items-center px-3 py-2.5 bg-gray-50 rounded-xl">
-                <PhotoIcon className="h-5 w-5 text-gray-400 mr-2" />
+                <PhotoIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
                 <span className="text-gray-900">
                   {employee.vneid_screenshot ? 'Đã tải lên' : 'Chưa tải lên'}
                 </span>
@@ -1301,7 +1301,7 @@ const Profile: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Số CCCD</label>
               <div className="flex items-center px-3 py-2.5 bg-gray-50 rounded-xl">
-                <IdentificationIcon className="h-5 w-5 text-gray-400 mr-2" />
+                <IdentificationIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
                 <span className="text-gray-900">{employee.cccd_number || 'Chưa cập nhật'}</span>
               </div>
             </div>
@@ -1330,7 +1330,7 @@ const Profile: React.FC = () => {
             {/* <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nơi khai sinh</label>
               <div className="flex items-center px-3 py-2.5 bg-gray-50 rounded-xl">
-                <MapPinIcon className="h-5 w-5 text-gray-400 mr-2" />
+                <MapPinIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
                 <span className="text-gray-900">{employee.birth_place || 'Chưa cập nhật'}</span>
               </div>
             </div> */}
@@ -1339,7 +1339,7 @@ const Profile: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Hộ khẩu thường trú</label>
               <div className="flex items-center px-3 py-2.5 bg-gray-50 rounded-xl">
-                <HomeIcon className="h-5 w-5 text-gray-400 mr-2" />
+                <HomeIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
                 <span className="text-gray-900">{employee.permanent_residence || 'Chưa cập nhật'}</span>
               </div>
             </div>
@@ -1348,7 +1348,7 @@ const Profile: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Địa chỉ hiện tại</label>
               <div className="flex items-center px-3 py-2.5 bg-gray-50 rounded-xl">
-                <MapPinIcon className="h-5 w-5 text-gray-400 mr-2" />
+                <MapPinIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
                 <span className="text-gray-900">{employee.current_address || 'Chưa cập nhật'}</span>
               </div>
             </div>
@@ -1480,8 +1480,8 @@ const Profile: React.FC = () => {
                     </div>
                   )}
                   {member.personal_email && (
-                    <div className="flex items-center text-gray-600">
-                      <EnvelopeIcon className="h-4 w-4 mr-1" />
+                    <div className="flex items-center text-gray-600 min-w-0">
+                      <EnvelopeIcon className="h-4 w-4 mr-1 flex-shrink-0" />
                       <span className="truncate">
                         {member.personal_email}
                       </span>
@@ -1521,7 +1521,7 @@ const Profile: React.FC = () => {
           aria-labelledby="team-modal-title"
         >
           <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[80vh]">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
               <div>
                 <h2
                   id="team-modal-title"
@@ -1541,7 +1541,7 @@ const Profile: React.FC = () => {
                 <XMarkIcon className="w-5 h-5" />
               </button>
             </div>
-            <div className="overflow-y-auto px-6 py-4 space-y-4">
+            <div className="overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
               {teamMembers.map((member) => (
                 <div
                   key={member.id}
@@ -1568,8 +1568,8 @@ const Profile: React.FC = () => {
                       </div>
                     )}
                     {member.personal_email && (
-                      <div className="flex items-center text-gray-600">
-                        <EnvelopeIcon className="h-4 w-4 mr-1" />
+                      <div className="flex items-center text-gray-600 min-w-0">
+                        <EnvelopeIcon className="h-4 w-4 mr-1 flex-shrink-0" />
                         <span className="truncate">{member.personal_email}</span>
                       </div>
                     )}
@@ -1591,7 +1591,7 @@ const Profile: React.FC = () => {
             className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold text-gray-900">{viewingDoc.document_name}</h3>
                 {viewingDoc.description && (
@@ -1624,7 +1624,7 @@ const Profile: React.FC = () => {
               )}
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between gap-3">
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between gap-3">
               <p className="text-xs text-gray-400">
                 {viewingDoc.is_read
                   ? 'Bạn đã đọc tài liệu này'
@@ -1685,7 +1685,7 @@ const Profile: React.FC = () => {
             <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
 
               {/* Modal header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+              <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100 flex-shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="h-9 w-9 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center flex-shrink-0">
                     <PencilIcon className="h-5 w-5" />

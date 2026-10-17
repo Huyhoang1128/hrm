@@ -48,7 +48,7 @@ const ApprovedNotificationDialog: React.FC<Props> = ({ request, onClose }) => {
         </div>
 
         {/* Message body */}
-        <div className="px-8 pb-2">
+        <div className="px-6 sm:px-8 pb-2">
           <p className="text-center text-gray-700 leading-relaxed">
             {message}
           </p>

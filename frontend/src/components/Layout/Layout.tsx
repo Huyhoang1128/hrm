@@ -9,17 +9,22 @@ import { FeedbackNoticeProvider } from '@/contexts/FeedbackNoticeContext';
 
 function LayoutInner({ children }: { children: ReactNode }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { drawerOpen, drawerInitialItem, unreadIds, markRead, closeDrawer } = useNotificationDrawer();
 
   return (
     <div className="h-full flex flex-col bg-primary-100">
-      <Sidebar onCollapseChange={setIsSidebarCollapsed} />
+      <Sidebar
+        onCollapseChange={setIsSidebarCollapsed}
+        mobileOpen={mobileNavOpen}
+        onMobileOpenChange={setMobileNavOpen}
+      />
 
       <div className={`flex flex-col flex-1 min-h-0 transition-all duration-300 ${isSidebarCollapsed ? 'lg:pl-16' : 'lg:pl-64'}`}>
-        <Header />
+        <Header onOpenMobileNav={() => setMobileNavOpen(true)} />
 
-        <main className="flex flex-col flex-1 min-h-0 overflow-y-auto py-6">
-          <div className="flex flex-col flex-1 min-h-0 w-full px-4 sm:px-6">{children}</div>
+        <main className="flex flex-col flex-1 min-h-0 overflow-y-auto py-4 sm:py-6">
+          <div className="flex flex-col flex-1 min-h-0 w-full min-w-0 px-4 sm:px-6">{children}</div>
         </main>
       </div>
 

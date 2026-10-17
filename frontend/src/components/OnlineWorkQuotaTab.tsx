@@ -169,7 +169,7 @@ const OnlineWorkQuotaTab: React.FC = () => {
       {/* Form thêm mới */}
       <div className="border border-gray-100 rounded-2xl p-4 flex flex-col gap-3">
         <p className="text-sm font-bold text-gray-900">Thêm ghi đè mới</p>
-        <div className="flex border-b border-gray-200">
+        <div className="flex border-b border-gray-200 overflow-x-auto">
           {SCOPE_TABS.map(tab => (
             <button
               key={tab.key}
@@ -177,7 +177,7 @@ const OnlineWorkQuotaTab: React.FC = () => {
                 setNewScope(tab.key);
                 setNewTargetId('');
               }}
-              className={`flex items-center gap-2 py-2.5 px-4 text-sm font-medium border-b-2 transition-colors ${
+              className={`flex items-center gap-2 py-2.5 px-3 sm:px-4 whitespace-nowrap shrink-0 text-sm font-medium border-b-2 transition-colors ${
                 newScope === tab.key
                   ? 'border-primary-600 text-primary-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -221,7 +221,7 @@ const OnlineWorkQuotaTab: React.FC = () => {
       </div>
 
       {/* Danh sách ghi đè hiện tại */}
-      <div className="border border-gray-100 rounded-2xl overflow-hidden">
+      <div className="border border-gray-100 rounded-2xl overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-100">
           <thead className="bg-gray-50">
             <tr>
@@ -254,6 +254,7 @@ const OnlineWorkQuotaTab: React.FC = () => {
                         value={Number(o.max_online_days)}
                         options={QUOTA_OPTIONS}
                         onChange={v => handleUpdateQuota(o.id, v)}
+                        portal
                       />
                     </td>
                     <td className="px-6 py-3 whitespace-nowrap text-right">
