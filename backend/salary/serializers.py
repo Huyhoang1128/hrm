@@ -4,7 +4,7 @@ salary/serializers.py – DRF serializers cho Payroll module.
 from rest_framework import serializers
 
 from .models import MonthlySalaryRecord, SalaryComponent, SalaryFormula, SalaryComponentOverride
-from .salary_data_models import EmployeeSalaryHistory, EmployeeKPIRecord, TaxBracketConfig, TaxBracket, DisciplinaryPenalty, SalesCommission, OvertimeRateConfig, SalaryAdvance, OtherAllowance, ParkingAllowanceOverride, LunchAllowanceOverride, EmployeeMonthlySalaryInput
+from .salary_data_models import EmployeeSalaryHistory, EmployeeKPIRecord, TaxBracketConfig, TaxBracket, DisciplinaryPenalty, SalesCommission, OvertimeRateConfig, SalaryAdvance, OtherAllowance, ParkingAllowanceOverride, LunchAllowanceOverride, EmployeeMonthlySalaryInput, MissingWorkdayPenalty
 from employee.models import Department, Position, Employee as EmployeeModel
 
 
@@ -510,3 +510,48 @@ class ApproveSalarySerializer(serializers.Serializer):
 class MarkPaidSerializer(serializers.Serializer):
     """Input để đánh dấu đã thanh toán."""
     payment_ref = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class MissingWorkdayPenaltySerializer(serializers.ModelSerializer):
+    """1 nhân viên trong danh sách phạt thiếu công, áp dụng từ tháng … đến tháng."""
+    employee_code = serializers.CharField(source='employee.employee_id', read_only=True)
+    employee_name = serializers.CharField(source='employee.full_name', read_only=True)
+    department_name = serializers.CharField(source='employee.department.name', read_only=True, default=None)
+    has_basic_salary = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MissingWorkdayPenalty
+        fields = ['id', 'employee', 'employee_code', 'employee_name', 'department_name', 'has_basic_salary',
+                  'from_month', 'to_month', 'base_amount', 'note', 'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at']
+
+    def get_has_basic_salary(self, obj):
+        return bool(obj.employee.basic_salary)
+
+    def validate_base_amount(self, value):
+        if value is None or value <= 0:
+            raise serializers.ValidationError("Mốc lương phải lớn hơn 0.")
+        return value
+
+    def validate(self, attrs):
+        from django.db.models import Q
+        employee = attrs.get('employee', getattr(self.instance, 'employee', None))
+        start = attrs.get('from_month', getattr(self.instance, 'from_month', None))
+        end = attrs.get('to_month', getattr(self.instance, 'to_month', None))
+        start = start.replace(day=1) if start else None
+        end = end.replace(day=1) if end else None
+        if start and end and end < start:
+            raise serializers.ValidationError({'to_month': 'Đến tháng phải sau hoặc bằng Từ tháng.'})
+        if employee and start:
+            overlap = MissingWorkdayPenalty.objects.filter(employee=employee).filter(
+                Q(to_month__isnull=True) | Q(to_month__gte=start)
+            )
+            if end:
+                overlap = overlap.filter(from_month__lte=end)
+            if self.instance is not None:
+                overlap = overlap.exclude(pk=self.instance.pk)
+            if overlap.exists():
+                raise serializers.ValidationError({
+                    'from_month': f'{employee.full_name} đã có trong danh sách phạt thiếu công ở khoảng tháng này.',
+                })
+        return attrs

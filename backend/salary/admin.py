@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from .models import MonthlySalaryRecord, SalaryComponent, SalaryFormula, SalaryComponentOverride
-from .salary_data_models import EmployeeSalaryHistory, EmployeeKPIRecord, TaxBracketConfig, TaxBracket, DisciplinaryPenalty, SalesCommission, OvertimeRateConfig, SalaryAdvance, OtherAllowance, EmployeeMonthlySalaryInput
+from .salary_data_models import EmployeeSalaryHistory, EmployeeKPIRecord, TaxBracketConfig, TaxBracket, DisciplinaryPenalty, SalesCommission, OvertimeRateConfig, SalaryAdvance, OtherAllowance, EmployeeMonthlySalaryInput, MissingWorkdayPenalty
 
 
 class SalaryComponentInline(admin.TabularInline):
@@ -136,3 +136,10 @@ class OvertimeRateConfigAdmin(admin.ModelAdmin):
     list_filter   = ('is_active', 'use_kpi', 'apply_to_all')
     filter_horizontal = ('departments', 'positions', 'employees')
     raw_id_fields = ('created_by',)
+
+
+@admin.register(MissingWorkdayPenalty)
+class MissingWorkdayPenaltyAdmin(admin.ModelAdmin):
+    list_display = ('employee', 'from_month', 'to_month', 'base_amount', 'note', 'updated_at')
+    search_fields = ('employee__employee_id', 'employee__full_name')
+    raw_id_fields = ('employee',)
