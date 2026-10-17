@@ -162,6 +162,7 @@ def _compute_ranking_for_month(year: int, month: int) -> list[dict]:
     ONTIME_OVERRIDE_EXPLANATION_TYPES = [
         ExplanationType.LATE,
         ExplanationType.INCOMPLETE_ATTENDANCE,
+        ExplanationType.MACHINE_ERROR,
     ]
 
     # Lấy tất cả attendance events trong tháng có check_in

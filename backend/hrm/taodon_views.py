@@ -469,7 +469,12 @@ def _generate_explanation_code(attendance_date=None, explanation_type=None) -> s
     else:
         year_month = timezone.now().strftime('%Y%m')
     
-    prefix = "NPM" if explanation_type == ExplanationType.LEAVE else "ATT-EXPL"
+    if explanation_type == ExplanationType.LEAVE:
+        prefix = "NPM"
+    elif explanation_type == ExplanationType.MACHINE_ERROR:
+        prefix = "MCC"  # HCNS lọc riêng đơn Lỗi máy chấm công
+    else:
+        prefix = "ATT-EXPL"
     return f"{prefix}-{year_month}-{str(_uuid.uuid4())[:8].upper()}"
 
 
@@ -516,8 +521,23 @@ class ExplanationEventCreateSerializer(drf_serializers.Serializer):
         reason = data.get('reason', '').strip()
 
         # Enforce reason for all types except INCOMPLETE_ATTENDANCE and LEAVE
+        # (Lỗi máy chấm công cũng bắt buộc lý do — HCNS cần để đối chiếu với máy chấm công)
         if explanation_type not in [ExplanationType.INCOMPLETE_ATTENDANCE, ExplanationType.LEAVE] and not reason:
             raise drf_serializers.ValidationError({'reason': 'Ghi chú là bắt buộc cho loại giải trình này.'})
+
+        # Lỗi máy chấm công: phải khai rõ máy thiếu giờ nào và giờ đã chấm thật — đó là
+        # căn cứ để tính lại công khi duyệt (main_api, cùng nhánh Quên chấm công).
+        if explanation_type == ExplanationType.MACHINE_ERROR:
+            punch = (data.get('forgot_punch_type') or '').strip()
+            if punch not in ('checkin', 'checkout', 'both'):
+                raise drf_serializers.ValidationError({
+                    'forgot_punch_type': 'Chọn máy chấm công thiếu giờ vào, giờ ra hay cả hai.'})
+            if punch in ('checkin', 'both') and not data.get('forgot_checkin_time'):
+                raise drf_serializers.ValidationError({
+                    'forgot_checkin_time': 'Nhập giờ vào bạn đã chấm thực tế.'})
+            if punch in ('checkout', 'both') and not data.get('forgot_checkout_time'):
+                raise drf_serializers.ValidationError({
+                    'forgot_checkout_time': 'Nhập giờ ra bạn đã chấm thực tế.'})
 
         # Chặn đơn giải trình vi phạm TRÙNG cùng ngày: mỗi đơn được duyệt hoàn
         # lại tiền phạt của ngày đó, nên 2 đơn trùng từng làm hoàn phạt 2 lần
