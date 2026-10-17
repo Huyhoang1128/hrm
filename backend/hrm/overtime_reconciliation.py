@@ -228,7 +228,7 @@ def _get_effective_attendance_times(employee, event_date, att):
         employee=employee,
         event_type=EmployeeEvent.EventType.EXPLANATION,
         event_date=event_date,
-        data__explanation_type='INCOMPLETE_ATTENDANCE',
+        data__explanation_type__in=['INCOMPLETE_ATTENDANCE', 'MACHINE_ERROR'],
     ).exclude(data__status__in=['REJECTED', 'CANCELLED']).order_by('-created_at').first()
 
     if not explanation:

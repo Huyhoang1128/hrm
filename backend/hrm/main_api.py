@@ -1770,7 +1770,7 @@ class EmployeeState:
         # Lấy cấu hình từ rule
         max_explanations_per_month = conditions.get("max_explanations_per_month", 3)
         penalty_reduction_rate = conditions.get("penalty_reduction_rate", 0.5)  # 50% giảm phạt
-        allowed_types = conditions.get("allowed_types", ["FORGOT", "INCOMPLETE_ATTENDANCE", "LATE", "EARLY_LEAVE", "BUSINESS_TRIP", "FIRST_DAY", "WORK_FROM_HOME"])
+        allowed_types = conditions.get("allowed_types", ["FORGOT", "INCOMPLETE_ATTENDANCE", "MACHINE_ERROR", "LATE", "EARLY_LEAVE", "BUSINESS_TRIP", "FIRST_DAY", "WORK_FROM_HOME"])
 
         effects = {}
 
@@ -1855,13 +1855,16 @@ class EmployeeState:
         # BUSINESS_TRIP / FIRST_DAY / FORGOT / INCOMPLETE_ATTENDANCE / LATE / EARLY_LEAVE
         # Duyệt giải trình: miễn phạt và có thể cộng thêm công.
         VALID_EXPLANATION_TYPES = (
-            "LATE", "EARLY_LEAVE", "FORGOT", "INCOMPLETE_ATTENDANCE", 
+            "LATE", "EARLY_LEAVE", "FORGOT", "INCOMPLETE_ATTENDANCE", "MACHINE_ERROR", 
             "BUSINESS_TRIP", "FIRST_DAY", "WORK_FROM_HOME"
         )
         
         if explanation_type in VALID_EXPLANATION_TYPES:
             event_date = event.data.get("date")
-            is_exempt_type = explanation_type in ("BUSINESS_TRIP", "FIRST_DAY", "WORK_FROM_HOME")
+            # "Lỗi máy chấm công" (MACHINE_ERROR — NV có chấm nhưng máy không ghi nhận):
+            # không tính lượt giải trình, không bị trừ công khi vượt hạn mức — nhưng KHÔNG
+            # xoá phạt cả ngày như Công tác / Ngày đầu (xem bước 1 bên dưới).
+            is_exempt_type = explanation_type in ("BUSINESS_TRIP", "FIRST_DAY", "WORK_FROM_HOME", "MACHINE_ERROR")
 
             # Event tách riêng, xử lý NGAY tại ngày vi phạm: chỉ trừ lỗi khỏi bộ
             # đếm x2, không hoàn phạt/quota/công (phần đó vẫn chạy ở event duyệt
@@ -1907,8 +1910,8 @@ class EmployeeState:
                 penalty_to_remove = self._get_penalty_for_date(event_date) if event_date else 0
                 late_penalty = self._get_penalty_for_date(event_date, "LATE") if event_date else 0
                 early_penalty = self._get_penalty_for_date(event_date, "EARLY_LEAVE") if event_date else 0
-            elif explanation_type in ("FORGOT", "INCOMPLETE_ATTENDANCE"):
-                # "Quên chấm công" chỉ miễn phần thiếu công do quên chấm công (xử lý riêng ở
+            elif explanation_type in ("FORGOT", "INCOMPLETE_ATTENDANCE", "MACHINE_ERROR"):
+                # "Quên chấm công" (và "Lỗi máy chấm công") chỉ miễn phần thiếu công do quên chấm công (xử lý riêng ở
                 # quota/target_credit bên dưới) — KHÔNG được đụng vào phạt đi muộn/về sớm, vì đi
                 # muộn/về sớm là lỗi độc lập, không liên quan đến việc quên chấm công. Muốn miễn
                 # phạt đi muộn/về sớm thì phải có đơn giải trình LATE/EARLY_LEAVE riêng được duyệt.
@@ -2006,7 +2009,7 @@ class EmployeeState:
 
             # 3. Tính toán cộng công (Work Credit)
             # Chỉ áp dụng cho các loại được coi là "làm bù" hoặc "đi vắng có phép"
-            if explanation_type in ("FORGOT", "INCOMPLETE_ATTENDANCE", "BUSINESS_TRIP", "FIRST_DAY", "WORK_FROM_HOME", "LEAVE"):
+            if explanation_type in ("FORGOT", "INCOMPLETE_ATTENDANCE", "MACHINE_ERROR", "BUSINESS_TRIP", "FIRST_DAY", "WORK_FROM_HOME", "LEAVE"):
                 # Get policy for quota
                 quota_max = 3
                 over_quota_deduction = 0.5
@@ -2031,7 +2034,7 @@ class EmployeeState:
                 target_credit = 1.0
                 is_half_day_expected = (event.data.get("expected_status") == "HALF_DAY")
                 is_additive_half_day_type = explanation_type in (
-                    "LEAVE", "BUSINESS_TRIP", "FIRST_DAY", "WORK_FROM_HOME", "INCOMPLETE_ATTENDANCE"
+                    "LEAVE", "BUSINESS_TRIP", "FIRST_DAY", "WORK_FROM_HOME", "INCOMPLETE_ATTENDANCE", "MACHINE_ERROR"
                 )
                 
                 # Nếu là đơn nghỉ phép tháng (LEAVE) nửa ngày (HALF_DAY) -> mục tiêu 0.5
@@ -2053,7 +2056,8 @@ class EmployeeState:
                 # INCOMPLETE_ATTENDANCE: tính công dựa trên timeline
                 # FE gửi actual_check_in/out (từ máy chấm công) + forgot_checkin/out_time (NV khai)
                 # Ghép lại → tính giờ làm → trả 0.5 hay 1.0
-                elif explanation_type == "INCOMPLETE_ATTENDANCE":
+                elif explanation_type in ("INCOMPLETE_ATTENDANCE", "MACHINE_ERROR"):
+                    # Lỗi máy chấm công tính công y hệt Quên chấm công: ghép giờ máy có với giờ NV khai.
                     shift_type = event.data.get("shift_type", "")
                     forgot_punch_type = event.data.get("forgot_punch_type", "")
                     forgot_checkin_time_str = event.data.get("forgot_checkin_time", "")
@@ -2199,7 +2203,7 @@ class EmployeeState:
                 # Bug thực tế: NV nghỉ phép nửa ngày sáng (0.5) + quên chấm công chiều được giải
                 # trình ra 0.5 công (làm 4.5h, dưới ngưỡng 5.5h) -> needed=max(0, 0.5-0.5)=0,
                 # cả ngày chỉ còn 0.5 công thay vì đúng ra 1.0 (NV80023, 03/9/2026).
-                is_partial_credit_type = is_half_day_expected or explanation_type == "INCOMPLETE_ATTENDANCE"
+                is_partial_credit_type = is_half_day_expected or explanation_type in ("INCOMPLETE_ATTENDANCE", "MACHINE_ERROR")
                 if is_additive_half_day_type and is_partial_credit_type and day_violations == 0:
                     needed = max(0.0, min(1.0, existing_credit + target_credit) - existing_credit)
                 else:
@@ -2578,7 +2582,7 @@ class EmployeeState:
         # công 3/9 có đơn "làm ngày đầu" duyệt 18/9 -> 18/9 bị tính lỗi thứ 7).
         # Tách phần trừ lỗi ra 1 event riêng (không lưu DB) xếp tại ngày vi phạm.
         # BUSINESS_TRIP vốn đã xếp theo ngày vi phạm nên không cần.
-        _COUNTER_RELEASE_TYPES = ("FORGOT", "INCOMPLETE_ATTENDANCE", "FIRST_DAY", "WORK_FROM_HOME")
+        _COUNTER_RELEASE_TYPES = ("FORGOT", "INCOMPLETE_ATTENDANCE", "MACHINE_ERROR", "FIRST_DAY", "WORK_FROM_HOME")
         _release_events = []
         for ev in raw_events:
             if ev.event_type != "explanation_approval" or not ev.data:
@@ -3388,7 +3392,7 @@ class EmployeeState:
         # Lấy cấu hình từ rule
         max_explanations_per_month = conditions.get("max_explanations_per_month", 3)
         penalty_reduction_rate = conditions.get("penalty_reduction_rate", 0.5)  # 50% giảm phạt
-        allowed_types = conditions.get("allowed_types", ["FORGOT", "INCOMPLETE_ATTENDANCE", "LATE", "EARLY_LEAVE"])
+        allowed_types = conditions.get("allowed_types", ["FORGOT", "INCOMPLETE_ATTENDANCE", "MACHINE_ERROR", "LATE", "EARLY_LEAVE"])
         
         # Kiểm tra loại giải trình có được phép không
         if explanation_type not in allowed_types:

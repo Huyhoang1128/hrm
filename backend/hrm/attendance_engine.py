@@ -947,7 +947,7 @@ class HRMAttendanceEngine:
             expl_type = (day_expl.get("explanation_type") or "").upper()
             
             # Nếu field đó trống, thử map từ expected_status (tương thích ngược)
-            if not expl_type or expl_type not in (list(EXEMPT_EXPLANATION_TYPES) + ["LEAVE", "LATE", "EARLY_LEAVE", "INCOMPLETE_ATTENDANCE"]):
+            if not expl_type or expl_type not in (list(EXEMPT_EXPLANATION_TYPES) + ["LEAVE", "LATE", "EARLY_LEAVE", "INCOMPLETE_ATTENDANCE", "MACHINE_ERROR"]):
                 exp = (day_expl.get("expected_status") or "").upper()
                 if exp in EXEMPT_EXPLANATION_TYPES:
                     expl_type = exp
@@ -1063,7 +1063,8 @@ class HRMAttendanceEngine:
                 is_half_day = True
 
         violation_type = None
-        if is_incomplete or (not attendance and expl_type == "INCOMPLETE_ATTENDANCE"):
+        # Lỗi máy chấm công (máy không ghi nhận giờ) xử lý như Quên chấm công
+        if is_incomplete or (not attendance and expl_type in ("INCOMPLETE_ATTENDANCE", "MACHINE_ERROR")):
             is_incomplete = True
             is_absent = False
             violation_type = "INCOMPLETE"
@@ -1307,7 +1308,9 @@ class HRMAttendanceEngine:
             # Update running counters
             if ctx["late_minutes"] > 0 or ctx["early_leave_minutes"] > 0:
                 running_violations += 1
-            if result.is_exempt and ctx.get("explanation_type") not in EXEMPT_EXPLANATION_TYPES:
+            # Lỗi máy chấm công không tính lượt giải trình
+            if (result.is_exempt and ctx.get("explanation_type") not in EXEMPT_EXPLANATION_TYPES
+                    and ctx.get("explanation_type") != "MACHINE_ERROR"):
                 running_expl_quota += 1
             running_ot      += result.overtime_hours
             running_live_ot += result.overtime_hours  # approx; ideally filter LIVE OT only

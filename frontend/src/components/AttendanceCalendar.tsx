@@ -232,6 +232,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
         case 'LATE': return 'đi muộn';
         case 'EARLY_LEAVE': return 'về sớm';
         case 'INCOMPLETE_ATTENDANCE': return 'quên chấm công';
+        case 'MACHINE_ERROR': return 'lỗi máy chấm công';
         case 'BUSINESS_TRIP': return 'công tác';
         case 'FIRST_DAY': return 'ngày đầu đi làm';
         case 'LEAVE': return 'nghỉ phép tháng';
@@ -715,6 +716,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
           'LATE': 'Đã duyệt đi muộn',
           'EARLY_LEAVE': 'Đã duyệt về sớm',
           'INCOMPLETE_ATTENDANCE': 'Đã duyệt quên chấm công',
+          'MACHINE_ERROR': 'Đã duyệt lỗi máy chấm công',
           'LEAVE': 'Đã duyệt nghỉ phép tháng',
           'BUSINESS_TRIP': 'Đã duyệt đi công tác',
           'FIRST_DAY': 'Đã duyệt làm ngày đầu'
@@ -808,6 +810,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
         LATE:                  { title: 'Giải trình đi muộn',       icon: '⏰', color: 'yellow' },
         EARLY_LEAVE:           { title: 'Giải trình về sớm',        icon: '🚪', color: 'yellow' },
         INCOMPLETE_ATTENDANCE: { title: 'Giải trình quên chấm công', icon: '🔔', color: 'purple' },
+        MACHINE_ERROR:         { title: 'Giải trình lỗi máy chấm công', icon: '🛠️', color: 'purple' },
         BUSINESS_TRIP:         { title: 'Giải trình công tác',      icon: '✈️', color: 'blue'   },
         FIRST_DAY:             { title: 'Giải trình ngày đầu',      icon: '🌟', color: 'blue'   },
         LEAVE:                 { title: 'Giải trình nghỉ phép',     icon: '🌴', color: 'green'  },

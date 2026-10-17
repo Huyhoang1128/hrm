@@ -190,6 +190,7 @@ const AttendanceManagement: React.FC = () => {
     LATE: 'Đơn giải trình đi muộn',
     EARLY_LEAVE: 'Đơn giải trình về sớm',
     INCOMPLETE_ATTENDANCE: 'Đơn giải trình quên chấm công',
+    MACHINE_ERROR: 'Đơn giải trình lỗi máy chấm công',
     BUSINESS_TRIP: 'Đơn giải trình công tác',
     FIRST_DAY: 'Đơn giải trình ngày đầu',
     OVERTIME: 'Đơn đăng ký tăng ca',
@@ -233,7 +234,8 @@ const AttendanceManagement: React.FC = () => {
     | 'early_leave_minutes'
     | 'first_day'
     | 'business_trip'
-    | 'incomplete_attendance';
+    | 'incomplete_attendance'
+    | 'machine_error';
   type RegistrationReason = 'overtime' | 'extra_hours' | 'night_shift' | 'live' | 'off_duty' | 'ca2';
   type OnlineWorkReason = 'morning' | 'afternoon' | 'full_day' | 'checkpage';
   type LeaveReason = 'morning' | 'afternoon' | 'full_day';
@@ -451,6 +453,9 @@ const AttendanceManagement: React.FC = () => {
       { id: 'late_minutes', label: 'Đi muộn', icon: 'clock' },
       { id: 'early_leave_minutes', label: 'Về sớm', icon: 'clock' },
       { id: 'incomplete_attendance', label: 'Quên chấm công', icon: 'warning' },
+      // Có chấm nhưng máy không ghi nhận giờ — không giới hạn số lần, không tính lượt
+      // giải trình, bắt buộc ghi lý do.
+      { id: 'machine_error', label: 'Lỗi máy chấm công', icon: 'warning' },
       { id: 'business_trip', label: 'Đi công tác', icon: 'briefcase' },
       { id: 'first_day', label: 'Ngày đầu đi làm', icon: 'calendar' },
     ];
@@ -470,6 +475,7 @@ const AttendanceManagement: React.FC = () => {
           late_minutes: 'LATE',
           early_leave_minutes: 'EARLY_LEAVE',
           incomplete_attendance: 'INCOMPLETE_ATTENDANCE',
+          machine_error: 'MACHINE_ERROR',
           business_trip: 'BUSINESS_TRIP',
           first_day: 'FIRST_DAY'
         } as Record<string, string>)[reason.id]);
@@ -485,6 +491,7 @@ const AttendanceManagement: React.FC = () => {
       if (reason.id === 'late_minutes') return (detail?.late_minutes || 0) > 0;
       if (reason.id === 'early_leave_minutes') return (detail?.early_leave_minutes || 0) > 0;
       if (reason.id === 'incomplete_attendance') return isIncomplete || detail?.status === 'ABSENT';
+      if (reason.id === 'machine_error') return isIncomplete || detail?.status === 'ABSENT';
       if (reason.id === 'first_day') return !detail || detail.status === 'ABSENT' || detail?.status === 'INCOMPLETE_ATTENDANCE';
       if (reason.id === 'business_trip') {
         return !detail || detail.status === 'ABSENT' || (detail?.late_minutes || 0) > 0 || (detail?.early_leave_minutes || 0) > 0 || detail?.status === 'INCOMPLETE_ATTENDANCE';
@@ -584,7 +591,7 @@ const AttendanceManagement: React.FC = () => {
       setLiveStartTime('21:00');
     }
     // Auto-detect ca bị quên chấm công từ shifts[] của ngày đang chọn
-    if (reason === 'incomplete_attendance' && selectedDayData?.shifts?.length) {
+    if ((reason === 'incomplete_attendance' || reason === 'machine_error') && selectedDayData?.shifts?.length) {
       const allShifts = (selectedDayData.shifts as any[])
         .slice()
         .sort((a: any, b: any) => (a.scheduled_start || '').localeCompare(b.scheduled_start || ''));
@@ -1375,7 +1382,7 @@ const AttendanceManagement: React.FC = () => {
 
           if (selectedContext === 'explanation') {
              const targetType = (({
-               late_minutes: 'LATE', early_leave_minutes: 'EARLY_LEAVE', incomplete_attendance: 'INCOMPLETE_ATTENDANCE',
+               late_minutes: 'LATE', early_leave_minutes: 'EARLY_LEAVE', incomplete_attendance: 'INCOMPLETE_ATTENDANCE', machine_error: 'MACHINE_ERROR',
                business_trip: 'BUSINESS_TRIP', first_day: 'FIRST_DAY'
              } as Record<string, string>)[selectedReason as string]);
              return rType === 'EXPLANATION' && rExplType === targetType;
@@ -1441,6 +1448,7 @@ const AttendanceManagement: React.FC = () => {
                     late_minutes: 'LATE',
                     early_leave_minutes: 'EARLY_LEAVE',
                     incomplete_attendance: 'INCOMPLETE_ATTENDANCE',
+                    machine_error: 'MACHINE_ERROR',
                     business_trip: 'BUSINESS_TRIP',
                     first_day: 'FIRST_DAY',
                   };
@@ -1528,7 +1536,7 @@ const AttendanceManagement: React.FC = () => {
 
         if (selectedContext === 'explanation') {
           const targetType = (({
-            late_minutes: 'LATE', early_leave_minutes: 'EARLY_LEAVE', incomplete_attendance: 'INCOMPLETE_ATTENDANCE',
+            late_minutes: 'LATE', early_leave_minutes: 'EARLY_LEAVE', incomplete_attendance: 'INCOMPLETE_ATTENDANCE', machine_error: 'MACHINE_ERROR',
             business_trip: 'BUSINESS_TRIP', first_day: 'FIRST_DAY'
           } as Record<string, string>)[selectedReason as string]);
           return rType === 'EXPLANATION' && rExplType === targetType;
@@ -1568,6 +1576,11 @@ const AttendanceManagement: React.FC = () => {
       }
       if (selectedReason === 'first_day' && !firstDayShift) {
         showNotify('error', 'Thiếu thông tin', 'Vui lòng chọn ca (sáng/chiều/cả ngày) cho đơn ngày đầu đi làm');
+        setIsSubmitting(false);
+        return;
+      }
+      if (selectedContext === 'explanation' && selectedReason === 'machine_error' && !formNote.trim()) {
+        showNotify('error', 'Thiếu thông tin', 'Vui lòng ghi lý do cho đơn Lỗi máy chấm công');
         setIsSubmitting(false);
         return;
       }
@@ -1812,6 +1825,7 @@ const AttendanceManagement: React.FC = () => {
           late_minutes: 'LATE',
           early_leave_minutes: 'EARLY_LEAVE',
           incomplete_attendance: 'INCOMPLETE_ATTENDANCE',
+          machine_error: 'MACHINE_ERROR',
           business_trip: 'BUSINESS_TRIP',
           first_day: 'FIRST_DAY',
         };
@@ -1847,14 +1861,15 @@ const AttendanceManagement: React.FC = () => {
           explanationData.half_day_period = businessTripShift === 'morning' ? 'MORNING' : 'AFTERNOON';
         }
 
-        if (explanationType === 'INCOMPLETE_ATTENDANCE') {
-          // Validate: phải chọn giờ bị quên
+        if (explanationType === 'INCOMPLETE_ATTENDANCE' || explanationType === 'MACHINE_ERROR') {
+          // Validate: phải chọn giờ bị quên (Lỗi máy chấm công: giờ đã chấm mà máy không ghi nhận)
+          const punchWord = explanationType === 'MACHINE_ERROR' ? 'đã chấm' : 'bị quên';
           if (forgotPunchType === 'checkin' && !forgotCheckinTime) {
-            showNotify('error', 'Thiếu thông tin', 'Vui lòng chọn giờ check-in bị quên');
+            showNotify('error', 'Thiếu thông tin', `Vui lòng chọn giờ check-in ${punchWord}`);
             return;
           }
           if (forgotPunchType === 'checkout' && !forgotCheckoutTime) {
-            showNotify('error', 'Thiếu thông tin', 'Vui lòng chọn giờ check-out bị quên');
+            showNotify('error', 'Thiếu thông tin', `Vui lòng chọn giờ check-out ${punchWord}`);
             return;
           }
 
@@ -2983,7 +2998,7 @@ const AttendanceManagement: React.FC = () => {
                               'Tăng ca', 'Làm thêm giờ', 'Trực tối', 'Live', 'Livestream',
                               'Ca CheckPage', 'Ca chiều tối', 'Ca gãy',
                               'Giải trình đi muộn', 'Giải trình về sớm', 'Giải trình quên chấm công', 'Giải trình đi công tác', 'Giải trình ngày đầu đi làm',
-                              'Đi muộn', 'Về sớm', 'Quên chấm công', 'Làm online checkpage', 'Làm online', 'Nghỉ phép'
+                              'Đi muộn', 'Về sớm', 'Quên chấm công', 'Lỗi máy chấm công', 'Làm online checkpage', 'Làm online', 'Nghỉ phép'
                             ].filter(Boolean);
                             prefixes.sort((a, b) => b.length - a.length);
 
@@ -3076,7 +3091,7 @@ const AttendanceManagement: React.FC = () => {
                                         </>
                                       ) : (
                                         <>
-                                          {ev.data?.explanation_type === 'INCOMPLETE_ATTENDANCE' && (
+                                          {['INCOMPLETE_ATTENDANCE', 'MACHINE_ERROR'].includes(ev.data?.explanation_type) && (
                                             <div className="bg-violet-50 p-2 rounded-lg mb-2 text-violet-800 border border-violet-100">
                                               <p className="font-bold flex items-center">
                                                 <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -3084,9 +3099,10 @@ const AttendanceManagement: React.FC = () => {
                                                   const type = ev.data.forgot_punch_type;
                                                   const hasIn = ev.data.forgot_checkin_time || ev.data.actual_check_in;
                                                   const hasOut = ev.data.forgot_checkout_time || ev.data.actual_check_out;
-                                                  if (type === 'checkin' || (hasIn && !hasOut)) return 'Quên Check-in';
-                                                  if (type === 'checkout' || (!hasIn && hasOut)) return 'Quên Check-out';
-                                                  return 'Quên cả Check-in/out';
+                                                  const word = ev.data?.explanation_type === 'MACHINE_ERROR' ? 'Máy thiếu' : 'Quên';
+                                                  if (type === 'checkin' || (hasIn && !hasOut)) return `${word} Check-in`;
+                                                  if (type === 'checkout' || (!hasIn && hasOut)) return `${word} Check-out`;
+                                                  return `${word} cả Check-in/out`;
                                                 })()}
                                               </p>
                                               <p>
@@ -3766,7 +3782,7 @@ const AttendanceManagement: React.FC = () => {
                               const isQuotaConsuming = selectedContext === 'explanation' &&
                                 ['late_minutes', 'early_leave_minutes', 'incomplete_attendance'].includes(reason.id);
                               const isNonQuota = (selectedContext === 'explanation' &&
-                                ['business_trip', 'first_day'].includes(reason.id)) || (selectedContext === 'online_work' && reason.id === 'checkpage');
+                                ['business_trip', 'first_day', 'machine_error'].includes(reason.id)) || (selectedContext === 'online_work' && reason.id === 'checkpage');
 
                               return (
                                 <div key={reason.id} className="relative group/chip">
@@ -4782,6 +4798,30 @@ const AttendanceManagement: React.FC = () => {
                         </div>
                       )}
 
+                    {/* === Lý do cho Lỗi máy chấm công — bắt buộc để HCNS đối chiếu với máy === */}
+                    {selectedContext === 'explanation' &&
+                      selectedReason === 'machine_error' && (
+                        <div className="space-y-3 mb-6 animate-fadeIn">
+                          <label
+                            htmlFor="machine-error-note"
+                            className="block text-sm font-semibold text-gray-700 uppercase tracking-wide"
+                          >
+                            Lý do (bắt buộc)
+                          </label>
+                          <textarea
+                            id="machine-error-note"
+                            rows={3}
+                            value={formNote}
+                            onChange={(e) => setFormNote(e.target.value)}
+                            placeholder="VD: Đã quẹt vân tay lúc 17:30 nhưng máy không ghi nhận"
+                            className="block w-full rounded-xl border-2 border-gray-200 shadow-sm focus:border-violet-500 focus:ring-violet-500 sm:text-sm p-3 transition-colors duration-200 resize-none"
+                          />
+                          <p className="text-xs text-gray-500">
+                            Đơn Lỗi máy chấm công không giới hạn số lần và không tính vào hạn mức giải trình.
+                          </p>
+                        </div>
+                      )}
+
                     {/* === Note Input for Business Trip === */}
                     {selectedContext === 'explanation' &&
                       selectedReason === 'business_trip' && (
@@ -4961,14 +5001,16 @@ const AttendanceManagement: React.FC = () => {
 
                     {/* === Detailed Options for Incomplete Attendance === */}
                     {selectedContext === 'explanation' &&
-                      selectedReason === 'incomplete_attendance' && (
+                      (selectedReason === 'incomplete_attendance' || selectedReason === 'machine_error') && (
                         <div className="space-y-4 mb-6 animate-fadeIn">
 
                           {/* Tiêu đề */}
                           <div className="flex items-center gap-2 mb-1">
                             <div className="w-1 h-5 bg-violet-500 rounded-full"></div>
                             <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
-                              Bạn quên chấm công lúc nào?
+                              {selectedReason === 'machine_error'
+                                ? 'Máy chấm công không ghi nhận giờ nào?'
+                                : 'Bạn quên chấm công lúc nào?'}
                             </h3>
                           </div>
 
@@ -4977,7 +5019,7 @@ const AttendanceManagement: React.FC = () => {
                             {[
                               {
                                 id: 'checkin',
-                                label: 'Quên\nCheck-in',
+                                label: selectedReason === 'machine_error' ? 'Thiếu\nCheck-in' : 'Quên\nCheck-in',
                                 icon: <ArrowLeftOnRectangleIcon className="w-6 h-6" />,
                                 activeColor: 'bg-violet-600 border-violet-600 text-white shadow-lg',
                                 inactiveColor: 'bg-white border-gray-200 text-gray-600 hover:border-violet-300 hover:bg-violet-50',
@@ -4985,7 +5027,7 @@ const AttendanceManagement: React.FC = () => {
                               },
                               {
                                 id: 'checkout',
-                                label: 'Quên\nCheck-out',
+                                label: selectedReason === 'machine_error' ? 'Thiếu\nCheck-out' : 'Quên\nCheck-out',
                                 icon: <ArrowRightOnRectangleIcon className="w-6 h-6" />,
                                 activeColor: 'bg-amber-500 border-amber-500 text-white shadow-lg',
                                 inactiveColor: 'bg-white border-gray-200 text-gray-600 hover:border-amber-300 hover:bg-amber-50',
@@ -5025,7 +5067,7 @@ const AttendanceManagement: React.FC = () => {
                                 <svg className="w-4 h-4 text-white opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5-4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
                                 </svg>
-                                <span className="text-xs font-bold text-white tracking-wide uppercase">Giờ check-in bị quên</span>
+                                <span className="text-xs font-bold text-white tracking-wide uppercase">{selectedReason === 'machine_error' ? 'Giờ check-in đã chấm' : 'Giờ check-in bị quên'}</span>
                               </div>
                               <div className="bg-violet-50 p-3 flex gap-2">
                                 {[
@@ -5065,7 +5107,7 @@ const AttendanceManagement: React.FC = () => {
                                 <svg className="w-4 h-4 text-white opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                                 </svg>
-                                <span className="text-xs font-bold text-white tracking-wide uppercase">Giờ check-out bị quên</span>
+                                <span className="text-xs font-bold text-white tracking-wide uppercase">{selectedReason === 'machine_error' ? 'Giờ check-out đã chấm' : 'Giờ check-out bị quên'}</span>
                               </div>
                               <div className="bg-amber-50 p-3 flex gap-2">
                                 {[
@@ -5383,6 +5425,7 @@ const AttendanceManagement: React.FC = () => {
                     {/* Row: Note */}
                     {formNote &&
                       (selectedReason === 'incomplete_attendance' ||
+                        selectedReason === 'machine_error' ||
                         selectedReason === 'business_trip' ||
                         selectedReason === 'first_day' ||
                         selectedContext === 'registration' ||
@@ -5749,7 +5792,7 @@ const AttendanceManagement: React.FC = () => {
                                         item.registration_type ? EXPLANATION_TYPE_MAP[item.registration_type] : '',
                                         'Giải trình đi muộn', 'Giải trình về sớm', 'Giải trình quên chấm công',
                                         'Giải trình đi công tác', 'Giải trình ngày đầu đi làm',
-                                        'Đi muộn', 'Về sớm', 'Quên chấm công', 'Đi công tác', 'Ngày đầu đi làm',
+                                        'Đi muộn', 'Về sớm', 'Quên chấm công', 'Lỗi máy chấm công', 'Đi công tác', 'Ngày đầu đi làm',
                                         'Đăng ký tăng ca', 'Đăng ký làm thêm giờ', 'Đăng ký trực tối', 'Đăng ký Live',
                                         'Tăng ca', 'Làm thêm giờ', 'Trực tối', 'Live',
                                         'Làm việc online', 'Làm online', 'Nghỉ phép'

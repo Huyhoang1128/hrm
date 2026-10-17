@@ -80,7 +80,7 @@ def _off_duty_approval_block_reason(event) -> str | None:
         employee=event.employee,
         event_date=event.event_date,
         event_type=EmployeeEvent.EventType.EXPLANATION,
-        data__explanation_type=ExplanationType.INCOMPLETE_ATTENDANCE,
+        data__explanation_type__in=[ExplanationType.INCOMPLETE_ATTENDANCE, ExplanationType.MACHINE_ERROR],
         data__status='APPROVED',
     ).exists()
     if has_approved_incomplete_attendance:
