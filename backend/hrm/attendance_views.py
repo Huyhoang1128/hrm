@@ -1928,6 +1928,7 @@ class AttendanceCalendarView(APIView):
             "explanation_quota_used":  quota_used,
             "explanation_quota_max":   quota_max,
             "explanation_quota_remaining": max(0, quota_max - quota_used),
+            **_explanation_quota_summary(employee, year, month),
             "events_processed":        result.get("events_processed", 0),
         }
 
@@ -2243,3 +2244,28 @@ class LivestreamAllowanceConfigDetailView(APIView):
         
         config.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def _explanation_quota_summary(employee, year, month) -> dict:
+    """Hạn mức giải trình theo từng loại cho lịch (hrm/explanation_quota.py). Chế độ chung
+    (mặc định) trả mode=COMBINED, giao diện giữ cách hiển thị cũ."""
+    from .explanation_quota import explanation_quota_status
+    try:
+        status = explanation_quota_status(employee, datetime.date(year, month, 1))
+    except Exception:
+        return {"explanation_quota_mode": "COMBINED"}
+    summary = {
+        "explanation_quota_mode": status["mode"],
+        "explanation_quota_shared": status["shared"],
+        "is_manager_combined_quota": status["is_manager_combined_quota"],
+        "explanation_quota_by_type": status["by_type"],
+    }
+    if status["mode"] == "PER_TYPE":
+        # Số tổng trên lịch = tổng các giỏ (hoặc rổ gộp) thay cho hạn mức chung của chính sách
+        summary.update({
+            "explanation_quota_used": status["combined"]["used"],
+            "explanation_quota_max": status["combined"]["max"],
+            "explanation_quota_remaining": status["combined"]["remaining"],
+        })
+    return summary
+

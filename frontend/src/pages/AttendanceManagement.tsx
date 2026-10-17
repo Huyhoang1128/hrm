@@ -2311,6 +2311,18 @@ const AttendanceManagement: React.FC = () => {
                 </span>
                 <span className="text-[10px] text-primary-500 font-medium">/{attendanceStats?.max_explanations_per_month || 0} lần</span>
               </div>
+              {/* Hạn mức theo từng loại: còn lại / tối đa của từng giỏ */}
+              {attendanceStats?.explanation_quota && !attendanceStats.explanation_quota.shared && (
+                <p className="mt-1 text-[10px] text-gray-500">
+                  {([['LATE', 'Đi muộn'], ['EARLY_LEAVE', 'Về sớm'], ['INCOMPLETE_ATTENDANCE', 'Quên chấm công']] as const)
+                    .map(([key, label]) => {
+                      const q = attendanceStats.explanation_quota.by_type?.[key];
+                      return q ? `${label} ${q.remaining}/${q.max}` : null;
+                    })
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -5524,7 +5536,13 @@ const AttendanceManagement: React.FC = () => {
 
                     {/* Quota Warning for Explanation */}
                     {selectedContext === 'explanation' &&
-                      attendanceStats?.remaining_explanations <= 0 && (
+                      (() => {
+                        // Hạn mức theo từng loại: chỉ cảnh báo khi giỏ của lý do đang chọn đã hết
+                        const quota = attendanceStats?.explanation_quota;
+                        if (!quota || quota.shared) return attendanceStats?.remaining_explanations <= 0;
+                        const bucket = ({ late_minutes: 'LATE', early_leave_minutes: 'EARLY_LEAVE', incomplete_attendance: 'INCOMPLETE_ATTENDANCE' } as Record<string, string>)[selectedReason as string];
+                        return !!bucket && (quota.by_type?.[bucket]?.remaining ?? 1) <= 0;
+                      })() && (
                         <div className="mt-4 p-4 bg-amber-50 rounded-2xl border border-amber-200 flex items-start space-x-3">
                           <svg
                             className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0"
@@ -5541,8 +5559,11 @@ const AttendanceManagement: React.FC = () => {
                           </svg>
                           <p className="text-xs text-amber-800 leading-relaxed">
                             <span className="font-bold">Lưu ý:</span> Bạn đã hết
-                            lượt giải trình miễn phí trong tháng này (tối đa 3
-                            lần). Đơn này vẫn có thể gửi đi nhưng có thể sẽ bị
+                            lượt giải trình miễn phí trong tháng này
+                            {attendanceStats?.explanation_quota && !attendanceStats.explanation_quota.shared
+                              ? ' cho loại này'
+                              : ` (tối đa ${attendanceStats?.max_explanations_per_month ?? 3} lần)`}
+                            . Đơn này vẫn có thể gửi đi nhưng có thể sẽ bị
                             tính phí bổ sung tùy theo quy định của công ty.
                           </p>
                         </div>

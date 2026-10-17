@@ -11,6 +11,7 @@ import {
   ExclamationCircleIcon,
   ComputerDesktopIcon,
   HeartIcon,
+  ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline';
 import {
   employeePermissionService,
@@ -22,13 +23,15 @@ import { SelectBox } from '../components/LandingLayout/SelectBox';
 import Pagination from '../components/Pagination';
 import OnlineWorkQuotaTab from '../components/OnlineWorkQuotaTab';
 import ChildCareRegimeTab from '../components/ChildCareRegimeTab';
+import ManagerExplanationQuotaTab from '../components/ManagerExplanationQuotaTab';
 
-type MainTabKey = 'employees' | 'online_quota' | 'child_care';
+type MainTabKey = 'employees' | 'online_quota' | 'child_care' | 'manager_explanation_quota';
 
 const MAIN_TABS: { key: MainTabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { key: 'employees', label: 'Danh sách nhân viên', icon: ShieldCheckIcon },
   { key: 'online_quota', label: 'Hạn mức ngày online', icon: ComputerDesktopIcon },
   { key: 'child_care', label: 'Chế độ con nhỏ', icon: HeartIcon },
+  { key: 'manager_explanation_quota', label: 'Rổ gộp giải trình', icon: ChatBubbleLeftRightIcon },
 ];
 
 const PAGE_SIZE = 20;
@@ -241,6 +244,12 @@ const RoleList: React.FC = () => {
       {activeTab === 'child_care' && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <ChildCareRegimeTab />
+        </div>
+      )}
+
+      {activeTab === 'manager_explanation_quota' && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <ManagerExplanationQuotaTab />
         </div>
       )}
 

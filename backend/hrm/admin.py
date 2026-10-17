@@ -710,6 +710,11 @@ class CompanyConfigAdmin(admin.ModelAdmin):
             'fields': ('max_explanation_count_per_month', 'supplement_work_hours_per_month',
                       'max_leave_count_per_month', 'max_online_work_count_per_month')
         }),
+        ('Hạn mức giải trình theo từng loại', {
+            'fields': ('explanation_quota_mode', 'max_late_explanation_per_month',
+                       'max_early_leave_explanation_per_month', 'max_incomplete_attendance_explanation_per_month',
+                       'manager_combined_explanation_quota')
+        }),
         ('Thông tin hiệu lực', {
             'fields': ('effective_from', 'effective_to')
         }),

@@ -62,7 +62,7 @@ Cỡ việc: **S** ≈ ½–1 ngày · **M** ≈ 2–4 ngày · **L** ≈ 1–2 
 | --- | --- | --- | --- |
 | 3.1 | ✅ **Chốt lương tháng**: snapshot bất biến, khoá dữ liệu lương của tháng (HTTP 423), chặn gửi phiếu lương khi chưa chốt | L | Cần 2.1. |
 | 3.2 | ✅ **Điều chỉnh nhân sự có ngày hiệu lực** (phòng ban / vị trí / lương), huỷ được, có log | M–L | Phần lương ghi vào `EmployeeSalaryHistory`. |
-| 3.3 | **Hạn mức giải trình theo từng loại** + rổ gộp cho trưởng phòng | L | Có 2 chế độ: COMBINED (mặc định) và PER_TYPE. |
+| 3.3 | ✅ **Hạn mức giải trình theo từng loại** + rổ gộp cho trưởng phòng | L | Có 2 chế độ: COMBINED (mặc định) và PER_TYPE. |
 | 3.4 | **Kế hoạch ca theo tuần**: chọn ca tự do, duyệt 2 bước, khoá, upload Excel | L | Đặt tên model khác `ShiftRegistration` để không trùng cơ chế đăng ký ca hiện có. |
 | 3.5 | Ca online cộng thêm (không cần chấm) | M | Làm sau 3.4. |
 | 3.6 | Cấu hình lương theo mốc hiệu lực | L | Hoãn, vì chủ yếu là nợ kỹ thuật. |

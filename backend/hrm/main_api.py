@@ -58,6 +58,18 @@ def _calc_checkin_checkout_diff(check_in_str: str, check_out_str: str) -> int:
 # ngưỡng này vẫn bị phạt theo đúng bậc tương ứng với số phút còn lại
 # (vd: muộn 31 phút, giải trình duyệt -> vẫn tính như muộn 1 phút -> phạt 50k).
 LATE_EXPLANATION_GRACE_MINUTES = 30
+
+# Loại đơn → trường đếm lượt của giỏ hạn mức tương ứng (hrm/explanation_quota.py)
+_QUOTA_BUCKET_FIELD = {
+    "LATE": "explanation_quota_used_late",
+    "EARLY_LEAVE": "explanation_quota_used_early_leave",
+    "FORGOT": "explanation_quota_used_incomplete",
+    "INCOMPLETE_ATTENDANCE": "explanation_quota_used_incomplete",
+}
+_QUOTA_BUCKET_NAME = {
+    "LATE": "LATE", "EARLY_LEAVE": "EARLY_LEAVE",
+    "FORGOT": "INCOMPLETE_ATTENDANCE", "INCOMPLETE_ATTENDANCE": "INCOMPLETE_ATTENDANCE",
+}
 # Ngưỡng 30 phút chỉ áp dụng cho giải trình của các ngày từ mốc này trở đi -
 # các ngày trước đó (1-9/9/2026, trước khi quy định thời hạn tạo/duyệt đơn chính
 # thức áp dụng) giữ nguyên hành vi cũ (miễn hoàn toàn khi giải trình LATE
@@ -118,6 +130,11 @@ class EmployeeState:
         # Monthly context
         self.violation_count_month = 0
         self.explanation_quota_used = 0
+        # Số lượt đã dùng của từng giỏ — chỉ dùng khi hạn mức tính theo từng loại
+        # (hrm/explanation_quota.py, CompanyConfig.explanation_quota_mode = PER_TYPE)
+        self.explanation_quota_used_late = 0
+        self.explanation_quota_used_early_leave = 0
+        self.explanation_quota_used_incomplete = 0
 
         # Annual leave tracking
         self.remaining_annual_leave = 0.0
@@ -1800,6 +1817,17 @@ class EmployeeState:
 
         return effects
 
+    def _explanation_quota_rules(self) -> dict:
+        """Cách tính hạn mức giải trình của nhân viên (hrm/explanation_quota.py), nạp 1 lần."""
+        if getattr(self, '_quota_rules_cache', None) is None:
+            try:
+                from hrm.explanation_quota import quota_rules
+                employee = self._get_employee_obj()
+                self._quota_rules_cache = quota_rules(employee.pk) if employee else {'mode': 'COMBINED'}
+            except Exception:
+                self._quota_rules_cache = {'mode': 'COMBINED'}
+        return self._quota_rules_cache
+
     def _count_day_violations(self, event_date: str):
         """(số lỗi muộn/sớm, số lỗi quên CC) còn lại (net) của 1 ngày trong calendar_result."""
         v = f = 0
@@ -2002,6 +2030,9 @@ class EmployeeState:
             # 2. Hạn mức giải trình (Exemption không tính quota)
             if not is_exempt_type:
                 effects["explanation_quota_used"] = 1
+                bucket_field = _QUOTA_BUCKET_FIELD.get(explanation_type)
+                if bucket_field:
+                    effects[bucket_field] = 1
                 logger.info(
                     "[Explanation Approval Rule] %s sử dụng 1 lượt giải trình (đã dùng %d lượt)",
                     explanation_type, self.explanation_quota_used,
@@ -2024,7 +2055,16 @@ class EmployeeState:
                         over_quota_deduction = float(policy.get("incomplete_over_quota_deduction", 0.5))
                     except Exception: pass
 
-                is_over_quota = not is_exempt_type and self.explanation_quota_used >= quota_max
+                # Hạn mức theo từng loại: so với giỏ của loại đơn (hoặc rổ gộp) thay vì hạn mức chung
+                rules = self._explanation_quota_rules()
+                quota_used_now = self.explanation_quota_used
+                if rules['mode'] == 'PER_TYPE':
+                    if rules['limits'] is None:
+                        quota_max = rules['combined_max']
+                    elif explanation_type in _QUOTA_BUCKET_FIELD:
+                        quota_used_now = getattr(self, _QUOTA_BUCKET_FIELD[explanation_type])
+                        quota_max = rules['limits'][_QUOTA_BUCKET_NAME[explanation_type]]
+                is_over_quota = not is_exempt_type and quota_used_now >= quota_max
                 logger.info(
                     "[Explanation Approval Rule] Quota: đơn thứ %d/%d | is_over_quota=%s | type=%s",
                     self.explanation_quota_used + 1, quota_max, is_over_quota, explanation_type,

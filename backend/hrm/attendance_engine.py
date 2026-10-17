@@ -254,7 +254,8 @@ class ExemptionRule(BaseRule):
         expl_type        = context.get("explanation_type")
         quota_used       = context.get("explanation_quota_used", 0)
         violation_type   = context.get("violation_type")
-        quota_max        = policy.get("max_explanation_quota", 3)
+        # Hạn mức theo từng loại: vòng lặp tháng truyền sẵn hạn mức của đúng giỏ
+        quota_max        = context.get("explanation_quota_max", policy.get("max_explanation_quota", 3))
         no_expl_ded      = float(policy.get("incomplete_no_expl_deduction", 1.0))
         approved_ded     = float(policy.get("incomplete_approved_deduction", 0.5))
         over_quota_ded   = float(policy.get("incomplete_over_quota_deduction", 0.5))
@@ -1251,6 +1252,13 @@ class HRMAttendanceEngine:
         # Running counters
         running_violations = 0
         running_expl_quota = 0
+        # Hạn mức giải trình theo từng loại (hrm/explanation_quota.py)
+        try:
+            from .explanation_quota import BUCKET_OF, quota_rules
+            quota_rule = quota_rules(employee.pk)
+        except Exception:
+            BUCKET_OF, quota_rule = {}, {'mode': 'COMBINED'}
+        running_by_bucket = {}
         running_ot         = 0.0
         running_live_ot    = 0.0
         prime_sessions     = 0
@@ -1283,6 +1291,14 @@ class HRMAttendanceEngine:
                 locked_periods         = locked_periods,
             )
 
+            if quota_rule['mode'] == 'PER_TYPE':
+                bucket = BUCKET_OF.get(str(ctx.get("explanation_type") or "").upper())
+                if quota_rule['limits'] is None:
+                    ctx["explanation_quota_max"] = quota_rule['combined_max']
+                elif bucket:
+                    ctx["explanation_quota_used"] = running_by_bucket.get(bucket, 0)
+                    ctx["explanation_quota_max"] = quota_rule['limits'][bucket]
+
             result = self._apply_rules(ctx, policy, tiers)
 
             # Persist event to DB
@@ -1312,6 +1328,9 @@ class HRMAttendanceEngine:
             if (result.is_exempt and ctx.get("explanation_type") not in EXEMPT_EXPLANATION_TYPES
                     and ctx.get("explanation_type") != "MACHINE_ERROR"):
                 running_expl_quota += 1
+                counted_bucket = BUCKET_OF.get(str(ctx.get("explanation_type") or "").upper())
+                if counted_bucket:
+                    running_by_bucket[counted_bucket] = running_by_bucket.get(counted_bucket, 0) + 1
             running_ot      += result.overtime_hours
             running_live_ot += result.overtime_hours  # approx; ideally filter LIVE OT only
 
