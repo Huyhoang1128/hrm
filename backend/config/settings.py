@@ -123,8 +123,9 @@ import dj_database_url
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 if DATABASE_URL:
-    # Use PostgreSQL when DATABASE_URL is provided (Docker environment)
-    # Configure with psycopg3 connection pool
+    # DATABASE_URL thường là PostgreSQL (Docker / production) — cấu hình thêm pool psycopg3.
+    # Cũng nhận sqlite:///đường/dẫn.sqlite3 (vd chạy thử local với DB riêng): khi đó KHÔNG
+    # thêm các OPTIONS chỉ Postgres mới có (pool, options), nếu không Django không khởi động.
     # Note: Connection pooling doesn't work with persistent connections (CONN_MAX_AGE)
     # So we set conn_max_age=0 when using pool
     db_config = dj_database_url.config(
@@ -132,6 +133,7 @@ if DATABASE_URL:
         conn_max_age=0,  # Disable persistent connections for pooling
         conn_health_checks=False,  # Disable health checks for pooling
     )
+    is_postgres = 'postgresql' in db_config.get('ENGINE', '')
     # Add connection pool configuration for psycopg3
     # Use setdefault to avoid overwriting existing OPTIONS
     db_config.setdefault('OPTIONS', {})
@@ -141,10 +143,11 @@ if DATABASE_URL:
     # đặc biệt ngay sau khi container restart (nhiều client gọi lại API cùng lúc).
     # Chỉ định rõ min_size/max_size để có đủ connection cho tải thực tế — vẫn rất
     # nhỏ so với max_connections=300 của Postgres nên an toàn để tăng thêm nếu cần.
-    db_config['OPTIONS']['pool'] = {
-        'min_size': int(os.environ.get('DB_POOL_MIN_SIZE', 10)),
-        'max_size': int(os.environ.get('DB_POOL_MAX_SIZE', 50)),
-    }
+    if is_postgres:
+        db_config['OPTIONS']['pool'] = {
+            'min_size': int(os.environ.get('DB_POOL_MIN_SIZE', 10)),
+            'max_size': int(os.environ.get('DB_POOL_MAX_SIZE', 50)),
+        }
     # Safety net cho đúng triệu chứng "app load rất chậm, nghi có connection
     # treo": tăng pool (trên) chỉ giúp CHỊU TẢI nhiều hơn, không ngăn được 1
     # connection bị "treo" (VD: request lỗi giữa chừng trong 1 transaction.
@@ -155,10 +158,11 @@ if DATABASE_URL:
     # thường (project không bật ATOMIC_REQUESTS, hầu hết request auto-commit,
     # transaction.atomic() ở nơi cần thì cũng chỉ vài giây), nên ngưỡng vài
     # phút là rất an toàn, không cần theo dõi/kill tay mỗi lần gặp lại nữa.
-    db_config['OPTIONS']['options'] = (
-        f"-c idle_in_transaction_session_timeout="
-        f"{int(os.environ.get('DB_IDLE_IN_TRANSACTION_TIMEOUT_MS', 120000))}"
-    )
+    if is_postgres:
+        db_config['OPTIONS']['options'] = (
+            f"-c idle_in_transaction_session_timeout="
+            f"{int(os.environ.get('DB_IDLE_IN_TRANSACTION_TIMEOUT_MS', 120000))}"
+        )
     DATABASES = {
         'default': db_config
     }
