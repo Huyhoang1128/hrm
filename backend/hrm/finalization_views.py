@@ -18,7 +18,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from employee.models import Department, Employee
+from employee.models import Department, Employee, compute_effective_employment_status
 from .main_api import EmployeeState
 from .models import WorkFinalization
 from .attendance_models import LivestreamAllowanceConfig
@@ -347,6 +347,17 @@ _HTLV_CODE_MAP = {
 }
 
 
+
+def _on_off(employment_status: str | None, end_date) -> str:
+    """Cột ON/OFF — OFF khi trạng thái lưu là Đã nghỉ, hoặc theo cùng quy tắc "Đã nghỉ"
+    với hồ sơ nhân viên (compute_effective_employment_status: có ngày nghỉ việc <= hôm
+    nay). Trước đây chỉ xét trạng thái lưu == INACTIVE nên NV chỉ được set ngày nghỉ
+    việc (hồ sơ hiện "Đã nghỉ") vẫn ra ON.
+    """
+    if employment_status == "INACTIVE":
+        return "OFF"
+    return "OFF" if compute_effective_employment_status(employment_status, end_date) == "INACTIVE" else "ON"
+
 def _format_hinh_thuc_lam_viec(contract_type: str | None) -> str | None:
     """Convert raw contract_type code (or already-stored display value) to display abbreviation.
 
@@ -587,7 +598,7 @@ def _build_finalization_record(employee: Employee, year: int, month: int) -> dic
         "ngay_bat_dau_lam_viec": employee.start_date,
         "ngay_ket_thuc_thu_viec": employee.probation_end_date,
         "ngay_len_chinh_thuc": employee.official_start_date,
-        "on_off": "OFF" if employee.employment_status == "INACTIVE" else "ON",
+        "on_off": _on_off(employee.employment_status, employee.end_date),
         "trang_thai_lam_viec": employee.employment_status,
         "ngay_nghi_viec": employee.end_date,
         "hinh_thuc_lam_viec": _format_hinh_thuc_lam_viec(employee.contract_type),
@@ -730,7 +741,9 @@ def _serialize_record(rec: WorkFinalization, stt: int = None) -> dict:
         "ngay_bat_dau_lam_viec": rec.ngay_bat_dau_lam_viec,
         "ngay_ket_thuc_thu_viec": rec.ngay_ket_thuc_thu_viec,
         "ngay_len_chinh_thuc": rec.ngay_len_chinh_thuc,
-        "on_off": rec.on_off,
+        # Tính lại từ trạng thái / ngày nghỉ việc đã lưu trong bản chốt, để bản chốt cũ
+        # (ON/OFF tính theo quy tắc cũ) hiển thị đúng mà không phải chốt lại.
+        "on_off": "OFF" if rec.on_off == "OFF" else _on_off(rec.trang_thai_lam_viec, rec.ngay_nghi_viec),
         "trang_thai_lam_viec": rec.trang_thai_lam_viec,
         "ngay_nghi_viec": rec.ngay_nghi_viec,
         "hinh_thuc_lam_viec": _format_hinh_thuc_lam_viec(rec.hinh_thuc_lam_viec),
@@ -780,7 +793,7 @@ def _serialize_employee_no_record(employee: Employee, year: int, month: int, stt
         "ngay_bat_dau_lam_viec": employee.start_date,
         "ngay_ket_thuc_thu_viec": employee.probation_end_date,
         "ngay_len_chinh_thuc": employee.official_start_date,
-        "on_off": "OFF" if employee.employment_status == "INACTIVE" else "ON",
+        "on_off": _on_off(employee.employment_status, employee.end_date),
         "trang_thai_lam_viec": employee.employment_status,
         "ngay_nghi_viec": employee.end_date,
         "hinh_thuc_lam_viec": _format_hinh_thuc_lam_viec(employee.contract_type),
