@@ -10,6 +10,8 @@ from decimal import Decimal
 
 from django.db import models, transaction
 
+from .payroll_rules import OT_HOURS_PER_DAY
+
 
 # ---------------------------------------------------------------------------
 # EmployeeSalaryHistory – Lịch sử lương theo kỳ
@@ -537,7 +539,7 @@ class MissingWorkdayPenalty(models.Model):
 
 OT_CALC_METHOD = [
     ('FIXED',      'Đơn giá cố định (nhập tay)'),
-    ('FROM_BASIC', 'Tính từ LC: LC ÷ công chuẩn ÷ 7.5h'),
+    ('FROM_BASIC', f'Tính từ LC: LC ÷ công chuẩn ÷ {OT_HOURS_PER_DAY}h'),
 ]
 
 class OvertimeRateConfig(models.Model):
@@ -614,7 +616,7 @@ class OvertimeRateConfig(models.Model):
         """
         Trả về đơn giá OT/giờ áp dụng cho nhân viên tại calc_date.
         Priority: cá nhân > vị trí > bộ phận > phòng ban (parent) > tất cả.
-        calc_method=FROM_BASIC: rate = basic_salary / standard_work_days / 7.5
+        calc_method=FROM_BASIC: rate = basic_salary / standard_work_days / OT_HOURS_PER_DAY
         """
         from django.db.models import Q as _Q
         qs = OvertimeRateConfig.objects.filter(
@@ -625,7 +627,7 @@ class OvertimeRateConfig(models.Model):
         def _rate(cfg) -> float:
             if cfg.calc_method == 'FROM_BASIC':
                 days = standard_work_days or 26.0
-                base = round(basic_salary / days / 7.5, 2)
+                base = round(basic_salary / days / float(OT_HOURS_PER_DAY), 2)
             else:
                 base = float(cfg.rate_per_hour)
             base = round(base * float(cfg.multiplier or 1), 2)

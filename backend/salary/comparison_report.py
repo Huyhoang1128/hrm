@@ -4,14 +4,14 @@ Báo cáo biến động lương: so lương của từng nhân viên giữa hai
 Nguồn số là `get_salary_rows` — đúng nguồn của trang Bảng lương, nên số trên báo
 cáo khớp bảng lương.
 
-Ba chỉ số, HR chọn chỉ số để so trên giao diện:
-- Tổng thu nhập: suy ngược từ Thực lĩnh mà bảng lương đã tính,
-  thực lĩnh + bảo hiểm + phạt chấm công + phạt biên bản + tạm ứng
-  (= lương ngày công + phụ cấp + doanh số + thu nhập khác). Suy ngược để luôn khớp
-  với số thực lĩnh đang hiển thị.
-- Lương thực lĩnh và Còn phải thanh toán: lấy thẳng số của bảng lương.
+Ba chỉ số, HR chọn chỉ số để so trên giao diện — đều lấy thẳng từ phiếu lương của dòng
+(salary/payslip.py, cùng công thức với bảng lương / phiếu lương / chốt lương):
+- Tổng thu nhập: mục VI của phiếu lương (lương + phụ cấp + thưởng).
+- Lương thực lĩnh và Còn phải thanh toán.
 """
 from decimal import Decimal
+
+from .payslip import PAYSLIP_KEY, apply_payslip_totals
 
 METRICS = (
     ('tong_thu_nhap', 'Tổng thu nhập'),
@@ -29,14 +29,11 @@ def _dec(row, key) -> Decimal:
 
 
 def row_metrics(row) -> dict:
-    gross = (
-        _dec(row, 'luong_thuc_linh') + _dec(row, 'bh_deduction') + _dec(row, 'cong_doan') + _dec(row, 'tong_phat')
-        + _dec(row, 'tong_phat_bienban') + _dec(row, 'phat_thieu_cong') + _dec(row, 'tam_ung')
-    )
+    payslip = row.get(PAYSLIP_KEY) or apply_payslip_totals(dict(row))[PAYSLIP_KEY]
     return {
-        'tong_thu_nhap': gross,
-        'luong_thuc_linh': _dec(row, 'luong_thuc_linh'),
-        'con_phai_thanh_toan': _dec(row, 'con_phai_thanh_toan'),
+        'tong_thu_nhap': _dec(payslip, 'tong_thu_nhap_vi'),
+        'luong_thuc_linh': _dec(payslip, 'luong_thuc_linh'),
+        'con_phai_thanh_toan': _dec(payslip, 'con_phai_thanh_toan'),
     }
 
 

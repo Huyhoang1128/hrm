@@ -73,6 +73,7 @@ class SalaryComparisonReportTests(APITestCase):
         report_row = next(r for r in self._report()['rows'] if r['employee_code'] == 'NV00201')
         income = row['luong_ngay_cong'] + row['phu_cap'] + row['luong_doanh_so'] + row['thu_nhap_khac']
         self.assertAlmostEqual(report_row['month_b']['tong_thu_nhap'], income, places=2)
+        self.assertEqual(report_row['month_b']['tong_thu_nhap'], row['phieu_luong']['tong_thu_nhap_vi'])
         self.assertGreater(row['bh_deduction'], 0)  # có BH nên tổng thu nhập ≠ thực lĩnh
 
     def test_filters_validation_and_permission(self):
@@ -90,6 +91,10 @@ class SalaryComparisonReportTests(APITestCase):
         self.assertIsNone(parse_period('2026'))
         self.assertIsNone(parse_period('1999-01'))
 
-    def test_gross_adds_back_union_fee(self):
-        row = {'luong_thuc_linh': 9_000_000, 'bh_deduction': 1_050_000, 'cong_doan': 50_000, 'tam_ung': 0}
-        self.assertEqual(row_metrics(row)['tong_thu_nhap'], Decimal('10100000'))
+    def test_gross_is_payslip_total_income(self):
+        """Tổng thu nhập = mục VI của phiếu lương (salary/payslip.py), không suy ngược từ thực lĩnh."""
+        row = {'luong_ngay_cong': 9_000_000, 'phu_cap': 500_000, 'muc_luong_dong_bh': 10_000_000,
+               'cong_doan': 50_000, 'tam_ung': 1_000_000}
+        metrics = row_metrics(row)
+        self.assertEqual(metrics['tong_thu_nhap'], Decimal('9500000'))
+        self.assertEqual(metrics['luong_thuc_linh'], Decimal('9500000') - Decimal('1050000') - Decimal('50000'))

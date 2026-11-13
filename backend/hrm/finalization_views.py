@@ -36,15 +36,23 @@ from salary.salary_data_models import (
     SalaryAdvance,
     DisciplinaryPenalty,
     OvertimeRateConfig,
-    TaxBracketConfig,
     SalesCommission,
 )
+from salary.payroll_rules import (
+    EMPLOYEE_INSURANCE_RATE,
+    FLAT_TAX_RATE,
+    MAX_LUNCH_ALLOWANCE_CAP,
+    TaxPolicy,
+    is_flat_tax_method,
+    progressive_tax_breakdown,
+    resolve_tax_policy,
+)
+from salary.payslip import apply_payslip_totals, prepare_salary_rows, responsibility_allowance
 from django.utils import timezone
 from employee.models import NON_OFFICIAL_CONTRACT_TYPES
 from employee.social_insurance import contribution_levels_for_month
 
 
-MAX_LUNCH_ALLOWANCE_CAP = Decimal("500000")
 DEFAULT_PROBATION_RATE_PERCENT = Decimal("85")
 PROBATION_RATE_PERCENT_MAP = {
     "OPTION_1": Decimal("85"),
@@ -118,87 +126,6 @@ def _get_salary_profile_for_month(employee: Employee, year: int, month: int) -> 
     )
 
 
-def _compute_progressive_tax(taxable_income: Decimal, tax_config: TaxBracketConfig | None) -> Decimal:
-    if taxable_income <= Decimal("0") or not tax_config:
-        return Decimal("0")
-
-    total_tax = Decimal("0")
-    for bracket in tax_config.brackets.order_by("order"):
-        lower = bracket.min_income
-        upper = bracket.max_income
-
-        if taxable_income <= lower:
-            break
-
-        taxable_in_bracket = (
-            taxable_income - lower if upper is None else min(taxable_income, upper) - lower
-        )
-
-        if taxable_in_bracket <= Decimal("0"):
-            continue
-
-        total_tax += taxable_in_bracket * bracket.rate
-
-    return total_tax
-
-
-def _get_default_tax_brackets(year: int) -> list[dict]:
-    """
-    Fallback bảng thuế theo tháng khi DB chưa cấu hình TaxBracketConfig.
-    - Từ kỳ thuế 2026: biểu 5 bậc.
-    - Trước 2026: biểu 7 bậc.
-    """
-    if year >= 2026:
-        return [
-            {"min": Decimal("0"), "max": Decimal("10000000"), "rate": Decimal("0.05")},
-            {"min": Decimal("10000000"), "max": Decimal("30000000"), "rate": Decimal("0.10")},
-            {"min": Decimal("30000000"), "max": Decimal("60000000"), "rate": Decimal("0.20")},
-            {"min": Decimal("60000000"), "max": Decimal("100000000"), "rate": Decimal("0.30")},
-            {"min": Decimal("100000000"), "max": None, "rate": Decimal("0.35")},
-        ]
-
-    return [
-        {"min": Decimal("0"), "max": Decimal("5000000"), "rate": Decimal("0.05")},
-        {"min": Decimal("5000000"), "max": Decimal("10000000"), "rate": Decimal("0.10")},
-        {"min": Decimal("10000000"), "max": Decimal("18000000"), "rate": Decimal("0.15")},
-        {"min": Decimal("18000000"), "max": Decimal("32000000"), "rate": Decimal("0.20")},
-        {"min": Decimal("32000000"), "max": Decimal("52000000"), "rate": Decimal("0.25")},
-        {"min": Decimal("52000000"), "max": Decimal("80000000"), "rate": Decimal("0.30")},
-        {"min": Decimal("80000000"), "max": None, "rate": Decimal("0.35")},
-    ]
-
-
-def _compute_progressive_tax_with_default(taxable_income: Decimal, year: int, tax_config: TaxBracketConfig | None) -> Decimal:
-    """Tính thuế lũy tiến: ưu tiên DB config, fallback bảng mặc định theo năm."""
-    if taxable_income <= Decimal("0"):
-        return Decimal("0")
-
-    # Ưu tiên config từ DB nếu có bậc thuế
-    if tax_config and tax_config.brackets.exists():
-        return _compute_progressive_tax(taxable_income, tax_config)
-
-    # Fallback theo luật mặc định
-    total_tax = Decimal("0")
-    for bracket in _get_default_tax_brackets(year):
-        lower = bracket["min"]
-        upper = bracket["max"]
-        rate = bracket["rate"]
-
-        if taxable_income <= lower:
-            break
-
-        taxable_in_bracket = (
-            taxable_income - lower if upper is None else min(taxable_income, upper) - lower
-        )
-
-        if taxable_in_bracket <= Decimal("0"):
-            continue
-
-        total_tax += taxable_in_bracket * rate
-
-    return total_tax
-
-
 def _resolve_lunch_policy(employee: Employee) -> dict:
     adjustments = _as_dict(employee.salary_adjustments)
     payroll_config = _as_dict(adjustments.get("payroll_config"))
@@ -223,15 +150,20 @@ def _resolve_lunch_policy(employee: Employee) -> dict:
     }
 
 
+def _lunch_allowance_override(employee: Employee, year: int, month: int):
+    """Số PC ăn trưa nhập tay của kỳ (LunchAllowanceOverride), None nếu chưa có."""
+    return LunchAllowanceOverride.objects.filter(
+        employee=employee, year=year, month=month,
+    ).values_list('amount', flat=True).first()
+
+
 def _calculate_lunch_allowance(employee: Employee, actual_work_days: Decimal, year: int, month: int) -> Decimal:
     """
     Phụ cấp ăn trưa của nhân viên trong kỳ. Bản ghi nhập tay của kỳ
     (`LunchAllowanceOverride`) thắng tất cả, kể cả khi là 0; không có thì tính
     theo lunchAllowancePolicy.
     """
-    override = LunchAllowanceOverride.objects.filter(
-        employee=employee, year=year, month=month,
-    ).values_list('amount', flat=True).first()
+    override = _lunch_allowance_override(employee, year, month)
     if override is not None:
         return _to_decimal(override)
     policy = _resolve_lunch_policy(employee)
@@ -245,21 +177,57 @@ def _calculate_lunch_allowance(employee: Employee, actual_work_days: Decimal, ye
     return min(max(policy["fixed_amount"], Decimal("0")), cap)
 
 
-def _calculate_parking_allowance(employee: Employee, actual_work_days: Decimal, fallback: Decimal) -> Decimal:
+def _resolve_parking_policy(employee: Employee) -> tuple:
+    """(mode, đơn giá/ngày, giá vé tháng) từ payroll_config.parkingAllowancePolicy."""
     adjustments = _as_dict(employee.salary_adjustments)
     policy = _as_dict(_as_dict(adjustments.get("payroll_config")).get("parkingAllowancePolicy"))
-    mode = str(policy.get("mode") or "")
+    # Support both snake_case and camelCase for backward compatibility
+    return (
+        str(policy.get("mode") or ""),
+        _to_decimal(policy.get("daily_rate") or policy.get("dailyRate"), Decimal("0")),
+        _to_decimal(policy.get("monthly_rate") or policy.get("monthlyRate"), Decimal("0")),
+    )
+
+
+def _parking_days(actual_work_days: Decimal) -> int:
+    return math.ceil(max(float(actual_work_days), 0))
+
+
+def _calculate_parking_allowance(employee: Employee, actual_work_days: Decimal, fallback: Decimal) -> Decimal:
+    mode, daily_rate, monthly_rate = _resolve_parking_policy(employee)
     if mode == "daily":
-        # Support both snake_case and camelCase for backward compatibility
-        daily_rate = _to_decimal(policy.get("daily_rate") or policy.get("dailyRate"), Decimal("0"))
-        return Decimal(str(math.ceil(max(float(actual_work_days), 0)))) * daily_rate
+        return Decimal(str(_parking_days(actual_work_days))) * daily_rate
     if mode == "monthly":
-        # Support both snake_case and camelCase for backward compatibility
-        monthly_rate = _to_decimal(policy.get("monthly_rate") or policy.get("monthlyRate"), Decimal("0"))
         return monthly_rate
     if mode == "none":
         return Decimal("0")
     return fallback
+
+
+def _allowance_formula_details(employee: Employee, ctx, actual_work_days: Decimal, total_work_days: Decimal,
+                               parking_overridden: bool) -> dict:
+    """Cách tính các phụ cấp theo ngày công để phiếu lương ghi rõ "N ngày × đơn giá" — đúng số đã
+    dùng ở trên (web không tự đọc lại cấu hình). None = nhập tay của kỳ / cố định / không có."""
+    standard_work_days = ctx.standard_work_days
+    details = {"gui_xe": None, "an_trua": None, "trach_nhiem": None}
+    mode, daily_rate, _ = _resolve_parking_policy(employee)
+    if not parking_overridden and mode == "daily":
+        details["gui_xe"] = {"mode": "daily", "so_ngay": _parking_days(actual_work_days), "don_gia": float(daily_rate)}
+    elif not parking_overridden and mode == "monthly":
+        details["gui_xe"] = {"mode": "monthly"}
+    if standard_work_days <= 0:
+        return details
+    lunch = _resolve_lunch_policy(employee)
+    if lunch["mode"] == "actual_working_day" and _lunch_allowance_override(employee, ctx.year, ctx.month) is None:
+        details["an_trua"] = {"so_cong": float(total_work_days), "cong_chuan": float(standard_work_days),
+                              "muc_ngay": float(lunch["monthly_cap"] / standard_work_days)}
+    payroll_config = _as_dict(_as_dict(employee.salary_adjustments).get("payroll_config"))
+    responsibility = _as_dict(payroll_config.get("responsibilityAllowancePolicy"))
+    if str(responsibility.get("mode") or "") == "actual_working_day":
+        monthly_max = _to_decimal(responsibility.get("monthly_max") or responsibility.get("monthlyMax"))
+        details["trach_nhiem"] = {"so_cong": float(total_work_days), "cong_chuan": float(standard_work_days),
+                                  "muc_ngay": float(monthly_max / standard_work_days)}
+    return details
 
 
 def _resolve_config_allowances(employee: Employee) -> Decimal:
@@ -268,23 +236,6 @@ def _resolve_config_allowances(employee: Employee) -> Decimal:
     allowances = _as_dict(_as_dict(adjustments.get("payroll_config")).get("allowances"))
     keys = ["transport", "phone", "housing", "hazardous"]
     return sum(_to_decimal(allowances.get(k), Decimal("0")) for k in keys)
-
-
-def _calculate_responsibility_allowance(employee: Employee, actual_work_days: Decimal, year: int, month: int) -> Decimal:
-    adjustments = _as_dict(employee.salary_adjustments)
-    policy = _as_dict(_as_dict(adjustments.get("payroll_config")).get("responsibilityAllowancePolicy"))
-    mode = str(policy.get("mode") or "none")
-    # Support both snake_case and camelCase for backward compatibility
-    monthly_max = _to_decimal(policy.get("monthly_max") or policy.get("monthlyMax"), Decimal("0"))
-    if mode == "fixed":
-        return max(monthly_max, Decimal("0"))
-    if mode == "actual_working_day":
-        standard_work_days = _get_salary_standard_work_days(year, month)
-        if standard_work_days > 0:
-            rate = monthly_max / standard_work_days
-            return min(max(actual_work_days, Decimal("0")) * rate, monthly_max)
-        return Decimal("0")
-    return Decimal("0")
 
 
 def _get_other_allowance(employee: Employee, year: int, month: int) -> Decimal:
@@ -1428,13 +1379,10 @@ def _get_dependent_record_counts(employee_ids, period_start, period_end) -> dict
 # (tổng lương, phiếu lương, email phiếu lương). Không kiểm tra quyền: nơi gọi tự lo.
 # ---------------------------------------------------------------------------
 
-# Tỷ lệ BH phần người lao động: 10,5% mức đóng BH — trừ vào lương và trừ khi tính thuế.
+# Tỷ lệ BH phần người lao động (EMPLOYEE_*_RATE), thuế khấu trừ cố định, biểu thuế: salary/payroll_rules.py.
 # Phí công đoàn KHÔNG tính theo tỷ lệ ở đây: lấy khoản cố định trong cấu hình lương của nhân
 # viên (payroll_config.deductions.unionFee, 0 nếu không phải đoàn viên), giống phiếu lương.
-EMPLOYEE_BHXH_RATE = Decimal('0.08')
-EMPLOYEE_BHYT_RATE = Decimal('0.015')
-EMPLOYEE_BHTN_RATE = Decimal('0.01')
-EMPLOYEE_INSURANCE_RATE = EMPLOYEE_BHXH_RATE + EMPLOYEE_BHYT_RATE + EMPLOYEE_BHTN_RATE  # 0.105
+# Lương thực lĩnh / còn phải thanh toán: salary/payslip.py apply_payslip_totals (nguồn duy nhất).
 
 
 @dataclass
@@ -1444,9 +1392,7 @@ class SalaryMonthContext:
     month: int
     calc_date: _dt.date
     standard_work_days: Decimal
-    tax_cfg: object
-    personal_deduction: Decimal
-    dependent_deduction_per_person: Decimal
+    tax_policy: TaxPolicy    # biểu thuế + giảm trừ gia cảnh của tháng (salary/payroll_rules.py)
     records: dict            # employee_id -> WorkFinalization
     salary_records: dict     # employee_id -> MonthlySalaryRecord
     dependent_counts: dict   # employee_id -> số người phụ thuộc có hồ sơ trong tháng
@@ -1475,9 +1421,6 @@ def build_salary_context(employees: list, year: int, month: int) -> SalaryMonthC
     employee_ids = [e.id for e in employees]
     _, days_in_month = cal_module.monthrange(year, month)
     calc_date = _dt.date(year, month, days_in_month)
-    tax_cfg = TaxBracketConfig.get_for_date(calc_date) or TaxBracketConfig.get_active()
-    default_personal_deduction = Decimal('15500000') if year >= 2026 else Decimal('11000000')
-    default_dependent_deduction = Decimal('6200000') if year >= 2026 else Decimal('4400000')
 
     def sums_by_employee(model):
         rows = (
@@ -1493,9 +1436,7 @@ def build_salary_context(employees: list, year: int, month: int) -> SalaryMonthC
         month=month,
         calc_date=calc_date,
         standard_work_days=_get_salary_standard_work_days(year, month),
-        tax_cfg=tax_cfg,
-        personal_deduction=(tax_cfg.personal_deduction if tax_cfg else default_personal_deduction),
-        dependent_deduction_per_person=(tax_cfg.dependent_deduction if tax_cfg else default_dependent_deduction),
+        tax_policy=resolve_tax_policy(calc_date),
         records={
             rec.employee_id: rec
             for rec in WorkFinalization.objects.filter(year=year, month=month, employee_id__in=employee_ids)
@@ -1514,14 +1455,44 @@ def build_salary_context(employees: list, year: int, month: int) -> SalaryMonthC
     )
 
 
+def _serialize_tax_brackets(brackets: list) -> list:
+    """Thuế từng bậc (salary/payroll_rules.progressive_tax_breakdown) ra JSON cho dòng lương."""
+    return [
+        {
+            'bac': item['bac'],
+            'tu': float(item['tu']),
+            'den': float(item['den']) if item['den'] is not None else None,
+            'thue_suat': float(item['thue_suat']),
+            'thu_nhap_trong_bac': float(item['thu_nhap_trong_bac']),
+            'thue': float(item['thue']),
+        }
+        for item in brackets
+    ]
+
+
+def _ensure_tax_detail(rows: list, year: int, month: int) -> None:
+    """Dòng đã chốt từ trước khi dòng lương có chi tiết thuế (bac_thue_tncn / thue_suat_co_dinh):
+    bổ sung lúc đọc từ chính thu nhập tính thuế đã chốt + biểu thuế của tháng — để web hiển thị
+    chi tiết thuế mà không tự giữ biểu thuế."""
+    missing = [row for row in rows if 'bac_thue_tncn' not in row]
+    if not missing:
+        return
+    policy = resolve_tax_policy(_dt.date(year, month, cal_module.monthrange(year, month)[1]))
+    for row in missing:
+        flat = is_flat_tax_method(row.get('tax_method'))
+        row['thue_suat_co_dinh'] = float(FLAT_TAX_RATE) if flat else None
+        row['bac_thue_tncn'] = [] if flat else _serialize_tax_brackets(
+            progressive_tax_breakdown(_to_decimal(row.get('thu_nhap_tinh_thue')), policy.brackets)
+        )
+
+
 def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
     """Một dòng bảng lương của nhân viên trong tháng của ctx."""
     year, month = ctx.year, ctx.month
     calc_date = ctx.calc_date
     standard_work_days = ctx.standard_work_days
-    tax_cfg = ctx.tax_cfg
-    personal_deduction = ctx.personal_deduction
-    dependent_deduction_per_person = ctx.dependent_deduction_per_person
+    personal_deduction = ctx.tax_policy.personal_deduction
+    dependent_deduction_per_person = ctx.tax_policy.dependent_deduction
     rec = ctx.records.get(employee.id)
     sr = ctx.salary_records.get(employee.id)
     contract_type = (employee.contract_type or "").upper()
@@ -1551,7 +1522,9 @@ def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
     parking_allowance = parking_override if parking_override is not None else _calculate_parking_allowance(employee, actual_work_days, stored_parking)
 
     config_allowances = _resolve_config_allowances(employee)
-    responsibility_allowance = _calculate_responsibility_allowance(employee, total_work_days, year, month)
+    responsibility_allowance_amount = responsibility_allowance(
+        employee.salary_adjustments, total_work_days, standard_work_days,
+    )
     other_allowance = _get_other_allowance(employee, year, month)
     other_fixed_income = _to_decimal(employee.other_fixed_monthly_income)
     advance_amount = _get_advance(employee, year, month)
@@ -1567,7 +1540,7 @@ def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
         + lunch_allowance
         + parking_allowance
         + config_allowances
-        + responsibility_allowance
+        + responsibility_allowance_amount
         + other_allowance
         + livestream_allowance
     )
@@ -1591,13 +1564,10 @@ def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
 
     tang_ca_hours = _to_decimal(rec.tang_ca if rec else 0)
     if ot_pay == Decimal('0') and tang_ca_hours > 0:
-        _, std_days = cal_module.monthrange(year, month)
-        sundays = sum(1 for d in range(1, std_days + 1) if cal_module.weekday(year, month, d) == 6)
-        standard_work_days_f = float(max(std_days - sundays - 1, 1))
         ot_rate = OvertimeRateConfig.get_for_employee(
             employee, calc_date,
             basic_salary=float(basic_salary),
-            standard_work_days=standard_work_days_f,
+            standard_work_days=float(standard_work_days),
         )
         ot_pay = _to_decimal(round(float(tang_ca_hours) * ot_rate, 2))
 
@@ -1645,25 +1615,26 @@ def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
     # Nếu đã đóng BHXH/BHYT/BHTN thì phải tính thuế luỹ tiến;
     # không được vừa trừ bảo hiểm vừa khấu trừ thêm 10% flat.
     has_mandatory_insurance = insurance_deduction_for_tax > Decimal('0')
+    tax_brackets = []
 
     if probation_only:
         # Thử việc thuần tuý: không đóng BH → áp 10%
         taxable_income = max(gross_income_for_tax, Decimal('0'))
-        pit_amount = taxable_income * Decimal('0.10')
+        pit_amount = taxable_income * FLAT_TAX_RATE
         personal_deduction_applied = Decimal('0')
         dependent_deduction_applied = Decimal('0')
         tax_method = 'FLAT_10_PROBATION'
     elif mixed_probation_official and not mixed_official_days_eligible_progressive_tax and not has_mandatory_insurance:
         # Có cả công TV + CT, CT < 14 ngày, nhưng KHÔNG đóng BH → 10%
         taxable_income = max(gross_income_for_tax, Decimal('0'))
-        pit_amount = taxable_income * Decimal('0.10')
+        pit_amount = taxable_income * FLAT_TAX_RATE
         personal_deduction_applied = Decimal('0')
         dependent_deduction_applied = Decimal('0')
         tax_method = 'FLAT_10_MIXED_LT14'
     elif is_non_official_contract and not has_mandatory_insurance:
         # Hợp đồng không chính thức, không đóng BH → 10%
         taxable_income = max(gross_income_for_tax, Decimal('0'))
-        pit_amount = taxable_income * Decimal('0.10')
+        pit_amount = taxable_income * FLAT_TAX_RATE
         personal_deduction_applied = Decimal('0')
         dependent_deduction_applied = Decimal('0')
         tax_method = 'FLAT_10_NON_OFFICIAL'
@@ -1675,17 +1646,13 @@ def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
             - (dependent_deduction_per_person * Decimal(dependent_count)),
             Decimal('0'),
         )
-        pit_amount = _compute_progressive_tax_with_default(taxable_income, year, tax_cfg)
+        tax_brackets = progressive_tax_breakdown(taxable_income, ctx.tax_policy.brackets)
+        pit_amount = sum((item['thue'] for item in tax_brackets), Decimal('0'))
         personal_deduction_applied = personal_deduction
         dependent_deduction_applied = dependent_deduction_per_person * Decimal(dependent_count)
         tax_method = 'PROGRESSIVE'
 
-    salary_income_for_net = taxable_basic_income
-    net_salary = (salary_income_for_net + total_allowance + sales_commission + other_fixed_income
-                  - total_penalty - advance_amount - bh_deduction - union_fee)
-    con_phai_thanh_toan = net_salary - pit_amount
-
-    return {
+    row = {
         "employee_id": employee.id,
         "ma_nv": employee.employee_id,
         "ho_va_ten": employee.full_name,
@@ -1708,6 +1675,7 @@ def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
         "truc_toi": float(_to_decimal(rec.truc_toi if rec else 0)),
         "lam_them_gio": float(_to_decimal(rec.lam_them_gio if rec else 0)),
         "phu_cap_gui_xe": float(parking_allowance),
+        "phu_cap_trach_nhiem": float(responsibility_allowance_amount),
         "phu_cap_khac": float(other_allowance),
         "phu_cap_livestream": float(livestream_allowance),
         "so_phien_livestream": livestream_sessions,
@@ -1734,12 +1702,20 @@ def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
         "giam_tru_nguoi_phu_thuoc": float(dependent_deduction_applied),
         "bao_hiem_bat_buoc": float(insurance_deduction_for_tax),
         "cong_doan": float(union_fee),
+        # Thuế khấu trừ cố định (mọi phương pháp FLAT_*): tỷ lệ áp; luỹ tiến: thuế từng bậc — web hiển
+        # thị đúng các số này, không tự giữ biểu thuế.
+        "thue_suat_co_dinh": float(FLAT_TAX_RATE) if tax_method != 'PROGRESSIVE' else None,
+        "bac_thue_tncn": _serialize_tax_brackets(tax_brackets),
+        "cach_tinh_phu_cap": _allowance_formula_details(
+            employee, ctx, actual_work_days, total_work_days, parking_override is not None,
+        ),
         "tam_ung": float(advance_amount),
-        "luong_thuc_linh": float(net_salary),
-        "con_phai_thanh_toan": float(con_phai_thanh_toan),
         "year": year,
         "month": month,
     }
+    # Lương thực lĩnh / còn phải thanh toán + các dòng phiếu lương (nguồn duy nhất: salary/payslip.py).
+    # Nơi phục vụ dòng (get_salary_rows, chốt lương) tính lại sau khi ghép dữ liệu lương tháng nhập tay.
+    return apply_payslip_totals(row)
 
 
 def get_salary_rows(year: int, month: int, department_id=None, legal_entity: str = '', employee_code=None,
@@ -1747,7 +1723,11 @@ def get_salary_rows(year: int, month: int, department_id=None, legal_entity: str
     """Bảng lương tháng — đúng dữ liệu GET /hrm/salary/department/ trả về.
 
     Tháng đã chốt (salary/payroll_finalization.py) trả nguyên các dòng đã chốt, trừ khi
-    refresh=True (xem bản tính lại từ dữ liệu hiện tại để đối chiếu)."""
+    refresh=True (xem bản tính lại từ dữ liệu hiện tại để đối chiếu).
+
+    Mọi dòng trả ra đã ghép dữ liệu lương tháng nhập tay và có phiếu lương / thực lĩnh / còn phải
+    thanh toán theo salary/payslip.py — dòng đã chốt cũng tính lại lúc đọc (chỉ từ chính dòng đó,
+    nên ra đúng số đã chốt) để mọi nơi dùng chung 1 công thức."""
     from salary.payroll_finalization import snapshot_salary_rows
 
     legal_entity = (legal_entity or '').strip()
@@ -1765,6 +1745,8 @@ def get_salary_rows(year: int, month: int, department_id=None, legal_entity: str
         if employees:
             ctx = build_salary_context(employees, year, month)
             results = [build_salary_row(employee, ctx) for employee in employees]
+    results = prepare_salary_rows(results, year, month)
+    _ensure_tax_detail(results, year, month)
     return {
         "year": year,
         "month": month,

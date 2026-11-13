@@ -22,7 +22,7 @@ from rest_framework.response import Response
 # lưu kèm dòng để phiếu lương tháng đã chốt không đổi khi cấu hình hiện tại thay đổi.
 EMPLOYEE_SNAPSHOT_FIELDS = ('salary_adjustments', 'social_insurance_contribution_level', 'probation_rate')
 # Đánh dấu dòng đọc từ bản đã chốt — không ghép lại dữ liệu lương tháng nhập tay
-# (đã ghép sẵn lúc chốt), xem salary/views.py _merge_monthly_inputs_into_salary_rows.
+# (đã ghép sẵn lúc chốt), xem salary/payslip.py merge_monthly_inputs.
 FINALIZED_ROW_FLAG = 'payroll_finalized'
 # So dòng đã chốt với dòng tính lại: số chênh quá ngưỡng này mới tính là khác.
 _COMPARE_TOLERANCE = 0.005
@@ -48,14 +48,15 @@ def compute_live_rows(year: int, month: int, employees=None) -> tuple:
     """(employees, rows) tính lại từ dữ liệu hiện tại — đúng dòng sẽ được chốt: dòng
     lương + dữ liệu lương tháng nhập tay + cấu hình lương của nhân viên."""
     from hrm.finalization_views import build_salary_context, build_salary_row, resolve_salary_employees
-    from .views import _merge_monthly_inputs_into_salary_rows
+    from .payslip import prepare_salary_rows
 
     if employees is None:
         employees = resolve_salary_employees(year, month)
     if not employees:
         return [], []
     ctx = build_salary_context(employees, year, month)
-    rows = _merge_monthly_inputs_into_salary_rows([build_salary_row(e, ctx) for e in employees], year, month)
+    # Thực lĩnh / còn phải thanh toán lưu vào bản chốt tính đúng như bảng lương (salary/payslip.py)
+    rows = prepare_salary_rows([build_salary_row(e, ctx) for e in employees], year, month)
     for employee, row in zip(employees, rows):
         row['employee_snapshot'] = _employee_snapshot(employee)
     return employees, [_json_safe(row) for row in rows]
@@ -147,6 +148,7 @@ def get_finalize_state(year: int, month: int, employee_ids=None) -> dict:
     lương 1 người / 1 phòng ban) thay vì cả công ty."""
     from hrm.finalization_views import resolve_salary_employees
     from users.utils import get_user_display_name
+    from .payslip import apply_payslip_totals
     from .salary_data_models import MonthlyPayrollSnapshot
 
     month_qs = MonthlyPayrollSnapshot.objects.filter(year=year, month=month)
@@ -170,7 +172,9 @@ def get_finalize_state(year: int, month: int, employee_ids=None) -> dict:
             changed.append({'employee_code': snap.employee_code, 'ho_va_ten': snap.ho_va_ten,
                             'reason': 'Không còn trong bảng lương tháng'})
             continue
-        keys = _changed_keys(snap.row, live[employee_id])
+        # Dòng đã chốt cũng tính lại phiếu lương như lúc đọc (salary/payslip.py) — bản chốt trước khi
+        # thống nhất công thức không bị coi là "đã đổi" chỉ vì công thức thực lĩnh cũ.
+        keys = _changed_keys(apply_payslip_totals(dict(snap.row)), live[employee_id])
         if keys:
             changed.append({'employee_code': snap.employee_code, 'ho_va_ten': snap.ho_va_ten,
                             'reason': 'Dữ liệu đã thay đổi', 'fields': keys[:10]})
