@@ -94,12 +94,12 @@ class SalaryRowsTests(APITestCase):
     def test_rows_lock_current_results(self):
         rows = {r['ma_nv']: r for r in self._get()['results']}
         self.assertEqual(list(rows), ['NV00101', 'NV00102', 'NV00103', 'NV00104'])  # NV00105 đã nghỉ trước tháng
-        self.assertEqual(len(rows['NV00101']), 57)
+        self.assertEqual(len(rows['NV00101']), 67)
         self.assertEqual((rows['NV00101']['cong_thieu'], rows['NV00101']['phat_thieu_cong']), (0, 0))
         expected = {
-            # 10,5% BH (1.050.000) + công đoàn theo cấu hình (50.000); trực ca = số buổi trực tối (2)
-            # như phiếu lương trên web (salary/payslip.py)
-            'NV00101': ('PROGRESSIVE', 20_850_002, 20_850_002),
+            # 10,5% BH (1.050.000) + công đoàn theo cấu hình (50.000); trực tối 2 buổi × đơn giá 0đ
+            # (chính sách mặc định) = 0 — trước đây cộng nhầm số buổi thành 2 đồng.
+            'NV00101': ('PROGRESSIVE', 20_850_000, 20_850_000),
             'NV00102': ('FLAT_10_PROBATION', 3_020_000, 2_718_000),
             # Thực lĩnh không trừ tạm ứng (500.000); còn phải thanh toán = thực lĩnh − tạm ứng − thuế
             'NV00103': ('PROGRESSIVE', 14_360_000, 13_860_000),
@@ -139,4 +139,4 @@ class SalaryRowsTests(APITestCase):
         self.client.force_authenticate(self.admin)
         data = self.client.get('/api/v1/salary/records/total-summary/', {'year': YEAR, 'month': MONTH}).data
         self.assertEqual((data['employee_count'], data['total_luong_thuc_linh'], data['total_con_phai_thanh_toan'],
-                          data['total_thue_tncn']), (4, 38_230_002, 37_428_002, 302_000))
+                          data['total_thue_tncn']), (4, 38_230_000, 37_428_000, 302_000))

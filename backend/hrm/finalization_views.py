@@ -39,11 +39,16 @@ from salary.salary_data_models import (
     SalesCommission,
 )
 from salary.payroll_rules import (
+    EMPLOYEE_BHTN_RATE,
+    EMPLOYEE_BHXH_RATE,
+    EMPLOYEE_BHYT_RATE,
     EMPLOYEE_INSURANCE_RATE,
     FLAT_TAX_RATE,
     MAX_LUNCH_ALLOWANCE_CAP,
     TaxPolicy,
+    insurance_salary_caps,
     is_flat_tax_method,
+    resolve_insurance_region,
     progressive_tax_breakdown,
     resolve_tax_policy,
 )
@@ -54,11 +59,16 @@ from employee.social_insurance import contribution_levels_for_month
 
 
 DEFAULT_PROBATION_RATE_PERCENT = Decimal("85")
-PROBATION_RATE_PERCENT_MAP = {
-    "OPTION_1": Decimal("85"),
-    "OPTION_2": Decimal("85"),
-    "OPTION_3": Decimal("100"),
+# Lương thử việc theo lựa chọn (employee.models PROBATION_SALARY_OPTIONS):
+# (tỷ lệ 1 tháng đầu kể từ ngày bắt đầu, tỷ lệ từ sau tháng đầu) — đúng nhãn "Tháng đầu X%, tháng sau Y%"
+# và câu trong hợp đồng.
+PROBATION_RATE_SCHEDULE_MAP = {
+    "OPTION_1": (Decimal("85"), Decimal("85")),
+    "OPTION_2": (Decimal("85"), Decimal("100")),
+    "OPTION_3": (Decimal("100"), Decimal("100")),
 }
+# Tỷ lệ tháng đầu (giữ tên cũ cho nơi khác dùng).
+PROBATION_RATE_PERCENT_MAP = {code: rates[0] for code, rates in PROBATION_RATE_SCHEDULE_MAP.items()}
 
 
 def _started_on_or_before_month_q(year: int, month: int):
@@ -93,13 +103,85 @@ def _as_dict(value):
 
 
 def _resolve_probation_rate_percent(employee: Employee) -> Decimal:
+    """Tỷ lệ lương thử việc THÁNG ĐẦU."""
+    return _resolve_probation_rate_schedule(employee)[0]
+
+
+def _resolve_probation_rate_schedule(employee: Employee) -> tuple:
+    """(tỷ lệ 1 tháng đầu, tỷ lệ sau tháng đầu) — số % tự nhập thì như nhau cả thời gian thử việc."""
     raw_rate = str(getattr(employee, "probation_rate", "") or "").upper().strip()
-    if raw_rate in PROBATION_RATE_PERCENT_MAP:
-        return PROBATION_RATE_PERCENT_MAP[raw_rate]
+    if raw_rate in PROBATION_RATE_SCHEDULE_MAP:
+        return PROBATION_RATE_SCHEDULE_MAP[raw_rate]
     parsed = _to_decimal(raw_rate, DEFAULT_PROBATION_RATE_PERCENT)
     if parsed <= Decimal("0"):
-        return DEFAULT_PROBATION_RATE_PERCENT
-    return parsed
+        parsed = DEFAULT_PROBATION_RATE_PERCENT
+    return parsed, parsed
+
+
+def _vnd(value) -> str:
+    """12.345.678 (làm tròn tới đồng, dấu chấm hàng nghìn)."""
+    return f"{int(_to_decimal(value).quantize(Decimal('1'))):,}".replace(",", ".")
+
+
+def _num(value) -> str:
+    """Số công / số buổi: bỏ phần thập phân thừa (14, 7,5)."""
+    text = f"{_to_decimal(value).normalize():f}"
+    return text.replace(".", ",")
+
+
+def _probation_rate_text(first_pct, later_pct, first_days, later_days) -> str:
+    """"85%" hoặc "85% tháng đầu (14 công), 100% (8 công)" — phiếu lương web + email dùng chung."""
+    if later_days <= 0 or first_pct == later_pct:
+        return f"{_num(first_pct)}%"
+    if first_days <= 0:
+        return f"{_num(later_pct)}%"
+    return f"{_num(first_pct)}% tháng đầu ({_num(first_days)} công), {_num(later_pct)}% ({_num(later_days)} công)"
+
+
+def _probation_first_month_end(employee: Employee):
+    """Ngày cuối của "1 tháng đầu" thử việc (ngày bắt đầu + 1 tháng − 1 ngày); None nếu thiếu ngày bắt đầu."""
+    start = getattr(employee, "start_date", None)
+    if not start:
+        return None
+    from dateutil.relativedelta import relativedelta
+    return start + relativedelta(months=1) - _dt.timedelta(days=1)
+
+
+def _probation_first_month_days(rec, employee: Employee, year: int, month: int,
+                                probation_work_days: Decimal) -> Decimal:
+    """Số công thử việc của kỳ thuộc 1 tháng đầu (kể từ ngày bắt đầu) — để trả tỷ lệ tháng đầu.
+
+    Tính theo TỪNG NGÀY công đã lưu trong bản chốt công (raw_state.daily_summary, gồm cả công lễ):
+    ngày ≤ hết thử việc VÀ ≤ hết tháng đầu. Không vượt tổng công thử việc của kỳ (số đã chốt / nhập tay
+    là chuẩn). Bản chốt không có công từng ngày (nhập tay / import / bản cũ): tạm tính theo tháng
+    dương lịch — kỳ chứa ngày bắt đầu là tháng đầu, các kỳ sau là sau tháng đầu.
+    """
+    if probation_work_days <= 0:
+        return Decimal('0')
+    first_month_end = _probation_first_month_end(employee)
+    if first_month_end is None:
+        return probation_work_days
+    period_start = _dt.date(year, month, 1)
+    period_end = _dt.date(year, month, cal_module.monthrange(year, month)[1])
+    if first_month_end >= period_end:
+        return probation_work_days
+    if first_month_end < period_start:
+        return Decimal('0')
+    daily = (rec.raw_state or {}).get("daily_summary") if rec is not None else None
+    if not daily:
+        start = employee.start_date
+        return probation_work_days if (start.year, start.month) == (year, month) else Decimal('0')
+    probation_end = employee.probation_end_date
+    first_month = Decimal('0')
+    for item in daily:
+        try:
+            day = _dt.date.fromisoformat(item.get("date", ""))
+        except (TypeError, ValueError):
+            continue
+        if day > first_month_end or (probation_end and day > probation_end):
+            continue
+        first_month += _to_decimal(item.get("work_credit"))
+    return min(first_month, probation_work_days)
 
 
 def _get_salary_standard_work_days(year: int, month: int) -> Decimal:
@@ -1526,10 +1608,18 @@ def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
     probation_only = has_probation_days and not has_official_days
     mixed_probation_official = has_probation_days and has_official_days
     mixed_official_days_eligible_progressive_tax = mixed_probation_official and official_work_days >= Decimal('14')
-    probation_rate_percent = _resolve_probation_rate_percent(employee)
-    probation_rate_multiplier = probation_rate_percent / Decimal('100')
+    # Lương thử việc: tỷ lệ 1 tháng đầu (kể từ ngày bắt đầu) và tỷ lệ sau tháng đầu (lựa chọn 2:
+    # 85% / 100%), chia theo từng ngày công của kỳ.
+    probation_rate_percent, probation_rate_after_percent = _resolve_probation_rate_schedule(employee)
+    probation_first_month_days = (
+        _probation_first_month_days(rec, employee, year, month, probation_work_days)
+        if probation_rate_after_percent != probation_rate_percent else probation_work_days
+    )
+    probation_later_days = probation_work_days - probation_first_month_days
     base_day_salary = (basic_salary / standard_work_days) if standard_work_days > 0 else Decimal('0')
-    probation_workday_salary = base_day_salary * probation_work_days * probation_rate_multiplier
+    probation_workday_salary = base_day_salary * (
+        probation_first_month_days * probation_rate_percent + probation_later_days * probation_rate_after_percent
+    ) / Decimal('100')
     official_workday_salary = base_day_salary * official_work_days
     split_workday_salary = probation_workday_salary + official_workday_salary
     lunch_allowance = _calculate_lunch_allowance(employee, total_work_days, year, month)
@@ -1596,14 +1686,18 @@ def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
 
     adjustments = _as_dict(employee.salary_adjustments)
     tax_policy = _as_dict(_as_dict(adjustments.get('payroll_config')).get('taxPolicy'))
+    # Trần mức đóng theo luật: BHXH + BHYT ≤ 20 × lương cơ sở, BHTN ≤ 20 × lương tối thiểu vùng của NV
+    # (salary/payroll_rules.py — cùng bảng phần xem trước cấu hình lương dùng).
+    insurance_region = resolve_insurance_region(employee.salary_adjustments)
+    cap_bhxh_bhyt, cap_bhtn = insurance_salary_caps(calc_date, insurance_region)
     if probation_only:
         ins_base = Decimal('0')
-        bh_deduction = Decimal('0')
     elif is_non_official_contract and not mixed_probation_official:
         ins_base = Decimal('0')
-        bh_deduction = Decimal('0')
-    else:
-        bh_deduction = ins_base * EMPLOYEE_INSURANCE_RATE
+    ins_base_bhxh_bhyt = min(ins_base, cap_bhxh_bhyt)
+    ins_base_bhtn = min(ins_base, cap_bhtn)
+    bh_deduction = (ins_base_bhxh_bhyt * (EMPLOYEE_BHXH_RATE + EMPLOYEE_BHYT_RATE)
+                    + ins_base_bhtn * EMPLOYEE_BHTN_RATE)
 
     if employee.id in ctx.dependent_counts:
         dependent_count = ctx.dependent_counts[employee.id]
@@ -1611,7 +1705,7 @@ def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
         dependent_count = max(int(_to_decimal(tax_policy.get('dependentCount'), Decimal('0'))), 0)
     deductions_config = _as_dict(_as_dict(adjustments.get('payroll_config')).get('deductions'))
     union_fee = _to_decimal(deductions_config.get('unionFee'), Decimal('0'))
-    insurance_deduction_for_tax = Decimal('0') if (probation_only or (is_non_official_contract and not mixed_probation_official)) else (ins_base * EMPLOYEE_INSURANCE_RATE)
+    insurance_deduction_for_tax = bh_deduction
     taxable_allowance = max(total_allowance - lunch_allowance, Decimal('0'))
     actual_total_days = _to_decimal(rec.tong_cong if rec else 0)
     if has_probation_days:
@@ -1622,12 +1716,18 @@ def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
             if actual_total_days > 0
             else Decimal('0')
         )
+    # Trực tối: bảng chốt công lưu SỐ BUỔI -> tiền = số buổi × đơn giá trong chính sách chấm công.
+    from .attendance_engine import PolicyLoader
+    night_duty_sessions = _to_decimal(rec.truc_toi if rec else 0)
+    night_duty_rate = _to_decimal(
+        PolicyLoader.load(calc_date)["policy"].get("night_duty_allowance_per_session"), Decimal('0'))
+    night_duty_amount = night_duty_sessions * night_duty_rate
     gross_income_for_tax = (
         taxable_basic_income
         + taxable_allowance
         + sales_commission
         + other_fixed_income
-        + _to_decimal(rec.truc_toi if rec else 0)
+        + night_duty_amount
         + ot_pay
     )
     # Nếu đã đóng BHXH/BHYT/BHTN thì phải tính thuế luỹ tiến;
@@ -1686,11 +1786,20 @@ def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
         # Công tính lương: đã gồm công lễ theo ranh giới thử việc.
         "cong_chinh_thuc": float(official_work_days),
         "probation_rate_percent": float(probation_rate_percent),
+        # Lựa chọn "tháng đầu X%, tháng sau Y%": công thử việc thuộc 1 tháng đầu và tỷ lệ sau tháng đầu.
+        "cong_thu_viec_thang_dau": float(probation_first_month_days),
+        "probation_rate_percent_after_first_month": float(probation_rate_after_percent),
+        "ty_le_thu_viec_text": _probation_rate_text(probation_rate_percent, probation_rate_after_percent,
+                                                    probation_first_month_days, probation_later_days),
         "luong_ngay_cong_thu_viec": float(probation_workday_salary),
         "luong_ngay_cong_chinh_thuc": float(official_workday_salary),
         "luong_ngay_cong": float(taxable_basic_income),
         "tang_ca": float(_to_decimal(rec.tang_ca if rec else 0)),
-        "truc_toi": float(_to_decimal(rec.truc_toi if rec else 0)),
+        "truc_toi": float(night_duty_sessions),  # số buổi
+        "don_gia_truc_toi": float(night_duty_rate),
+        "tien_truc_toi": float(night_duty_amount),
+        "cach_tinh_truc_toi": (f"{_num(night_duty_sessions)} buổi × {_vnd(night_duty_rate)}"
+                               if night_duty_amount > 0 else None),
         "lam_them_gio": float(_to_decimal(rec.lam_them_gio if rec else 0)),
         "phu_cap_gui_xe": float(parking_allowance),
         "phu_cap_trach_nhiem": float(responsibility_allowance_amount),
@@ -1706,6 +1815,14 @@ def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
         "phat_thieu_cong": float(missing_workday_penalty),
         "bh_deduction": float(bh_deduction),
         "muc_luong_dong_bh": float(ins_base),
+        # Mức đóng sau khi áp trần (BHXH+BHYT / BHTN) — phiếu lương tính BH theo 2 số này.
+        "muc_dong_bhxh_bhyt": float(ins_base_bhxh_bhyt),
+        "muc_dong_bhtn": float(ins_base_bhtn),
+        "vung_luong_toi_thieu": insurance_region,
+        "ghi_chu_tran_bh": (
+            f"Áp trần: BHXH, BHYT tính trên {_vnd(ins_base_bhxh_bhyt)}; BHTN trên {_vnd(ins_base_bhtn)} (vùng {insurance_region})"
+            if ins_base_bhxh_bhyt < ins_base or ins_base_bhtn < ins_base else None
+        ),
         "luong_tang_ca": float(ot_pay),
         "so_gio_tang_ca": float(tang_ca_hours),
         "contract_type": employee.contract_type,

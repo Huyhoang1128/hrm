@@ -44,6 +44,8 @@ export interface PayrollRules {
     lunch_allowance_max_cap: number;
     /** Mức gửi xe/ngày mặc định của chính sách chấm công */
     parking_allowance_per_day: number;
+    /** Đơn giá trực tối / buổi (0 = không tự tính, HR nhập tay ở Dữ liệu lương tháng). */
+    night_duty_allowance_per_session: number;
     /** Đơn giá OT tính từ lương: lương cơ bản ÷ công chuẩn ÷ số giờ này */
     ot_hours_per_day: number;
   };

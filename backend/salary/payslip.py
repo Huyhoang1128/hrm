@@ -103,6 +103,12 @@ def insurance_breakdown(row: dict) -> tuple:
     Theo mức lương đóng BH của dòng × tỷ lệ; dòng không có mức đóng (dữ liệu cũ) thì chia
     bh_deduction theo đúng tỷ lệ. Thử việc / HĐ không chính thức: dòng có mức đóng 0 và bh_deduction 0.
     """
+    if row.get('muc_dong_bhxh_bhyt') is not None:
+        # Dòng có mức đóng đã áp trần (BHXH+BHYT theo lương cơ sở, BHTN theo lương tối thiểu vùng)
+        base_xh_yt = _dec(row.get('muc_dong_bhxh_bhyt'))
+        base_tn = _dec(row.get('muc_dong_bhtn'))
+        return (_money(base_xh_yt * EMPLOYEE_BHXH_RATE), _money(base_xh_yt * EMPLOYEE_BHYT_RATE),
+                _money(base_tn * EMPLOYEE_BHTN_RATE))
     base = _dec(row.get('muc_luong_dong_bh'))
     if base > 0:
         return (_money(base * EMPLOYEE_BHXH_RATE), _money(base * EMPLOYEE_BHYT_RATE),
@@ -123,7 +129,9 @@ def apply_payslip_totals(row: dict) -> dict:
     luong_ot = _money(_input_or(row, 'luong_ot_input', 'luong_tang_ca'))
     ban_san_pham = _money(_input_or(row, 'ban_san_pham_input'))
     phu_mo = _money(_input_or(row, 'phu_mo_input'))
-    truc_ca = _money(_input_or(row, 'truc_ca_input', 'truc_toi'))
+    # Trực ca: số nhập tay, không thì tiền trực tối (số buổi × đơn giá). Dòng đã chốt từ trước khi có
+    # tien_truc_toi giữ đúng số đã chốt (khi đó truc_toi được cộng thẳng).
+    truc_ca = _money(_input_or(row, 'truc_ca_input', 'tien_truc_toi' if 'tien_truc_toi' in row else 'truc_toi'))
     thu_nhap_khac = _money(row.get('thu_nhap_khac'))
     tong_luong_iii = luong_ngay_cong + luong_doanh_so + luong_ot + ban_san_pham + phu_mo + truc_ca + thu_nhap_khac
 

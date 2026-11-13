@@ -84,6 +84,8 @@ def payroll_rules(request):
         'lunch_allowance_max_cap': float(MAX_LUNCH_ALLOWANCE_CAP),
         # Mức gửi xe/ngày mặc định (gợi ý khi chọn "Vé ngày" lúc cấu hình lương)
         'parking_allowance_per_day': float(attendance_policy['parking_allowance_per_day']),
+        # Đơn giá trực tối / buổi (tiền trực = số buổi trong bảng chốt công × đơn giá; 0 = không tự tính)
+        'night_duty_allowance_per_session': float(attendance_policy.get('night_duty_allowance_per_session') or 0),
         # Đơn giá OT tính từ lương: lương cơ bản ÷ công chuẩn ÷ số giờ này
         'ot_hours_per_day': float(OT_HOURS_PER_DAY),
     }

@@ -279,6 +279,14 @@ const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose
   const congThuViec = record.cong_thu_viec ?? 0;
   const congChinhThuc = record.cong_chinh_thuc ?? 0;
   const probationRatePercent = record.probation_rate_percent ?? 0;
+  // Câu tỷ lệ thử việc do backend tạo (lựa chọn "tháng đầu 85%, tháng sau 100%" ghi rõ số công từng mức);
+  // dòng đã chốt từ trước không có thì ghi 1 tỷ lệ như cũ.
+  const probationRateText = record.ty_le_thu_viec_text || `${probationRatePercent}%`;
+  // Cách tính trực tối (số buổi × đơn giá) — chỉ khi không nhập tay số tiền trực của tháng.
+  const nightDutyFormula =
+    record.cach_tinh_truc_toi && (record as unknown as Record<string, unknown>)['truc_ca_input'] == null
+      ? record.cach_tinh_truc_toi
+      : null;
   const hasProbationDays = congThuViec > 0;
   const luongDoanhSo = p.luong_doanh_so;
   const luongOt = p.luong_ot;
@@ -349,7 +357,7 @@ const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose
       '  CÁC KHOẢN THU NHẬP',
       '────────────────────────────────────────',
       `  Lương ngày công    : ${fmtN(luongNgayCongThucTe)}`,
-      ...(hasProbationDays ? [`  └─ Lương công TV (${probationRatePercent}%) : ${fmtN(luongCongThuViec)}`] : []),
+      ...(hasProbationDays ? [`  └─ Lương công TV (${probationRateText}) : ${fmtN(luongCongThuViec)}`] : []),
       ...(hasProbationDays ? [`  └─ Lương công CT    : ${fmtN(luongCongChinhThuc)}`] : []),
       ...(luongDoanhSo ? [`  Lương doanh số     : ${fmtN(luongDoanhSo)}`] : []),
       ...(luongOt ? [`  Lương OT            : ${fmtN(luongOt)}`] : []),
@@ -623,7 +631,7 @@ const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose
                 <>
                   <tr>
                     <td className="border border-gray-300 px-3 py-2 text-center text-gray-500">9a</td>
-                    <td className="border border-gray-300 px-3 py-2 text-gray-700">Lương công thử việc ({probationRatePercent}%)</td>
+                    <td className="border border-gray-300 px-3 py-2 text-gray-700">Lương công thử việc ({probationRateText})</td>
                     <td className="border border-gray-300 px-3 py-2 text-right text-gray-800">{fmt(luongCongThuViec)}</td>
                   </tr>
                   <tr>
@@ -655,7 +663,9 @@ const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose
               </tr>
               <tr>
                 <td className="border border-gray-300 px-3 py-2 text-center text-gray-500">13a</td>
-                <td className="border border-gray-300 px-3 py-2 text-gray-700">Trực ca</td>
+                <td className="border border-gray-300 px-3 py-2 text-gray-700">
+                  Trực ca{nightDutyFormula ? <span className="text-xs text-gray-500"> ({nightDutyFormula})</span> : null}
+                </td>
                 <td className="border border-gray-300 px-3 py-2 text-right text-gray-800">{trucCa ? fmt(trucCa) : '—'}</td>
               </tr>
               <tr>
@@ -738,7 +748,10 @@ const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose
               </tr>
               <tr>
                 <td className="border border-gray-300 px-3 py-2 text-center text-gray-500">18</td>
-                <td className="border border-gray-300 px-3 py-2 text-gray-700">Mức lương đóng BH</td>
+                <td className="border border-gray-300 px-3 py-2 text-gray-700">
+                  Mức lương đóng BH
+                  {record.ghi_chu_tran_bh ? <div className="text-xs text-amber-700">{record.ghi_chu_tran_bh}</div> : null}
+                </td>
                 <td className="border border-gray-300 px-3 py-2 text-right text-gray-800">{fmt(mucLuongDongBH)}</td>
               </tr>
               <tr>
