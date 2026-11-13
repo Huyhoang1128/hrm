@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { salaryService, type PenaltyRecord } from '../services/salary.service';
 import { employeesAPI } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useSystemRules } from '../services/systemRules.service';
 
 const now = new Date();
 const SEARCH_DEBOUNCE_MS = 250;
@@ -63,6 +64,9 @@ type GroupedPenaltySummary = {
 
 const DisciplinaryPenaltyManagement: React.FC = () => {
   const { user } = useAuth();
+  // Địa danh + giờ hạn hoàn thành ghi trên biên bản in: cấu hình backend (COMPANY_CITY,
+  // PENALTY_REPORT_SUBMIT_DEADLINE qua system-rules "branding"), không ghi cứng ở web.
+  const branding = useSystemRules()?.branding ?? null;
   const isAdmin = Boolean(user?.is_super_admin || (user as any)?.is_superuser || user?.role?.toUpperCase() === 'ADMIN');
   const hasPenaltyPermission = isAdmin || user?.employee_permission?.can_manage_disciplinary_penalties === true;
 
@@ -457,11 +461,13 @@ const DisciplinaryPenaltyManagement: React.FC = () => {
             <strong><em>Ghi chú:</em></strong>
             ${notesHtml}
             <p>- Nhân sự vi phạm kí và gửi biên bản cho giám sát nội bộ của công ty.</p>
-            <p>- Thời gian hoàn thành biên bản: trước 17h30 ngày ${shortDate}</p>
+            ${branding?.penalty_report_submit_deadline
+              ? `<p>- Thời gian hoàn thành biên bản: trước ${escapeHtml(branding.penalty_report_submit_deadline)} ngày ${shortDate}</p>`
+              : ''}
             <p>- Biên bản phải có đủ chữ ký xác nhận của các bên.</p>
           </div>
 
-          <div class="location-date"><em>Hà Nội, ngày ${day} tháng ${printMonth} năm ${printYear}</em></div>
+          <div class="location-date"><em>${branding?.company_city ? `${escapeHtml(branding.company_city)}, ` : ''}ngày ${day} tháng ${printMonth} năm ${printYear}</em></div>
           <div class="signatures first-row">
             <div><strong>Người lập biên bản</strong><em>(Ký, ghi rõ họ tên)</em></div>
             <div><strong>Người vi phạm</strong><em>(Ký, ghi rõ họ tên)</em></div>

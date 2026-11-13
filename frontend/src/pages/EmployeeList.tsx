@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { SelectBox } from '../components/LandingLayout/SelectBox';
 import Pagination from '../components/Pagination';
 import { useLockBodyScroll } from '../hooks/useLockBodyScroll';
+import { useSystemRules } from '../services/systemRules.service';
 import { CITIZEN_ID_ISSUE_PLACE_OPTIONS } from '../constants/onboarding';
 import { UsersIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
@@ -287,7 +288,14 @@ const EmployeeList: React.FC = () => {
     }
   };
   const SEND_EMAIL_COOLDOWN_KEY = 'send_all_emails_cooldown_until';
-  const COOLDOWN_DURATION = 120; // 2 phút (giây)
+  // Thời gian chờ giữa 2 lần "Gửi tất cả" do backend quy định và kiểm tra (system-rules "account");
+  // localStorage chỉ để hiện đếm ngược trên trình duyệt này.
+  const sendAllCooldownSeconds = useSystemRules()?.account?.send_all_emails_cooldown_seconds ?? null;
+  const startEmailCooldown = (seconds: number) => {
+    if (seconds <= 0) return;
+    localStorage.setItem(SEND_EMAIL_COOLDOWN_KEY, (Date.now() + seconds * 1000).toString());
+    setEmailCooldownRemaining(seconds);
+  };
 
   const getNearestExpiryDate = (employee: Employee) => {
     const dates: Date[] = [];
@@ -812,9 +820,7 @@ const EmployeeList: React.FC = () => {
       
       if (response.success) {
         // Lưu thời điểm hết cooldown vào localStorage
-        const cooldownUntil = Date.now() + COOLDOWN_DURATION * 1000;
-        localStorage.setItem(SEND_EMAIL_COOLDOWN_KEY, cooldownUntil.toString());
-        setEmailCooldownRemaining(COOLDOWN_DURATION);
+        if (sendAllCooldownSeconds != null) startEmailCooldown(sendAllCooldownSeconds);
 
         // Hiển thị thông báo chi tiết
         alert(
@@ -836,7 +842,10 @@ const EmployeeList: React.FC = () => {
         alert(`❌ ${response.message}`);
       }
     } catch (error: any) {
-      alert(`❌ Lỗi: ${error.message || 'Không thể gửi email'}`);
+      // Backend chặn bấm lặp (429) và trả số giây còn phải chờ.
+      const retryAfter = Number(error.response?.data?.retry_after);
+      if (error.response?.status === 429 && retryAfter > 0) startEmailCooldown(retryAfter);
+      alert(`❌ Lỗi: ${error.response?.data?.message || error.message || 'Không thể gửi email'}`);
     } finally {
       setIsSendingEmails(false);
     }
