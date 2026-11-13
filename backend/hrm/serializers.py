@@ -22,6 +22,11 @@ from datetime import timedelta
 from dateutil.relativedelta import relativedelta
 from users.utils import get_user_display_name
 from employee.models import PROBATION_CONTRACT_TYPES, OFFICIAL_LABOR_CONTRACT_TYPES, probation_months_for
+from employee.models import (
+    REGION_CHOICES, BLOCK_CHOICES, normalize_rank, rank_label, normalize_education_level,
+)
+from django.core.validators import MaxLengthValidator
+from hrm import onboarding_rules
 from .models import OnlineWorkQuotaOverride, ChildCareRegime, ManagerExplanationQuotaConfig
 logger = logging.getLogger(__name__)
 
@@ -265,6 +270,10 @@ class PositionSerializer(serializers.ModelSerializer):
 
 
 class EmployeeSerializer(serializers.ModelSerializer):
+    def validate_rank(self, value):
+        # Cấp bậc lưu mã (employee.models.RANK_CHOICES); web / client cũ gửi nhãn vẫn nhận.
+        return normalize_rank(value)
+
     def validate_social_insurance_contribution_level(self, value):
         # BHXH theo kỳ (employee/social_insurance.py): mức đóng trên hồ sơ tự cập nhật theo kỳ
         # hiện hành, sửa trực tiếp sẽ bị ghi đè và bảng lương cũng không dùng.
@@ -1949,6 +1958,14 @@ class CompanyConfigSerializer(serializers.ModelSerializer):
             'is_current'
         ]
         read_only_fields = ['created_at', 'updated_at', 'code', 'is_current']
+
+    def validate(self, attrs):
+        # Khoảng giá trị các ô số (hrm/company_config_rules.py) — web đọc cùng giới hạn qua system-rules.
+        from .company_config_rules import validate_values
+        errors = validate_values(attrs)
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
     
     def create(self, validated_data):
         """
@@ -3984,15 +4001,8 @@ class OnboardingProcessCreateSerializer(serializers.ModelSerializer):
     facebook_link = serializers.URLField(write_only=True, required=False, allow_blank=True)
     
     # Thông tin công việc
-    REGION_CHOICES = [
-        ("Miền Bắc", "Miền Bắc"),
-        ("Miền Nam", "Miền Nam"),
-    ]
-    BLOCK_CHOICES = [
-        ("Khối Back office", "Khối Back office"),
-        ("Khối Marketing", "Khối Marketing"),
-        ("Khối Kinh doanh", "Khối Kinh doanh"),
-    ]
+    REGION_CHOICES = REGION_CHOICES
+    BLOCK_CHOICES = BLOCK_CHOICES
     SUB_DEPARTMENT_CHOICES = [
         ("ADS", "ADS"),
         ("ADS2", "ADS2"),
@@ -4066,10 +4076,8 @@ class OnboardingProcessCreateSerializer(serializers.ModelSerializer):
         ("BO_PHAN_IT", "Bộ phận IT"),
         ("BO_PHAN_AI", "Bộ phận AI"),
     ]
-    WORK_FORM_CHOICES = [
-        ("FULL_TIME", "Full-time"),
-        ("PART_TIME", "Part-time"),
-    ]
+    # Cùng tập hình thức làm việc với form nhận việc (hrm/onboarding_rules.py).
+    WORK_FORM_CHOICES = onboarding_rules.work_form_choices()
 
     region = serializers.CharField(write_only=True, required=False, allow_blank=True)
     block = serializers.CharField(write_only=True, required=False, allow_blank=True)
@@ -4157,33 +4165,16 @@ class OnboardingProcessCreateSerializer(serializers.ModelSerializer):
         }
     
     def validate_citizen_id_file(self, value):
-        """Validate CCCD file - must be PDF, max 5MB"""
-        if value:
-            # Check file extension
-            if not value.name.lower().endswith('.pdf'):
-                raise serializers.ValidationError("File CCCD phải là định dạng PDF")
-            
-            # Check file size (5MB = 5 * 1024 * 1024 bytes)
-            if value.size > 5 * 1024 * 1024:
-                raise serializers.ValidationError("File CCCD không được vượt quá 5MB")
-        
-        return value
-    
+        # Cùng giới hạn với form nhận việc công khai (hrm/onboarding_rules.py).
+        return onboarding_rules.validate_citizen_id_file(value)
+
     def validate_vneid_screenshot(self, value):
-        """Ảnh VNEID — giới hạn theo ALLOWED_IMAGE_TYPES và dung lượng."""
-        if value:
-            from django.conf import settings as dj_settings
-            allowed = getattr(dj_settings, 'ALLOWED_IMAGE_TYPES', [])
-            ct = getattr(value, 'content_type', '') or ''
-            if allowed and ct and ct not in allowed:
-                raise serializers.ValidationError(
-                    f'Định dạng ảnh không hợp lệ. Cho phép: {", ".join(allowed)}'
-                )
-            max_mb = 10
-            if value.size > max_mb * 1024 * 1024:
-                raise serializers.ValidationError(f'Ảnh VNEID không được vượt quá {max_mb}MB')
-        return value
-    
+        return onboarding_rules.validate_vneid_screenshot(value)
+
+    def validate_rank(self, value):
+        # Cấp bậc lưu mã (employee.models.RANK_CHOICES); nhãn cũ vẫn nhận.
+        return normalize_rank(value) or ''
+
     def validate(self, attrs):
         """Validate và convert frontend fields sang backend fields"""
         # Map full_name -> candidate_name
@@ -4316,14 +4307,15 @@ class OnboardingProcessCreateSerializer(serializers.ModelSerializer):
             except Exception as e:
                 logger.error(f"Failed to create department from sub_department '{sub_department}': {str(e)}")
         
-        # 2. Tạo/lấy Position từ rank
+        # 2. Tạo/lấy Position từ rank (rank đã là mã -> dùng nhãn làm tên vị trí như trước)
         if rank and not validated_data.get('position'):
+            rank_title = rank_label(rank)
             try:
                 position, created = Position.objects.get_or_create(
-                    title=rank,
+                    title=rank_title,
                     defaults={
-                        'code': rank.upper().replace(' ', '_')[:64],
-                        'description': f'Vị trí {rank} (tự động tạo từ onboarding)',
+                        'code': rank_title.upper().replace(' ', '_')[:64],
+                        'description': f'Vị trí {rank_title} (tự động tạo từ onboarding)',
                         'department': validated_data.get('department'),
                         'level': 1,
                     }
@@ -4905,6 +4897,14 @@ class OnboardingProcessUpdateSerializer(serializers.ModelSerializer):
 
         raise serializers.ValidationError(f'"{value}" is not a valid choice.')
 
+    def validate_citizen_id_file(self, value):
+        # Cùng giới hạn với form nhận việc công khai (hrm/onboarding_rules.py).
+        return onboarding_rules.validate_citizen_id_file(value)
+
+    def validate_rank(self, value):
+        # Cấp bậc lưu mã (employee.models.RANK_CHOICES); nhãn cũ vẫn nhận.
+        return normalize_rank(value)
+
     def update(self, instance, validated_data):
         # citizen_id_file là CharField trên model (lưu S3 key) nên cần upload file
         # lên S3 trước khi set vào instance.
@@ -5100,18 +5100,12 @@ class EmployeeOnboardingFormSerializer(serializers.ModelSerializer):
         # Các field mới (giống OnboardingProcessCreateSerializer)
         facebook_link = serializers.URLField(write_only=True, required=False, allow_blank=True)
         
-        REGION_CHOICES = [("Miền Bắc", "Miền Bắc"), ("Miền Nam", "Miền Nam")]
-        BLOCK_CHOICES = [
-            ("Khối Back office", "Khối Back office"),
-            ("Khối Marketing", "Khối Marketing"),
-            ("Khối Kinh doanh", "Khối Kinh doanh"),
-        ]
+        REGION_CHOICES = REGION_CHOICES
+        BLOCK_CHOICES = BLOCK_CHOICES
         SUB_DEPARTMENT_CHOICES = OnboardingProcessCreateSerializer.SUB_DEPARTMENT_CHOICES
         SECTION_CHOICES = OnboardingProcessCreateSerializer.SECTION_CHOICES
-        WORK_FORM_CHOICES = [
-            ("FULL_TIME", "Full-time"),
-            ("PART_TIME", "Part-time"),
-        ]
+        # Hình thức làm việc người mới được chọn — hrm/onboarding_rules.py (web đọc cùng danh sách).
+        WORK_FORM_CHOICES = onboarding_rules.work_form_choices()
         POSITION_CHOICES = [
             ("Nhân viên Sale", "Nhân viên Sale"),
             ("Nhân viên Kinh doanh", "Nhân viên Kinh doanh"),
@@ -5235,29 +5229,32 @@ class EmployeeOnboardingFormSerializer(serializers.ModelSerializer):
             ]
             read_only_fields = ['candidate_email']  # Email không cho phép sửa
         
+        def get_fields(self):
+            # Độ dài tối đa mỗi ô = field model nhận giá trị (hrm/onboarding_rules.py) — trước đây
+            # không giới hạn nên chuỗi dài hơn cột Employee (vd nơi khai sinh > 255) làm lỗi DB.
+            fields = super().get_fields()
+            for name, max_length in onboarding_rules.text_max_lengths().items():
+                field = fields.get(name)
+                if isinstance(field, serializers.CharField):
+                    field.max_length = max_length
+                    field.validators.append(MaxLengthValidator(
+                        max_length, message=field.error_messages['max_length'].format(max_length=max_length)))
+            return fields
+
         def validate_citizen_id_file(self, value):
-            """Validate CCCD file"""
-            if value:
-                if not value.name.lower().endswith('.pdf'):
-                    raise serializers.ValidationError("File CCCD phải là định dạng PDF")
-                if value.size > 15 * 1024 * 1024:
-                    raise serializers.ValidationError("File CCCD không được vượt quá 15MB")
-            return value
-        
+            return onboarding_rules.validate_citizen_id_file(value)
+
         def validate_vneid_screenshot(self, value):
-            if value:
-                from django.conf import settings as dj_settings
-                allowed = getattr(dj_settings, 'ALLOWED_IMAGE_TYPES', [])
-                ct = getattr(value, 'content_type', '') or ''
-                if allowed and ct and ct not in allowed:
-                    raise serializers.ValidationError(
-                        f'Định dạng ảnh không hợp lệ. Cho phép: {", ".join(allowed)}'
-                    )
-                max_mb = 10
-                if value.size > max_mb * 1024 * 1024:
-                    raise serializers.ValidationError(f'Ảnh VNEID không được vượt quá {max_mb}MB')
-            return value
-        
+            return onboarding_rules.validate_vneid_screenshot(value)
+
+        def validate_job_rank(self, value):
+            # Cấp bậc lưu mã (employee.models.RANK_CHOICES); link / web cũ gửi nhãn vẫn nhận.
+            return normalize_rank(value) or ''
+
+        def validate_education_level(self, value):
+            # Form gửi mã EDUCATION_LEVEL; nhãn cũ của form ('Cử nhân đại học'...) vẫn nhận và đổi sang mã.
+            return normalize_education_level(value) or value
+
         def validate(self, attrs):
             """Validate và convert frontend fields"""
             # Map full_name -> candidate_name
@@ -5265,11 +5262,20 @@ class EmployeeOnboardingFormSerializer(serializers.ModelSerializer):
                 attrs['candidate_name'] = attrs.pop('full_name')
             elif 'full_name' in attrs:
                 attrs.pop('full_name')
-            
+
             # Map employee_id -> desired_employee_id
             if 'employee_id' in attrs:
                 attrs['desired_employee_id'] = attrs.pop('employee_id')
-            
+
+            # Quy tắc của form (tên, số CCCD/ĐT/BHXH/MST, tuổi, ngày cấp CCCD) — cùng hằng số web dùng.
+            errors = onboarding_rules.validate_submit(attrs)
+            # Phòng/Ban, Vị trí phải chọn từ danh sách có sẵn (không tự tạo theo tên lạ).
+            if attrs.get('sub_department') and not onboarding_rules.find_department(attrs['sub_department']):
+                errors['sub_department'] = f'Phòng/Ban "{attrs["sub_department"]}" không có trong hệ thống'
+            if attrs.get('position') and not onboarding_rules.find_position(attrs['position']):
+                errors['position'] = f'Vị trí "{attrs["position"]}" không có trong hệ thống'
+            if errors:
+                raise serializers.ValidationError(errors)
             return attrs
 
         def validate_gender(self, value):
@@ -5354,37 +5360,19 @@ class EmployeeOnboardingFormSerializer(serializers.ModelSerializer):
             salary = validated_data.pop('salary', None)
             probation_period_months = validated_data.pop('probation_period_months', None)
             probation_rate = validated_data.pop('probation_rate', '')
-            # Tự động tạo/cập nhật Department và Position
-            from employee.models import Department, Position
-            
+            # Gắn Department / Position đã có theo tên (validate() đã từ chối tên không có trong hệ
+            # thống). Không tự tạo mới: trước đây get_or_create theo tên nên giá trị lạ (danh sách
+            # dự phòng ghi cứng ở web) sinh ra phòng ban rác.
             if sub_department and not validated_data.get('department'):
-                try:
-                    department, created = Department.objects.get_or_create(
-                        name=sub_department,
-                        defaults={
-                            'code': sub_department.upper().replace(' ', '_')[:64],
-                            'description': f'Phòng/Ban {sub_department}'
-                        }
-                    )
+                department = onboarding_rules.find_department(sub_department)
+                if department:
                     validated_data['department'] = department
-                except Exception as e:
-                    logger.error(f"Failed to create department: {str(e)}")
-            
+
             if position_title and not validated_data.get('position'):
-                try:
-                    position, created = Position.objects.get_or_create(
-                        title=position_title,
-                        defaults={
-                            'code': position_title.upper().replace(' ', '_')[:64],
-                            'description': f'Vị trí {position_title}',
-                            'department': validated_data.get('department'),
-                            'level': 1,
-                        }
-                    )
+                position = onboarding_rules.find_position(position_title)
+                if position:
                     validated_data['position'] = position
-                except Exception as e:
-                    logger.error(f"Failed to create position: {str(e)}")
-            
+
             # Update OnboardingProcess fields
             for attr, value in validated_data.items():
                 setattr(instance, attr, value)
@@ -5467,16 +5455,8 @@ class EmployeeOnboardingFormSerializer(serializers.ModelSerializer):
                     'OTHER': 'O',
                 }.get(instance.gender, '')
                 
-                # Map education_level
-                education_label = (instance.education_level or '').strip()
-                education_map = {
-                    'Thạc sĩ': 'MASTER',
-                    'Cử nhân đại học': 'BACHELOR',
-                    'Cử nhân cao đẳng': 'ASSOCIATE',
-                    'Trung cấp': 'HIGH_SCHOOL',
-                    'Khác': 'OTHER',
-                }
-                employee_education_level = education_map.get(education_label) if education_label else None
+                # education_level: mã EDUCATION_LEVEL (nhãn cũ đổi sang mã ở validate_education_level)
+                employee_education_level = normalize_education_level(instance.education_level)
                 
                 # Cập nhật các field
                 employee.full_name = instance.candidate_name
@@ -5696,7 +5676,7 @@ class OnboardingProcessListSerializer(serializers.ModelSerializer):
             if obj.position:
                 return obj.position.title
             if obj.employee and obj.employee.rank:
-                return obj.employee.rank
+                return rank_label(obj.employee.rank)
             return 'N/A'
 
         def get_position_name(self, obj):
