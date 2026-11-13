@@ -2253,8 +2253,9 @@ const AttendanceManagement: React.FC = () => {
 
           {/* === Hạn mức còn lại === */}
           {(() => {
-            const maxMonthlyLeave = attendanceStats?.max_leave_per_month || 1;
-            const remainingMonthlyLeave = attendanceStats?.remaining_leave ?? 1;
+            // Hạn mức lấy từ API stats (CompanyConfig) — 0 là hợp lệ; đang tải thì hiện "—", không đoán số.
+            const maxMonthlyLeave = attendanceStats?.max_leave_per_month ?? '—';
+            const remainingMonthlyLeave = attendanceStats?.remaining_leave ?? '—';
 
             return (
               <div className="group bg-white p-4 rounded-xl border border-primary-100 hover:shadow-md transition-all duration-300">
@@ -2275,9 +2276,10 @@ const AttendanceManagement: React.FC = () => {
           })()}
 
           {(() => {
-              const maxOnline = attendanceStats?.max_online_work_per_month || 3;
-              const usedOnline = (attendanceStats?.max_online_work_per_month || 0) - (attendanceStats?.remaining_online_work || 0);
-              const remainingOnline = Math.max(0, maxOnline - usedOnline);
+              // Hạn mức online theo người (OnlineWorkQuotaOverride có thể = 0) do API stats tính —
+              // đang tải thì hiện "—", không đoán số.
+              const maxOnline = attendanceStats?.max_online_work_per_month ?? '—';
+              const remainingOnline = attendanceStats?.remaining_online_work ?? '—';
 
               return (
                 <div className="group bg-white p-4 rounded-xl border border-emerald-100 hover:shadow-md transition-all duration-300">
@@ -3511,9 +3513,11 @@ const AttendanceManagement: React.FC = () => {
 
                               {/* Card 3: Nghỉ phép tháng */}
                               {showMonthlyLeaveCard && (() => {
-                                const maxLeave = attendanceStats?.max_leave_per_month || 1;
-                                const remainingLeave = attendanceStats?.remaining_leave ?? 1;
-                                const isQuotaExhausted = remainingLeave <= 0;
+                                // Hạn mức từ API stats (0 là hợp lệ). Chưa tải xong thì không khoá thẻ,
+                                // không hiện số — backend vẫn kiểm tra khi gửi đơn.
+                                const maxLeave: number | null = attendanceStats?.max_leave_per_month ?? null;
+                                const remainingLeave: number | null = attendanceStats?.remaining_leave ?? null;
+                                const isQuotaExhausted = remainingLeave != null && remainingLeave <= 0;
 
                                 return (
                                   <button
@@ -3539,7 +3543,9 @@ const AttendanceManagement: React.FC = () => {
                                         <p className="mt-1 text-sm text-gray-500">
                                           {isQuotaExhausted 
                                             ? 'Đã hết lượt nghỉ phép tháng này'
-                                            : `Đăng ký nghỉ phép (Còn ${remainingLeave}/${maxLeave} ngày)`}
+                                            : remainingLeave != null && maxLeave != null
+                                              ? `Đăng ký nghỉ phép (Còn ${remainingLeave}/${maxLeave} ngày)`
+                                              : 'Đăng ký nghỉ phép'}
                                         </p>
                                       </div>
                                     </div>
@@ -3558,12 +3564,16 @@ const AttendanceManagement: React.FC = () => {
 
                               {/* Card 4: Làm việc online */}
                               {showOnlineWorkCard && (() => {
-                                const maxOnline = attendanceStats?.max_online_work_per_month || 3;
-                                const remainingOnline = attendanceStats?.remaining_online_work || 0;
+                                // Hạn mức online theo người (có thể = 0) từ API stats. Chưa tải xong thì
+                                // không khoá thẻ, không hiện số — backend vẫn kiểm tra khi gửi đơn.
+                                const maxOnline: number | null = attendanceStats?.max_online_work_per_month ?? null;
+                                const remainingOnline: number | null = attendanceStats?.remaining_online_work ?? null;
+                                const quotaCount = remainingOnline != null && maxOnline != null
+                                  ? `${remainingOnline}/${maxOnline} ngày` : null;
                                 const freeSlot = onlineFreeSlot(selectedDate, attendanceStats?.online_weekend_unlimited);
                                 // Chủ nhật / chiều T7 tuần 2-4 không tính hạn mức -> không khoá thẻ
                                 const isOnlineQuotaExhausted =
-                                  remainingOnline <= 0 && !freeSlot.sunday && !freeSlot.satAfternoon;
+                                  remainingOnline != null && remainingOnline <= 0 && !freeSlot.sunday && !freeSlot.satAfternoon;
                                 return (
                                   <button
                                     type="button"
@@ -3591,8 +3601,8 @@ const AttendanceManagement: React.FC = () => {
                                             : freeSlot.sunday
                                               ? 'Làm việc từ xa (Chủ nhật — không tính hạn mức)'
                                               : freeSlot.satAfternoon
-                                                ? `Làm việc từ xa (buổi chiều không tính hạn mức · còn ${remainingOnline}/${maxOnline} ngày)`
-                                                : `Làm việc từ xa (Còn ${remainingOnline}/${maxOnline} ngày)`}
+                                                ? `Làm việc từ xa (buổi chiều không tính hạn mức${quotaCount ? ` · còn ${quotaCount}` : ''})`
+                                                : quotaCount ? `Làm việc từ xa (Còn ${quotaCount})` : 'Làm việc từ xa'}
                                         </p>
                                       </div>
                                     </div>
@@ -3689,9 +3699,11 @@ const AttendanceManagement: React.FC = () => {
                               // Lọc lý do cho Nghỉ phép tháng và Làm việc online
                               if (selectedContext === 'monthly_leave' || selectedContext === 'online_work') {
                                 const isLeave = selectedContext === 'monthly_leave';
-                                const remaining = isLeave 
-                                  ? (attendanceStats?.remaining_leave ?? 1)
-                                  : (attendanceStats?.remaining_online_work ?? 3);
+                                // Còn lại từ API stats; chưa có (đang tải) thì không lọc theo hạn mức —
+                                // backend vẫn kiểm tra khi gửi đơn, không đoán bằng số ghi cứng.
+                                const remaining: number | null = isLeave
+                                  ? (attendanceStats?.remaining_leave ?? null)
+                                  : (attendanceStats?.remaining_online_work ?? null);
                                 
                                 let filtered = [...reasons];
                                 const freeSlotReasons = isLeave
@@ -3701,10 +3713,10 @@ const AttendanceManagement: React.FC = () => {
                                   // Chủ nhật không tính hạn mức -> giữ đủ sáng/chiều/cả ngày
                                 } else if (freeSlotReasons.satAfternoon) {
                                   // Chiều T7 tuần 2/4 miễn hạn mức; sáng & cả ngày đều chỉ tính 0.5
-                                  if (remaining < 0.5) {
+                                  if (remaining != null && remaining < 0.5) {
                                     filtered = filtered.filter(r => r.id === 'afternoon');
                                   }
-                                } else if (remaining < 1.0) {
+                                } else if (remaining != null && remaining < 1.0) {
                                   filtered = filtered.filter(r => r.id !== 'full_day');
                                 }
 

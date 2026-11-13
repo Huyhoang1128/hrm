@@ -882,8 +882,9 @@ const EmployeeMonthAttendance: React.FC<EmployeeMonthAttendanceProps> = ({
             </div>
 
             {(() => {
-              const maxMonthlyLeave = attendanceStats?.max_leave_per_month || 1;
-              const remainingMonthlyLeave = attendanceStats?.remaining_leave ?? maxMonthlyLeave;
+              // Hạn mức lấy từ API stats (CompanyConfig) — 0 là hợp lệ; đang tải thì hiện "—", không đoán số.
+              const maxMonthlyLeave = attendanceStats?.max_leave_per_month ?? '—';
+              const remainingMonthlyLeave = attendanceStats?.remaining_leave ?? '—';
               return (
                 <div className="group bg-white p-4 rounded-xl border border-primary-100 hover:shadow-md transition-all duration-300">
                   <div className="flex items-center gap-3 mb-2">
@@ -901,9 +902,10 @@ const EmployeeMonthAttendance: React.FC<EmployeeMonthAttendanceProps> = ({
             })()}
 
             {(() => {
-              const maxOnline = attendanceStats?.max_online_work_per_month || 3;
-              const usedOnline = (attendanceStats?.max_online_work_per_month || 0) - (attendanceStats?.remaining_online_work || 0);
-              const remainingOnline = Math.max(0, maxOnline - usedOnline);
+              // Hạn mức online theo người (OnlineWorkQuotaOverride có thể = 0) do API stats tính —
+              // đang tải thì hiện "—", không đoán số.
+              const maxOnline = attendanceStats?.max_online_work_per_month ?? '—';
+              const remainingOnline = attendanceStats?.remaining_online_work ?? '—';
               return (
                 <div className="group bg-white p-4 rounded-xl border border-emerald-100 hover:shadow-md transition-all duration-300">
                   <div className="flex items-center gap-3 mb-2">
