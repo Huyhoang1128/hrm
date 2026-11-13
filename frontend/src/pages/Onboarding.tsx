@@ -488,7 +488,7 @@ const Onboarding: React.FC = () => {
         params.year = filterYear;
       }
       if (filterPosition) params.position = filterPosition;
-      const res = await managementApi.get('/api-hrm/onboarding-processes/stats/', { params });
+      const res = await managementApi.get('/api-hrm/onboardings/stats/', { params });
       setStats(res.data);
     } catch {
       setStats(null);
