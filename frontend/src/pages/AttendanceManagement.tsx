@@ -2402,7 +2402,12 @@ const AttendanceManagement: React.FC = () => {
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="flex h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></span>
                 <p className="text-[10px] text-red-500 font-bold uppercase tracking-widest leading-none">
-                  Cập nhật mới nhất • Hiệu lực từ 08/2024
+                  Cập nhật mới nhất
+                  {(() => {
+                    // Ngày hiệu lực của phiên bản chính sách chấm công đang áp dụng (backend)
+                    const eff = systemRules?.attendance?.penalty_policy.effective_from;
+                    return eff ? ` • Hiệu lực từ ${eff.slice(5, 7)}/${eff.slice(0, 4)}` : '';
+                  })()}
                 </p>
               </div>
             </div>
@@ -2422,16 +2427,57 @@ const AttendanceManagement: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium whitespace-pre-wrap">
-              {[
-                { nội_dung: 'Quên chấm công (In-Out) nhưng không chứng minh được đi làm đúng giờ', xử_lý: 'Trừ 1.0 công làm việc', ghi_chú: '' },
-                { nội_dung: 'Quên chấm công (In-Out) nhưng chứng minh được đi làm đúng giờ (nhưng quá 3 lỗi giải trình/tháng)', xử_lý: 'Trừ 0.5 công làm việc', ghi_chú: '' },
-                { nội_dung: 'Đi muộn / Về sớm < 10 phút', xử_lý: '50.000 VNĐ', ghi_chú: 'Từ lần vi phạm thứ 7: x2/lần vi phạm' },
-                { nội_dung: 'Đi muộn / Về sớm 11 - 30 phút', xử_lý: '100.000 VNĐ', ghi_chú: 'Từ lần vi phạm thứ 7: x2/lần vi phạm' },
-                { nội_dung: 'Đi muộn / Về sớm 31 - 60 phút', xử_lý: 'Quản lý: 150.000 VNĐ\nNhân viên: 120.000 VNĐ', ghi_chú: 'Từ lần vi phạm thứ 7: x2/lần vi phạm' },
-                { nội_dung: 'Đi muộn / Về sớm 61 - 120 phút', xử_lý: 'Quản lý: 250.000 VNĐ\nNhân viên: 200.000 VNĐ', ghi_chú: 'Từ lần vi phạm thứ 7: x2/lần vi phạm' },
-                { nội_dung: 'Đi muộn / Về sớm > 120 phút', xử_lý: 'Trừ 0.5 công làm việc', ghi_chú: 'Từ lần vi phạm thứ 7: x2/lần vi phạm' },
-                { nội_dung: 'Nghỉ không báo / Nghỉ không được duyệt', xử_lý: '500.000 VNĐ\nvà tùy mức độ vi phạm, sa thải...', ghi_chú: 'Hình thức xử lý cao nhất: Sa thải' },
-              ].map((item, idx) => (
+              {(() => {
+                // Bảng phạt dựng từ chính sách chấm công backend đang áp dụng (system-rules
+                // attendance.penalty_policy = PolicyLoader: PenaltyTierConfig + AttendancePolicyConfig,
+                // đúng nguồn engine dùng để phạt) — đổi cấu hình là bảng đổi theo, không ghi cứng số.
+                const policy = systemRules?.attendance?.penalty_policy;
+                if (!policy) return [];
+                const vnd = (n: number) => `${n.toLocaleString('vi-VN')} VNĐ`;
+                const cong = (n: number) => `Trừ ${Number.isInteger(n) ? n.toFixed(1) : n} công làm việc`;
+                const multiplierNote = `Từ lần vi phạm thứ ${policy.multiplier_threshold}: x${policy.multiplier_value}/lần vi phạm`;
+                // Hạn mức giải trình của rổ chứa Quên chấm công — theo đúng người đang xem (API stats)
+                const incompleteQuota =
+                  ((attendanceStats?.explanation_quota?.groups || []) as Array<{ types?: string[]; max: number }>)
+                    .find((g) => g.types?.includes('INCOMPLETE_ATTENDANCE'))?.max
+                  ?? attendanceStats?.max_explanations_per_month;
+                const rows = [
+                  { nội_dung: 'Quên chấm công (In-Out) nhưng không chứng minh được đi làm đúng giờ', xử_lý: cong(policy.incomplete_no_expl_deduction), ghi_chú: '' },
+                  {
+                    nội_dung: `Quên chấm công (In-Out) nhưng chứng minh được đi làm đúng giờ (nhưng quá ${incompleteQuota != null ? `${incompleteQuota} lỗi giải trình/tháng` : 'hạn mức giải trình/tháng'})`,
+                    // Engine: duyệt giải trình Quên chấm công khi đã hết hạn mức = trừ phần "được duyệt" + phần "vượt hạn mức"
+                    xử_lý: cong(policy.incomplete_approved_deduction + policy.incomplete_over_quota_deduction),
+                    ghi_chú: '',
+                  },
+                ];
+                let prevMax: number | null = null;
+                policy.tiers.forEach((t) => {
+                  const range = t.max_minutes == null
+                    ? `> ${prevMax ?? 0} phút`
+                    : prevMax == null ? `≤ ${t.max_minutes} phút` : `${prevMax + 1} - ${t.max_minutes} phút`;
+                  // Bậc trừ công (PenaltyRule): không phạt tiền, không nhân hệ số
+                  const isDeduction = t.work_deduction > 0;
+                  rows.push({
+                    nội_dung: `Đi muộn / Về sớm ${range}`,
+                    xử_lý: isDeduction
+                      ? cong(t.work_deduction)
+                      : t.fine_manager === t.fine_regular
+                        ? vnd(t.fine_regular)
+                        : `Quản lý: ${vnd(t.fine_manager)}\nNhân viên: ${vnd(t.fine_regular)}`,
+                    ghi_chú: isDeduction ? '' : multiplierNote,
+                  });
+                  if (t.max_minutes != null) prevMax = t.max_minutes;
+                });
+                const absencePenalty = systemRules?.attendance?.unreported_absence_penalty;
+                rows.push({
+                  nội_dung: 'Nghỉ không báo / Nghỉ không được duyệt',
+                  xử_lý: absencePenalty != null
+                    ? `${vnd(absencePenalty)}\nvà tùy mức độ vi phạm, sa thải...`
+                    : 'Tùy mức độ vi phạm, sa thải...',
+                  ghi_chú: 'Hình thức xử lý cao nhất: Sa thải',
+                });
+                return rows;
+              })().map((item, idx) => (
                 <tr key={idx} className="hover:bg-gray-50/40 transition-colors group">
                   <td className="px-3 sm:px-6 py-4 text-[13px] text-gray-600 border-r border-gray-50 group-hover:text-primary-600 transition-colors leading-relaxed">
                     {item.nội_dung}
@@ -2444,6 +2490,11 @@ const AttendanceManagement: React.FC = () => {
                   </td>
                 </tr>
               ))}
+              {!systemRules?.attendance && (
+                <tr>
+                  <td colSpan={3} className="px-3 sm:px-6 py-4 text-[13px] text-gray-400">Đang tải quy định…</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

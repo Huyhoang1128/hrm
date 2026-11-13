@@ -59,3 +59,51 @@ class OvertimeRulesTests(TestCase):
         self.assertIn('hours', self._validate('OVERTIME', '18:00', short_end))
         self.assertNotIn('EXTRA_HOURS', OT_MIN_DURATION_TYPES)
         self.assertNotIn('hours', self._validate('EXTRA_HOURS', '18:00', short_end))
+
+
+class PenaltyPolicyRulesTests(TestCase):
+    """Bảng "Quy định kỷ luật" ở trang Chấm công dựng từ attendance.penalty_policy."""
+
+    def setUp(self):
+        from hrm.attendance_engine import PolicyLoader
+        PolicyLoader.clear_cache()
+        self.addCleanup(PolicyLoader.clear_cache)
+
+    def _section(self):
+        return build_rules(_admin_request(), {'attendance'})['attendance']
+
+    def test_defaults_match_engine(self):
+        from hrm.attendance_engine import _DEFAULT_PENALTY_TABLE, _DEFAULT_POLICY
+        from hrm.penalty_config import PENALTY_AMOUNT_PER_VIOLATION
+
+        section = self._section()
+        policy = section['penalty_policy']
+        self.assertIsNone(policy['effective_from'])
+        self.assertEqual(
+            [(t['max_minutes'], t['fine_regular'], t['fine_manager'], t['work_deduction']) for t in policy['tiers']],
+            list(_DEFAULT_PENALTY_TABLE),
+        )
+        self.assertEqual(policy['multiplier_threshold'], _DEFAULT_POLICY['penalty_multiplier_threshold'])
+        self.assertEqual(policy['incomplete_over_quota_deduction'], _DEFAULT_POLICY['incomplete_over_quota_deduction'])
+        self.assertEqual(section['unreported_absence_penalty'], PENALTY_AMOUNT_PER_VIOLATION)
+
+    def test_configured_policy_is_returned(self):
+        from hrm.attendance_models import AttendancePolicyConfig, AttendancePolicyVersion, PenaltyTierConfig
+
+        version = AttendancePolicyVersion.objects.create(
+            version_code='vtest', name='Test', effective_from=datetime.date(2025, 1, 1), is_active=True,
+        )
+        PenaltyTierConfig.objects.create(version=version, order=1, max_minutes=15,
+                                         fine_amount_regular=70_000, fine_amount_manager=90_000)
+        PenaltyTierConfig.objects.create(version=version, order=2, max_minutes=None, deduct_work_credit=1)
+        AttendancePolicyConfig.objects.create(version=version, penalty_multiplier_threshold=5,
+                                              incomplete_no_expl_deduction=0.5)
+        policy = self._section()['penalty_policy']
+        self.assertEqual(policy['version_code'], 'vtest')
+        self.assertEqual(policy['effective_from'], '2025-01-01')
+        self.assertEqual(policy['tiers'], [
+            {'max_minutes': 15, 'fine_regular': 70_000, 'fine_manager': 90_000, 'work_deduction': 0.0},
+            {'max_minutes': None, 'fine_regular': 0, 'fine_manager': 0, 'work_deduction': 1.0},
+        ])
+        self.assertEqual(policy['multiplier_threshold'], 5)
+        self.assertEqual(policy['incomplete_no_expl_deduction'], 0.5)
