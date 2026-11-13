@@ -59,14 +59,14 @@ class EmployeeSelfUpdateLinkTests(APITestCase):
         self.assertTrue(data['is_self_update'])
         self.assertEqual((data['current_address'], data['bank_account'], data['citizen_id'], data['date_of_birth'],
                           data['education_level'], data['has_vneid_screenshot']),
-                         ('Địa chỉ cũ', '111', '001200000001', '1995-05-01', 'Cử nhân đại học', True))
+                         ('Địa chỉ cũ', '111', '001200000001', '1995-05-01', 'BACHELOR', True))
         self.assertNotIn('salary', data)
 
     def test_submit_updates_personal_fields_but_never_hr_fields(self):
         token = self._token()
         OnboardingProcess.objects.filter(employee=self.staff).update(citizen_id_file='onboarding/cccd.pdf')
         payload = {
-            'candidate_name': 'NV NV00402', 'date_of_birth': '1995-05-01', 'gender': 'M', 'candidate_phone': '0900000002',
+            'candidate_name': 'Nhân Viên Bốn', 'date_of_birth': '1995-05-01', 'gender': 'M', 'candidate_phone': '0900000002',
             'education_level': 'Cử nhân đại học', 'ethnicity': 'Kinh', 'birth_place': 'Hà Nội', 'nationality': 'Việt Nam',
             'facebook_link': 'https://facebook.com/nv402', 'citizen_id': '001200000001',
             'citizen_id_issue_date': '2021-06-01', 'citizen_id_issue_place': 'POLICE_ADMIN',

@@ -82,6 +82,89 @@ EDUCATION_LEVEL = [
     ('DOCTORATE', 'Tiến sĩ'),
     ('OTHER', 'Khác'),
 ]
+# Nhãn cũ của form nhận việc (trước khi form gửi mã) -> mã. Giữ để link / bản ghi cũ vẫn map đúng.
+# 'Trung cấp' trước đây map sang HIGH_SCHOOL — giữ nguyên cách map đó.
+EDUCATION_LEVEL_LEGACY_LABELS = {
+    'Cử nhân đại học': 'BACHELOR',
+    'Cử nhân cao đẳng': 'ASSOCIATE',
+    'Trung cấp': 'HIGH_SCHOOL',
+}
+
+# Cấp bậc (Employee.rank lưu MÃ). Trước đây form nhận việc lưu NHÃN ('Nhân viên', 'Leader'...)
+# còn trang sửa hồ sơ lưu mã -> cùng 1 field 2 kiểu giá trị. Đây là danh sách duy nhất; web đọc
+# qua GET /api-hrm/system-rules/ (section "choices").
+RANK_CHOICES = [
+    ('CHAIRMAN', 'Chủ tịch'),
+    ('DIRECTOR', 'Giám đốc'),
+    ('DEPUTY_DIRECTOR', 'Phó Giám đốc'),
+    ('LEADER', 'Leader'),
+    ('SUPERVISOR', 'Quản lý'),
+    ('MANAGER', 'Trưởng phòng'),
+    ('MANAGER_TRAINEE', 'Trưởng phòng tập sự'),
+    ('DEPUTY_MANAGER', 'Phó phòng'),
+    ('STAFF', 'Nhân viên'),
+    ('INTERN', 'Thực tập sinh'),
+]
+# Nhãn khác từng được web dùng cho cùng mã.
+RANK_LEGACY_LABELS = {
+    'Trưởng nhóm': 'LEADER',
+}
+# Cấp bậc được coi là quản lý (xem danh sách onboarding của cấp dưới). 'Quản lý' (SUPERVISOR)
+# không nằm trong danh sách cũ nên không thêm vào.
+MANAGER_RANKS = frozenset({
+    'LEADER', 'MANAGER_TRAINEE', 'DEPUTY_MANAGER', 'MANAGER', 'DEPUTY_DIRECTOR', 'DIRECTOR', 'CHAIRMAN',
+})
+
+# Vùng/Miền và Khối: lưu chính nhãn (Employee.region / block là chữ tự do) — danh sách để chọn.
+REGION_CHOICES = [
+    ('Miền Bắc', 'Miền Bắc'),
+    ('Miền Nam', 'Miền Nam'),
+]
+BLOCK_CHOICES = [
+    ('Khối Back office', 'Khối Back office'),
+    ('Khối Marketing', 'Khối Marketing'),
+    ('Khối Kinh doanh', 'Khối Kinh doanh'),
+]
+
+
+def _choice_key(value):
+    import unicodedata
+    return unicodedata.normalize('NFC', str(value)).strip().casefold()
+
+
+def normalize_choice(value, choices, legacy_labels=None):
+    """Mã của 1 lựa chọn từ mã hoặc nhãn (không phân biệt hoa thường). Không nhận ra -> None."""
+    if value is None or str(value).strip() == '':
+        return None
+    key = _choice_key(value)
+    for code, label in choices:
+        if key in (_choice_key(code), _choice_key(label)):
+            return code
+    for label, code in (legacy_labels or {}).items():
+        if key == _choice_key(label):
+            return code
+    return None
+
+
+def normalize_rank(value):
+    """Mã cấp bậc từ mã / nhãn (kể cả nhãn cũ). Giá trị lạ giữ nguyên (đã strip) để không mất dữ liệu."""
+    if value is None:
+        return None
+    code = normalize_choice(value, RANK_CHOICES, RANK_LEGACY_LABELS)
+    return code or str(value).strip()
+
+
+def rank_label(value):
+    """Nhãn hiển thị của cấp bậc (giá trị lạ trả nguyên văn)."""
+    if not value:
+        return value or ''
+    code = normalize_choice(value, RANK_CHOICES, RANK_LEGACY_LABELS)
+    return dict(RANK_CHOICES).get(code, value) if code else value
+
+
+def normalize_education_level(value):
+    """Mã trình độ học vấn từ mã / nhãn / nhãn cũ của form nhận việc. Không nhận ra -> None."""
+    return normalize_choice(value, EDUCATION_LEVEL, EDUCATION_LEVEL_LEGACY_LABELS)
 
 # Marital status
 MARITAL_STATUS = [
@@ -122,6 +205,8 @@ PROBATION_CONTRACT_TYPES = frozenset({'PROBATION', 'PROBATION_1M', 'PROBATION_2M
 NON_OFFICIAL_CONTRACT_TYPES = PROBATION_CONTRACT_TYPES | {'INTERN', 'COLLABORATOR'}
 FIXED_TERM_CONTRACT_MONTHS = {'SIX_MONTH': 6, 'ONE_YEAR': 12, 'TWO_YEAR': 24, 'THREE_YEAR': 36}
 OFFICIAL_LABOR_CONTRACT_TYPES = frozenset(FIXED_TERM_CONTRACT_MONTHS) | {'INDEFINITE'}
+# Hợp đồng lao động thực sự (có hạn, cần tái ký) — cam kết / thoả thuận (bảo mật, nội quy...) không tính.
+LABOR_CONTRACT_TYPES = NON_OFFICIAL_CONTRACT_TYPES | OFFICIAL_LABOR_CONTRACT_TYPES | {'SERVICE'}
 # Mã thử việc có sẵn số tháng; 'PROBATION' dùng số tháng nhập riêng.
 PROBATION_MONTHS_BY_CONTRACT_TYPE = {'PROBATION_1M': 1, 'PROBATION_2M': 2}
 

@@ -1,5 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { setContractTypeGroups } from '../constants/contractTypes';
 import { buildContractWarnings } from '../utils/contractWarnings';
+
+// Nhóm loại HĐ đến từ backend (system-rules) — test nạp sẵn bản chụp, không gọi mạng.
+vi.mock('../services/systemRules.service', () => ({ getSystemRules: () => new Promise(() => {}) }));
+
+beforeAll(() => {
+  setContractTypeGroups({
+    probation: ['PROBATION', 'PROBATION_1M', 'PROBATION_2M'],
+    non_official: ['PROBATION', 'PROBATION_1M', 'PROBATION_2M', 'INTERN', 'COLLABORATOR'],
+    official_labor: ['SIX_MONTH', 'ONE_YEAR', 'TWO_YEAR', 'THREE_YEAR', 'INDEFINITE'],
+    labor: ['PROBATION', 'PROBATION_1M', 'PROBATION_2M', 'INTERN', 'COLLABORATOR',
+      'SIX_MONTH', 'ONE_YEAR', 'TWO_YEAR', 'THREE_YEAR', 'INDEFINITE', 'SERVICE'],
+  });
+});
 
 const TODAY = new Date(2026, 9, 15); // 15/10/2026
 

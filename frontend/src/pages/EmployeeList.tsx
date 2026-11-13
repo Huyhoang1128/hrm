@@ -8,18 +8,8 @@ import Pagination from '../components/Pagination';
 import { useLockBodyScroll } from '../hooks/useLockBodyScroll';
 import { CITIZEN_ID_ISSUE_PLACE_OPTIONS } from '../constants/onboarding';
 import { UsersIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-
-const getEmploymentStatusLabel = (status?: string) => {
-  const labels: Record<string, string> = {
-    ACTIVE: 'Đang làm việc',
-    INACTIVE: 'Đã nghỉ',
-    PROBATION: 'Thử việc',
-    SUSPENDED: 'Tạm nghỉ',
-    PAUSED: 'Tạm dừng',
-    MATERNITY_LEAVE: 'Nghỉ thai sản',
-  };
-  return (status && labels[status]) || status || '';
-};
+import { useSystemRules } from '../services/systemRules.service';
+import { choiceLabel, pickChoices } from '../utils/hrChoices';
 
 const getGenderLabel = (gender?: string) => {
   const labels: Record<string, string> = {
@@ -33,18 +23,6 @@ const getGenderLabel = (gender?: string) => {
 const getCccdIssuePlaceLabel = (place?: string) =>
   CITIZEN_ID_ISSUE_PLACE_OPTIONS.find((option) => option.value === place)?.label || place || '';
 
-const getEducationLevelLabel = (level?: string) => {
-  const labels: Record<string, string> = {
-    HIGH_SCHOOL: 'Trung học phổ thông',
-    ASSOCIATE: 'Cao đẳng',
-    BACHELOR: 'Đại học',
-    MASTER: 'Thạc sĩ',
-    DOCTORATE: 'Tiến sĩ',
-    OTHER: 'Khác',
-  };
-  return (level && labels[level]) || level || '';
-};
-
 const getMaritalStatusLabel = (status?: string) => {
   const labels: Record<string, string> = {
     SINGLE: 'Độc thân',
@@ -53,42 +31,6 @@ const getMaritalStatusLabel = (status?: string) => {
     WIDOWED: 'Góa',
   };
   return (status && labels[status]) || status || '';
-};
-
-const getContractTypeLabel = (type?: string, display?: string) => {
-  const labels: Record<string, string> = {
-    PROBATION: 'Hợp đồng thử việc',
-    PROBATION_1M: 'Thử việc 1 tháng',
-    PROBATION_2M: 'Thử việc 2 tháng',
-    INTERN: 'Hợp đồng thực tập sinh',
-    COLLABORATOR: 'Hợp đồng cộng tác viên',
-    SIX_MONTH: 'Hợp đồng lao động 6 tháng',
-    ONE_YEAR: 'Hợp đồng lao động 12 tháng',
-    TWO_YEAR: 'Hợp đồng lao động 24 tháng',
-    THREE_YEAR: 'Hợp đồng lao động 36 tháng',
-    INDEFINITE: 'Hợp đồng vô thời hạn',
-    SERVICE: 'Hợp đồng dịch vụ',
-    CONFIDENTIALITY: 'Thoả thuận bảo mật',
-    COMPANY_RULES: 'Cam kết đọc hiểu nội quy công ty',
-    NURSING_COMMITMENT: 'Cam kết của CBNV Điều dưỡng',
-  };
-  return (type && labels[type]) || display || type || '';
-};
-
-const getRankLabel = (rank?: string | null) => {
-  const labels: Record<string, string> = {
-    CHAIRMAN: 'Chủ tịch',
-    DIRECTOR: 'Giám đốc',
-    DEPUTY_DIRECTOR: 'Phó Giám đốc',
-    LEADER: 'Trưởng nhóm',
-    SUPERVISOR: 'Quản lý',
-    MANAGER: 'Trưởng phòng',
-    MANAGER_TRAINEE: 'Trưởng phòng tập sự',
-    DEPUTY_MANAGER: 'Phó phòng',
-    STAFF: 'Nhân viên',
-    INTERN: 'Thực tập sinh',
-  };
-  return (rank && labels[rank.toUpperCase()]) || rank || '';
 };
 
 const toExcelDate = (value?: string | null): Date | string => {
@@ -204,6 +146,15 @@ const DEFAULT_CUSTOM_EXPORT_KEYS = [
 const EmployeeList: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  // Nhãn trạng thái / loại HĐ / cấp bậc / học vấn và số ngày "sắp hết hạn" lấy từ backend
+  // (GET /api-hrm/system-rules/) — không chép danh sách / con số ở trang này.
+  const systemRules = useSystemRules();
+  const choices = systemRules?.choices ?? null;
+  const expiringDays = systemRules?.hr?.contract_expiring_soon_days ?? null;
+  const getEmploymentStatusLabel = (status?: string) => choiceLabel(choices?.employment_status, status);
+  const getEducationLevelLabel = (level?: string) => choiceLabel(choices?.education_level, level);
+  const getContractTypeLabel = (type?: string, display?: string) => choiceLabel(choices?.contract_type, type, display);
+  const getRankLabel = (rank?: string | null) => choiceLabel(choices?.rank, rank);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -294,25 +245,21 @@ const EmployeeList: React.FC = () => {
     if (employee.probation_end_date) dates.push(new Date(employee.probation_end_date));
     if (employee.contract_end_date) dates.push(new Date(employee.contract_end_date));
     if (dates.length === 0) return null;
-    return new Date(Math.min(...dates.map((d) => d.getTime())));
+    // Backend lọc theo mốc HĐ HOẶC thử việc nằm trong cửa sổ -> ưu tiên mốc chưa qua.
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const upcoming = dates.filter((d) => new Date(d).setHours(0, 0, 0, 0) >= today.getTime());
+    const pool = upcoming.length > 0 ? upcoming : dates;
+    return new Date(Math.min(...pool.map((d) => d.getTime())));
   };
   
   const fetchExpiringContractEmployees = async () => {
     try {
       setIsLoadingExpiringContracts(true);
-      const response = await employeesAPI.list({ page_size: 1000 });
-      
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const fourDaysLater = new Date(today);
-      fourDaysLater.setDate(today.getDate() + 4);
-      
-      const expiring = (response.results || []).filter((emp: Employee) => {
-        const nearestExpiryDate = getNearestExpiryDate(emp);
-        if (!nearestExpiryDate) return false;
-        nearestExpiryDate.setHours(0, 0, 0, 0);
-        return nearestExpiryDate >= today && nearestExpiryDate <= fourDaysLater;
-      }).sort((a: Employee, b: Employee) => {
+      // Backend lọc theo cửa sổ "sắp hết hạn" (CONTRACT_EXPIRING_SOON_DAYS) — web không tự tính số ngày.
+      const response = await employeesAPI.list({ page_size: 1000, expiring_soon: true });
+
+      const expiring = (response.results || []).sort((a: Employee, b: Employee) => {
         const dateA = getNearestExpiryDate(a) || new Date();
         const dateB = getNearestExpiryDate(b) || new Date();
         return dateA.getTime() - dateB.getTime();
@@ -348,12 +295,8 @@ const EmployeeList: React.FC = () => {
       if (contractType !== 'all') params.contract_type = contractType;
       
       if (expiringSoon === 'expiring') {
-        const today = new Date();
-        const deadline = new Date();
-        deadline.setDate(today.getDate() + 5);
-        params.expiring_soon_before = deadline.toISOString().split('T')[0];
-        // We also send a flag so the backend knows to filter by either probation or contract end date
-        params.is_expiring_soon = true;
+        // Backend lọc HĐ hoặc thử việc sắp hết hạn theo số ngày cấu hình (CONTRACT_EXPIRING_SOON_DAYS).
+        params.expiring_soon = true;
       }
       
       const response = await employeesAPI.list(params);
@@ -998,7 +941,7 @@ const EmployeeList: React.FC = () => {
     // Helper: áp dropdown validation cho 1 cột (rows 2→1001)
     const applyDropdown = (colKey: string, values: string[]) => {
       const colNumber = sheet.getColumn(colKey).number;
-      if (!colNumber) return;
+      if (!colNumber || values.length === 0) return;
       const formulae = [`"${values.join(',')}"`];
       for (let r = 2; r <= 1001; r++) {
         sheet.getCell(r, colNumber).dataValidation = {
@@ -1031,9 +974,10 @@ const EmployeeList: React.FC = () => {
     };
 
     applyDropdown('employment_status', ['Đang làm việc', 'Tạm dừng', 'Đã nghỉ']);
-    applyDropdown('rank', ['Chủ tịch', 'Giám đốc', 'Phó Giám đốc', 'Leader', 'Trưởng phòng', 'Trưởng phòng tập sự', 'Phó phòng', 'Nhân viên', 'Thực tập sinh']);
-    applyDropdown('work_form', ['Toàn thời gian', 'Bán thời gian', 'Hợp đồng', 'Thực tập', 'Cộng tác viên']);
-    applyDropdown('education_level', ['Trung học phổ thông', 'Cao đẳng', 'Đại học', 'Thạc sĩ', 'Tiến sĩ', 'Khác']);
+    // Cấp bậc / hình thức / học vấn: nhãn theo danh sách backend (import map nhãn -> mã).
+    applyDropdown('rank', (choices?.rank ?? []).map((o) => o.label));
+    applyDropdown('work_form', (choices?.work_form ?? []).map((o) => o.label));
+    applyDropdown('education_level', (choices?.education_level ?? []).map((o) => o.label));
     applyDropdown('gender', ['Nam', 'Nữ', 'Khác']);
     applyDropdown('marital_status', ['Độc thân', 'Đã kết hôn', 'Ly hôn', 'Góa']);
     applyDropdownRange(
@@ -1323,10 +1267,12 @@ const EmployeeList: React.FC = () => {
   };
 
   const isExpiringSoon = (employee: Employee) => {
+    // Chưa tải được số ngày từ backend thì không tô — không đoán số.
+    if (expiringDays === null) return false;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const deadline = new Date(today);
-    deadline.setDate(today.getDate() + 4);
+    deadline.setDate(today.getDate() + expiringDays);
 
     const probEnd = employee.probation_end_date ? new Date(employee.probation_end_date) : null;
     const contEnd = employee.contract_end_date ? new Date(employee.contract_end_date) : null;
@@ -1494,7 +1440,9 @@ const EmployeeList: React.FC = () => {
                   ⚠️ Cảnh báo: {expiringContractEmployees.length} nhân sự sắp hết hạn hợp đồng
                 </h3>
                 {expiringContractEmployees.length === 0 ? (
-                  <p className="text-sm text-amber-800">Không có nhân sự nào sắp hết hạn hợp đồng trong 4 ngày tới.</p>
+                  <p className="text-sm text-amber-800">
+                    Không có nhân sự nào sắp hết hạn hợp đồng{expiringDays !== null ? ` trong ${expiringDays} ngày tới` : ''}.
+                  </p>
                 ) : (
                 <div className="space-y-2">
                   {expiringContractEmployees.map((emp) => {
@@ -1521,7 +1469,7 @@ const EmployeeList: React.FC = () => {
                               Hôm nay/Hôm qua
                             </span>
                           )}
-                          {daysUntilExpiry > 1 && daysUntilExpiry <= 4 && (
+                          {daysUntilExpiry > 1 && (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
                               {daysUntilExpiry} ngày còn lại
                             </span>
@@ -1637,17 +1585,7 @@ const EmployeeList: React.FC = () => {
               value={contractTypeFilter}
               options={[
                 { value: 'all', label: 'Tất cả loại hợp đồng' },
-                { value: 'PROBATION', label: 'Hợp đồng thử việc' },
-                { value: 'PROBATION_1M', label: 'Thử việc 1 tháng' },
-                { value: 'PROBATION_2M', label: 'Thử việc 2 tháng' },
-                { value: 'INTERN', label: 'Hợp đồng thực tập sinh' },
-                { value: 'COLLABORATOR', label: 'Hợp đồng cộng tác viên' },
-                { value: 'SIX_MONTH', label: 'Hợp đồng lao động 6 tháng' },
-                { value: 'ONE_YEAR', label: 'Hợp đồng lao động 12 tháng' },
-                { value: 'TWO_YEAR', label: 'Hợp đồng lao động 24 tháng' },
-                { value: 'THREE_YEAR', label: 'Hợp đồng lao động 36 tháng' },
-                { value: 'INDEFINITE', label: 'Hợp đồng vô thời hạn' },
-                { value: 'SERVICE', label: 'Hợp đồng dịch vụ' },
+                ...pickChoices(choices?.contract_type, choices?.contract_type_groups.labor),
               ]}
               onChange={(v) => { setContractTypeFilter(v); setCurrentPage(1); }}
             />
@@ -1656,7 +1594,7 @@ const EmployeeList: React.FC = () => {
               value={expiringSoonFilter}
               options={[
                 { value: 'all', label: 'Tất cả' },
-                { value: 'expiring', label: 'Sắp hết hạn (≤ 5 ngày)' },
+                { value: 'expiring', label: `Sắp hết hạn${expiringDays !== null ? ` (≤ ${expiringDays} ngày)` : ''}` },
               ]}
               onChange={(v) => { setExpiringSoonFilter(v); setCurrentPage(1); }}
             />
@@ -1870,7 +1808,7 @@ const EmployeeList: React.FC = () => {
                         <div className="flex items-center">
                           <div className="text-sm font-medium text-gray-900">{employee.full_name}</div>
                           {isExpiringSoon(employee) && (
-                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-600" title="Sắp hết hạn hợp đồng/thử việc (≤ 5 ngày)">
+                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-600" title={`Sắp hết hạn hợp đồng/thử việc${expiringDays !== null ? ` (≤ ${expiringDays} ngày)` : ''}`}>
                               ⚠️
                             </span>
                           )}

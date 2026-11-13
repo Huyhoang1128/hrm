@@ -42,6 +42,8 @@ export const employeesAPI = {
     is_active?: boolean;
     end_date_from?: string;
     end_date_to?: string;
+    /** HĐ / thử việc sắp hết hạn — số ngày do backend quyết định (CONTRACT_EXPIRING_SOON_DAYS). */
+    expiring_soon?: boolean;
   }): Promise<{
     count: number;
     next: string | null;

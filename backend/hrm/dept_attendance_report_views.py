@@ -13,7 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
 
-from employee.models import Department, Employee
+from employee.models import Department, Employee, rank_label
 from .event_models import EmployeeEvent
 from .main_api import EmployeeState
 from .attendance_views import AttendanceCalendarView
@@ -80,7 +80,7 @@ def _build_employee_violation_summary(employee: Employee, calendar: list, year: 
     """
     emp_department = employee.department.name if employee.department else ""
     emp_position = employee.position.title if employee.position else ""
-    emp_rank = employee.rank or ""
+    emp_rank = rank_label(employee.rank) or ""  # rank lưu mã -> hiện nhãn
     emp_doctor_team = employee.doctor_team or ""
 
     tong_cong = 0.0

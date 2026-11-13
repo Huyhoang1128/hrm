@@ -8,10 +8,10 @@ import { API_BASE_URL } from '../utils/api';
 import { useParams } from 'react-router-dom';
 import { SelectBox } from '../components/LandingLayout/SelectBox';
 import {
-  ETHNICITY_OPTIONS, NATIONALITY_OPTIONS, SECTION_OPTIONS, WORK_FORM_OPTIONS, WORK_LOCATION_OPTIONS,
-  CITIZEN_ID_ISSUE_PLACE_OPTIONS, EDUCATION_LEVEL_OPTIONS, RANK_OPTIONS,
-  REGION_OPTIONS, BLOCK_OPTIONS, SUB_DEPARTMENT_OPTIONS, POSITION_OPTIONS,
+  ETHNICITY_OPTIONS, NATIONALITY_OPTIONS, WORK_LOCATION_OPTIONS, CITIZEN_ID_ISSUE_PLACE_OPTIONS,
 } from '../constants/onboarding';
+import { useSystemRules, formatBytes } from '../services/systemRules.service';
+import { choiceLabel } from '../utils/hrChoices';
 import {
   CheckCircleIcon,
   ExclamationCircleIcon,
@@ -26,10 +26,26 @@ import {
 
 const STEP_LABELS = ['Cơ bản', 'Công việc', 'CCCD', 'Địa chỉ', 'Liên hệ', 'Lương', 'Xác nhận'];
 
-const VNEID_ALLOWED_MIME = new Set([
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif',
-]);
-const VNEID_MAX_BYTES = 10 * 1024 * 1024;
+/** Tuổi tròn tại ngày `today`. */
+const ageOn = (dob: Date, today: Date): number => {
+  let age = today.getFullYear() - dob.getFullYear();
+  const monthDiff = today.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) age--;
+  return age;
+};
+
+/** "yyyy-mm-dd" -> "dd/mm/yyyy" */
+const isoToDisplay = (iso: string): string => iso.split('-').reverse().join('/');
+
+/** Kiểm tra ô chỉ gồm chữ số, độ dài [min, max] (max mặc định = min). Chưa có số từ backend thì chỉ kiểm tra chữ số. */
+const digitsError = (val: string, min?: number, max?: number): string => {
+  if (!/^\d*$/.test(val)) return 'Chỉ được nhập số';
+  if (min === undefined) return '';
+  const hi = max ?? min;
+  if (val.length > hi) return `Tối đa ${hi} chữ số`;
+  if (val.length > 0 && val.length < min) return min === hi ? `Còn thiếu ${min - val.length} số` : `Tối thiểu ${min} chữ số`;
+  return '';
+};
 
 // ============================================
 // TYPES
@@ -242,6 +258,20 @@ export const EmployeeOnboardingForm: React.FC = () => {
   const [positions, setPositions] = useState<any[]>([]);
   const [sections, setSections] = useState<any[]>([]);
 
+  // Giới hạn & danh sách lựa chọn của form lấy từ backend (GET /api-hrm/system-rules/, section
+  // "onboarding" + "choices", public) — đúng số serializer nộp form kiểm tra. Đang tải / lỗi thì
+  // không chặn bằng số đoán: backend vẫn kiểm tra khi nộp.
+  const systemRules = useSystemRules();
+  const formRules = systemRules?.onboarding ?? null;
+  const choices = systemRules?.choices ?? null;
+  const workFormOptions = formRules?.work_form ?? [];
+  const maxLen = (field: string): number | undefined => formRules?.text_max_length[field];
+  const nameRegex = formRules ? new RegExp(formRules.name_pattern) : null;
+  const isTooLong = (field: string, val: string): boolean => {
+    const limit = maxLen(field);
+    return limit !== undefined && val.length > limit;
+  };
+
   const [values, setValues] = useState<FormValues>({
     candidate_name: '', candidate_email: '', candidate_phone: '',
     date_of_birth: '', gender: 'M', education_level: '', facebook_link: '',
@@ -381,28 +411,27 @@ export const EmployeeOnboardingForm: React.FC = () => {
   }, [token]);
 
   // ===== INLINE VALIDATION =====
-  const NAME_REGEX = /^[a-zA-ZÀ-ỹ\s]+$/;
+  // Mọi con số (tuổi, số chữ số, độ dài, ngày cấp CCCD tối thiểu, mẫu tên) lấy từ formRules (backend).
   const getFieldError = (field: string, val: string): string => {
     if (!val) return '';
     switch (field) {
       case 'date_of_birth': {
         const dob = new Date(val);
         if (isNaN(dob.getTime())) return 'Ngày sinh không hợp lệ';
-        const today = new Date();
-        let age = today.getFullYear() - dob.getFullYear();
-        const monthDiff = today.getMonth() - dob.getMonth();
-        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) age--;
-        if (age < 18) return `Chưa đủ 18 tuổi (hiện ${age} tuổi)`;
-        if (age > 65) return `Tuổi không hợp lệ (${age} tuổi)`;
+        if (!formRules) return '';
+        const age = ageOn(dob, new Date());
+        if (age < formRules.min_age) return `Chưa đủ ${formRules.min_age} tuổi (hiện ${age} tuổi)`;
+        if (age > formRules.max_age) return `Tuổi không hợp lệ (${age} tuổi)`;
         return '';
       }
       case 'citizen_id_issue_date': {
         const d = new Date(val);
         if (isNaN(d.getTime())) return 'Ngày cấp không hợp lệ';
-        const minDate = new Date('2019-01-01');
         const today = new Date();
         today.setHours(23, 59, 59, 999);
-        if (d < minDate) return 'Ngày cấp CCCD gắn chip phải từ 01/01/2019 trở đi';
+        if (formRules && d < new Date(formRules.citizen_id_min_issue_date)) {
+          return `Ngày cấp CCCD gắn chip phải từ ${isoToDisplay(formRules.citizen_id_min_issue_date)} trở đi`;
+        }
         if (d > today) return 'Ngày cấp không được sau hôm nay';
         return '';
       }
@@ -412,45 +441,29 @@ export const EmployeeOnboardingForm: React.FC = () => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         if (d > today) return 'Ngày sinh không được sau hôm nay';
-        let age = today.getFullYear() - d.getFullYear();
-        const monthDiff = today.getMonth() - d.getMonth();
-        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < d.getDate())) age--;
-        if (age < 18) return `Người liên hệ phải đủ 18 tuổi (hiện ${age} tuổi)`;
-        if (age > 100) return `Tuổi không hợp lệ (${age} tuổi)`;
+        if (!formRules) return '';
+        const age = ageOn(d, today);
+        if (age < formRules.emergency_contact_min_age) return `Người liên hệ phải đủ ${formRules.emergency_contact_min_age} tuổi (hiện ${age} tuổi)`;
+        if (age > formRules.emergency_contact_max_age) return `Tuổi không hợp lệ (${age} tuổi)`;
         return '';
       }
       case 'candidate_name':
       case 'emergency_contact_name':
       case 'emergency_contact_relationship':
-        if (!NAME_REGEX.test(val)) return 'Không được chứa số hoặc ký tự đặc biệt';
-        if (val.length > 50) return 'Tối đa 50 ký tự';
+        if (nameRegex && !nameRegex.test(val)) return 'Không được chứa số hoặc ký tự đặc biệt';
+        if (isTooLong(field, val)) return `Tối đa ${maxLen(field)} ký tự`;
         return '';
       case 'candidate_phone':
       case 'emergency_contact_phone':
-        if (!/^\d*$/.test(val)) return 'Chỉ được nhập số';
-        if (val.length > 10) return 'Tối đa 10 chữ số';
-        if (val.length > 0 && val.length < 10) return `Còn thiếu ${10 - val.length} số`;
-        return '';
+        return digitsError(val, formRules?.phone_digits);
       case 'citizen_id':
-        if (!/^\d*$/.test(val)) return 'Chỉ được nhập số';
-        if (val.length > 12) return 'Tối đa 12 chữ số';
-        if (val.length > 0 && val.length < 12) return `Còn thiếu ${12 - val.length} số`;
-        return '';
+        return digitsError(val, formRules?.citizen_id_digits);
       case 'old_id_number':
-        if (!/^\d*$/.test(val)) return 'Chỉ được nhập số';
-        if (val.length > 9) return 'Tối đa 9 chữ số';
-        if (val.length > 0 && val.length < 9) return `Còn thiếu ${9 - val.length} số`;
-        return '';
+        return digitsError(val, formRules?.old_id_digits);
       case 'social_insurance_number':
-        if (!/^\d*$/.test(val)) return 'Chỉ được nhập số';
-        if (val.length > 10) return 'Tối đa 10 chữ số';
-        if (val.length > 0 && val.length < 10) return `Còn thiếu ${10 - val.length} số`;
-        return '';
+        return digitsError(val, formRules?.social_insurance_digits);
       case 'tax_code':
-        if (!/^\d*$/.test(val)) return 'Chỉ được nhập số';
-        if (val.length > 13) return 'Tối đa 13 chữ số';
-        if (val.length > 0 && val.length < 10) return `Tối thiểu 10 chữ số`;
-        return '';
+        return digitsError(val, formRules?.tax_code_min_digits, formRules?.tax_code_max_digits);
       case 'facebook_link':
         if (val && !/^https?:\/\//i.test(val)) return 'Phải bắt đầu bằng http:// hoặc https://';
         return '';
@@ -460,16 +473,16 @@ export const EmployeeOnboardingForm: React.FC = () => {
   const validateStep = (step: number): boolean => {
     if (step === 1) {
       if (!values.candidate_name.trim()) { showToast('error', 'Vui lòng nhập họ và tên'); return false; }
-      if (!NAME_REGEX.test(values.candidate_name.trim())) { showToast('error', 'Họ và tên không được chứa số hoặc ký tự đặc biệt'); return false; }
-      if (values.candidate_name.trim().length > 50) { showToast('error', 'Họ và tên không quá 50 ký tự'); return false; }
+      if (nameRegex && !nameRegex.test(values.candidate_name.trim())) { showToast('error', 'Họ và tên không được chứa số hoặc ký tự đặc biệt'); return false; }
+      if (isTooLong('candidate_name', values.candidate_name.trim())) { showToast('error', `Họ và tên không quá ${maxLen('candidate_name')} ký tự`); return false; }
       if (!values.date_of_birth) { showToast('error', 'Vui lòng chọn ngày sinh'); return false; }
       if (!values.gender) { showToast('error', 'Vui lòng chọn giới tính'); return false; }
       if (!values.candidate_phone.trim()) { showToast('error', 'Vui lòng nhập số điện thoại'); return false; }
-      if (!/^\d{10}$/.test(values.candidate_phone.trim())) { showToast('error', 'Số điện thoại phải có đúng 10 chữ số'); return false; }
+      { const err = getFieldError('candidate_phone', values.candidate_phone.trim()); if (err) { showToast('error', `Số điện thoại: ${err}`); return false; } }
       if (!values.education_level) { showToast('error', 'Vui lòng chọn trình độ học vấn'); return false; }
       if (!values.ethnicity) { showToast('error', 'Vui lòng chọn dân tộc'); return false; }
       if (!values.birth_place.trim()) { showToast('error', 'Vui lòng nhập nơi khai sinh'); return false; }
-      if (values.birth_place.trim().length > 200) { showToast('error', 'Nơi khai sinh không quá 200 ký tự'); return false; }
+      if (isTooLong('birth_place', values.birth_place.trim())) { showToast('error', `Nơi khai sinh không quá ${maxLen('birth_place')} ký tự`); return false; }
       if (!values.nationality.trim()) { showToast('error', 'Vui lòng nhập quốc tịch'); return false; }
       if (!values.facebook_link.trim()) { showToast('error', 'Vui lòng nhập link Facebook'); return false; }
       if (!/^https?:\/\//i.test(values.facebook_link.trim())) { showToast('error', 'Link Facebook phải bắt đầu bằng http:// hoặc https://'); return false; }
@@ -486,39 +499,32 @@ export const EmployeeOnboardingForm: React.FC = () => {
     }
     if (step === 3) {
       if (!values.citizen_id.trim()) { showToast('error', 'Vui lòng nhập số CCCD'); return false; }
-      if (!/^\d{12}$/.test(values.citizen_id.trim())) { showToast('error', 'Số CCCD phải có đúng 12 chữ số'); return false; }
+      { const err = getFieldError('citizen_id', values.citizen_id.trim()); if (err) { showToast('error', `Số CCCD: ${err}`); return false; } }
       if (!citizenIdFile && !hasCitizenIdFile) { showToast('error', 'Vui lòng upload file CCCD (PDF)'); return false; }
       if (!vneidScreenshotFile && !hasVneidScreenshot) { showToast('error', 'Vui lòng upload ảnh chụp màn hình thông tin VNeID'); return false; }
       if (!values.citizen_id_issue_date) { showToast('error', 'Vui lòng chọn ngày cấp CCCD'); return false; }
-      {
-        const issueDate = new Date(values.citizen_id_issue_date);
-        const minDate = new Date('2019-01-01');
-        const today = new Date();
-        today.setHours(23, 59, 59, 999);
-        if (Number.isNaN(issueDate.getTime())) { showToast('error', 'Ngày cấp CCCD không hợp lệ'); return false; }
-        if (issueDate < minDate) { showToast('error', 'Ngày cấp CCCD phải từ 01/01/2019 trở đi'); return false; }
-        if (issueDate > today) { showToast('error', 'Ngày cấp CCCD không được sau ngày hôm nay'); return false; }
-      }
+      { const err = getFieldError('citizen_id_issue_date', values.citizen_id_issue_date); if (err) { showToast('error', err); return false; } }
       if (!values.citizen_id_issue_place.trim()) { showToast('error', 'Vui lòng chọn nơi cấp CCCD'); return false; }
-      if (values.old_id_number && !/^\d{9}$/.test(values.old_id_number.trim())) { showToast('error', 'Số CMND cũ phải có đúng 9 chữ số'); return false; }
+      { const err = getFieldError('old_id_number', values.old_id_number.trim()); if (err) { showToast('error', `Số CMND cũ: ${err}`); return false; } }
     }
     if (step === 4) {
       if (!values.permanent_address.trim()) { showToast('error', 'Vui lòng nhập địa chỉ thường trú'); return false; }
-      if (values.permanent_address.trim().length > 500) { showToast('error', 'Địa chỉ thường trú không quá 500 ký tự'); return false; }
+      if (isTooLong('permanent_address', values.permanent_address.trim())) { showToast('error', `Địa chỉ thường trú không quá ${maxLen('permanent_address')} ký tự`); return false; }
       if (!values.current_address.trim()) { showToast('error', 'Vui lòng nhập địa chỉ hiện tại'); return false; }
-      if (values.current_address.trim().length > 500) { showToast('error', 'Địa chỉ hiện tại không quá 500 ký tự'); return false; }
-      if (values.social_insurance_number.trim() && !/^\d{10}$/.test(values.social_insurance_number.trim())) { showToast('error', 'Mã BHXH phải có đúng 10 chữ số'); return false; }
-      if (values.tax_code.trim() && !/^\d{10,13}$/.test(values.tax_code.trim())) { showToast('error', 'Mã số thuế phải có 10-13 chữ số'); return false; }
+      if (isTooLong('current_address', values.current_address.trim())) { showToast('error', `Địa chỉ hiện tại không quá ${maxLen('current_address')} ký tự`); return false; }
+      { const err = getFieldError('social_insurance_number', values.social_insurance_number.trim()); if (err) { showToast('error', `Mã BHXH: ${err}`); return false; } }
+      { const err = getFieldError('tax_code', values.tax_code.trim()); if (err) { showToast('error', `Mã số thuế: ${err}`); return false; } }
       if (!values.marital_status) { showToast('error', 'Vui lòng chọn tình trạng hôn nhân'); return false; }
     }
     if (step === 5) {
       if (!values.emergency_contact_name.trim()) { showToast('error', 'Vui lòng nhập tên người liên hệ khẩn cấp'); return false; }
-      if (!NAME_REGEX.test(values.emergency_contact_name.trim())) { showToast('error', 'Tên người liên hệ không được chứa số hoặc ký tự đặc biệt'); return false; }
-      if (values.emergency_contact_name.trim().length > 50) { showToast('error', 'Tên người liên hệ không quá 50 ký tự'); return false; }
+      if (nameRegex && !nameRegex.test(values.emergency_contact_name.trim())) { showToast('error', 'Tên người liên hệ không được chứa số hoặc ký tự đặc biệt'); return false; }
+      if (isTooLong('emergency_contact_name', values.emergency_contact_name.trim())) { showToast('error', `Tên người liên hệ không quá ${maxLen('emergency_contact_name')} ký tự`); return false; }
       if (!values.emergency_contact_relationship.trim()) { showToast('error', 'Vui lòng nhập mối quan hệ'); return false; }
-      if (!NAME_REGEX.test(values.emergency_contact_relationship.trim())) { showToast('error', 'Mối quan hệ không được chứa số hoặc ký tự đặc biệt'); return false; }
+      if (nameRegex && !nameRegex.test(values.emergency_contact_relationship.trim())) { showToast('error', 'Mối quan hệ không được chứa số hoặc ký tự đặc biệt'); return false; }
+      if (isTooLong('emergency_contact_relationship', values.emergency_contact_relationship.trim())) { showToast('error', `Mối quan hệ không quá ${maxLen('emergency_contact_relationship')} ký tự`); return false; }
       if (!values.emergency_contact_phone.trim()) { showToast('error', 'Vui lòng nhập số điện thoại người liên hệ'); return false; }
-      if (!/^\d{10}$/.test(values.emergency_contact_phone.trim())) { showToast('error', 'Số điện thoại người liên hệ phải có đúng 10 chữ số'); return false; }
+      { const err = getFieldError('emergency_contact_phone', values.emergency_contact_phone.trim()); if (err) { showToast('error', `Số điện thoại người liên hệ: ${err}`); return false; } }
       if (!values.emergency_contact_dob) { showToast('error', 'Vui lòng chọn ngày sinh người liên hệ'); return false; }
       {
         const err = getFieldError('emergency_contact_dob', values.emergency_contact_dob);
@@ -546,7 +552,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
       return !!(values.candidate_name.trim() && !getFieldError('candidate_name', values.candidate_name) &&
         values.date_of_birth && !getFieldError('date_of_birth', values.date_of_birth) &&
         values.gender &&
-        values.candidate_phone.trim() && /^\d{10}$/.test(values.candidate_phone.trim()) &&
+        values.candidate_phone.trim() && !getFieldError('candidate_phone', values.candidate_phone.trim()) &&
         values.education_level && values.ethnicity &&
         values.birth_place.trim() && values.nationality.trim() &&
         values.facebook_link.trim() && !getFieldError('facebook_link', values.facebook_link));
@@ -565,7 +571,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
     }
     if (step === 4) {
       return !!(values.emergency_contact_name.trim() && values.emergency_contact_relationship.trim() &&
-        values.emergency_contact_phone.trim() && /^\d{10}$/.test(values.emergency_contact_phone.trim()) &&
+        values.emergency_contact_phone.trim() && !getFieldError('emergency_contact_phone', values.emergency_contact_phone.trim()) &&
         values.emergency_contact_dob && !getFieldError('emergency_contact_dob', values.emergency_contact_dob) &&
         values.emergency_contact_occupation.trim() &&
         values.emergency_contact_address.trim());
@@ -583,14 +589,20 @@ export const EmployeeOnboardingForm: React.FC = () => {
   const handlePrevious = () => setCurrentStep((s) => Math.max(s - 1, 0));
 
   // ===== FILE =====
+  // Định dạng / dung lượng file theo backend (formRules.citizen_id_file / vneid_screenshot) — cùng
+  // giới hạn mọi đường nộp CCCD / VNeID. Chưa tải được quy định thì để backend kiểm tra khi nộp.
+  const citizenIdFileRule = formRules?.citizen_id_file ?? null;
+  const vneidRule = formRules?.vneid_screenshot ?? null;
+  const extList = (exts: string[]) => exts.map((x) => x.replace(/^\./, '').toUpperCase()).join(', ');
+
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
-      showToast('error', 'File CCCD phải là định dạng PDF'); e.target.value = ''; return;
+    if (citizenIdFileRule && !citizenIdFileRule.extensions.some((x) => file.name.toLowerCase().endsWith(x))) {
+      showToast('error', `File CCCD phải là định dạng ${extList(citizenIdFileRule.extensions)}`); e.target.value = ''; return;
     }
-    if (file.size > 15 * 1024 * 1024) {
-      showToast('error', 'File CCCD không được vượt quá 15MB'); e.target.value = ''; return;
+    if (citizenIdFileRule && file.size > citizenIdFileRule.max_bytes) {
+      showToast('error', `File CCCD không được vượt quá ${formatBytes(citizenIdFileRule.max_bytes)}`); e.target.value = ''; return;
     }
     setCitizenIdFile(file);
   };
@@ -598,17 +610,18 @@ export const EmployeeOnboardingForm: React.FC = () => {
   const handleVneidScreenshotChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const mime = (file.type || '').toLowerCase();
-    const okMime = !mime || VNEID_ALLOWED_MIME.has(mime);
-    const ext = file.name.toLowerCase().split('.').pop() || '';
-    const okExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif'].includes(ext);
-    if (!okMime && !okExt) {
-      showToast('error', 'Ảnh VNeID: chỉ chấp nhận JPG, PNG, GIF, WEBP, HEIC/HEIF');
-      e.target.value = ''; return;
-    }
-    if (file.size > VNEID_MAX_BYTES) {
-      showToast('error', 'Ảnh VNeID không được vượt quá 10MB');
-      e.target.value = ''; return;
+    if (vneidRule) {
+      const mime = (file.type || '').toLowerCase();
+      const okMime = !mime || vneidRule.mime_types.includes(mime);
+      const okExt = vneidRule.extensions.some((x) => file.name.toLowerCase().endsWith(x));
+      if (!okMime && !okExt) {
+        showToast('error', `Ảnh VNeID: chỉ chấp nhận ${extList(vneidRule.extensions)}`);
+        e.target.value = ''; return;
+      }
+      if (file.size > vneidRule.max_bytes) {
+        showToast('error', `Ảnh VNeID không được vượt quá ${formatBytes(vneidRule.max_bytes)}`);
+        e.target.value = ''; return;
+      }
     }
     setVneidScreenshotFile(file);
   };
@@ -753,7 +766,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
         <div className="flex-1 flex flex-col gap-5 justify-evenly">
           <h3 className="text-2xl sm:text-4xl font-bold text-gray-900 text-center">Thông tin cơ bản</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <TF label="Họ và tên" value={values.candidate_name} onChange={handleChange('candidate_name')} required placeholder="Nguyễn Văn A" error={getFieldError('candidate_name', values.candidate_name)} maxLength={50} />
+            <TF label="Họ và tên" value={values.candidate_name} onChange={handleChange('candidate_name')} required placeholder="Nguyễn Văn A" error={getFieldError('candidate_name', values.candidate_name)} maxLength={maxLen('candidate_name')} />
             <TF label="Email" value={values.candidate_email} onChange={handleChange('candidate_email')} disabled />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -761,13 +774,13 @@ export const EmployeeOnboardingForm: React.FC = () => {
             <SF label="Giới tính" value={values.gender} onChange={handleSelect('gender')}
               options={[{ value: 'M', label: 'Nam' }, { value: 'F', label: 'Nữ' }, { value: 'O', label: 'Khác' }]} required />
           </div>
-          <TF label="Số điện thoại" value={values.candidate_phone} onChange={handleChange('candidate_phone')} required placeholder="0123456789" error={getFieldError('candidate_phone', values.candidate_phone)} maxLength={10} />
+          <TF label="Số điện thoại" value={values.candidate_phone} onChange={handleChange('candidate_phone')} required placeholder="0123456789" error={getFieldError('candidate_phone', values.candidate_phone)} maxLength={formRules?.phone_digits} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <SF label="Trình độ học vấn" value={values.education_level} onChange={handleSelect('education_level')} options={EDUCATION_LEVEL_OPTIONS} required />
+            <SF label="Trình độ học vấn" value={values.education_level} onChange={handleSelect('education_level')} options={choices?.education_level ?? []} required />
             <SF label="Dân tộc" value={values.ethnicity} onChange={handleSelect('ethnicity')} options={ETHNICITY_OPTIONS} searchable />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <TF label="Nơi khai sinh" value={values.birth_place} onChange={handleChange('birth_place')} placeholder="Xã/Phường, Tỉnh/TP theo đơn vị hành chính mới" />
+            <TF label="Nơi khai sinh" value={values.birth_place} onChange={handleChange('birth_place')} placeholder="Xã/Phường, Tỉnh/TP theo đơn vị hành chính mới" maxLength={maxLen('birth_place')} />
             <SF label="Quốc tịch" value={values.nationality} onChange={handleSelect('nationality')} options={NATIONALITY_OPTIONS} searchable />
           </div>
           <TF label="Link Facebook" value={values.facebook_link} onChange={handleChange('facebook_link')} placeholder="https://facebook.com/..." required error={getFieldError('facebook_link', values.facebook_link)} />
@@ -795,16 +808,17 @@ export const EmployeeOnboardingForm: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
             <SF label="Đơn vị làm việc" value={values.company_unit} onChange={handleSelect('company_unit')}
               options={companyUnits.map(cu => ({ value: cu.code, label: cu.name }))} />
-            <SF label="Vùng/Miền" value={values.region} onChange={handleSelect('region')} options={REGION_OPTIONS} />
-            <SF label="Khối" value={values.block} onChange={handleSelect('block')} options={BLOCK_OPTIONS} />
+            <SF label="Vùng/Miền" value={values.region} onChange={handleSelect('region')} options={choices?.region ?? []} />
+            <SF label="Khối" value={values.block} onChange={handleSelect('block')} options={choices?.block ?? []} />
+          </div>
+          {/* Chỉ chọn từ dữ liệu thật của hệ thống — không còn danh sách dự phòng ghi cứng (backend từ chối tên lạ). */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <SF label="Phòng/Ban" value={values.sub_department} onChange={handleSelect('sub_department')} options={departments.map(d => ({ value: d.name, label: d.name }))} searchable />
+            <SF label="Bộ phận" value={values.section} onChange={handleSelect('section')} options={sections.map(s => ({ value: s.name, label: s.name }))} searchable />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <SF label="Phòng/Ban" value={values.sub_department} onChange={handleSelect('sub_department')} options={departments.length > 0 ? departments.map(d => ({ value: d.name, label: d.name })) : SUB_DEPARTMENT_OPTIONS} searchable />
-            <SF label="Bộ phận" value={values.section} onChange={handleSelect('section')} options={sections.length > 0 ? sections.map(s => ({ value: s.name, label: s.name })) : SECTION_OPTIONS} searchable />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <SF label="Vị trí" value={values.position} onChange={handleSelect('position')} options={positions.length > 0 ? positions.map(p => ({ value: p.title, label: p.title })) : POSITION_OPTIONS} searchable />
-            <SF label="Cấp bậc" value={values.job_rank} onChange={handleSelect('job_rank')} options={RANK_OPTIONS} required />
+            <SF label="Vị trí" value={values.position} onChange={handleSelect('position')} options={positions.map(p => ({ value: p.title, label: p.title }))} searchable />
+            <SF label="Cấp bậc" value={values.job_rank} onChange={handleSelect('job_rank')} options={choices?.rank ?? []} required />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <TF label="Team Bác sĩ" value={values.doctor_team} onChange={handleChange('doctor_team')} placeholder="Team Dr. Nguyễn Văn A..." />
@@ -812,8 +826,8 @@ export const EmployeeOnboardingForm: React.FC = () => {
           </div>
           <div className="p-4 bg-gray-50 rounded-lg">
             <RF label="Hình thức làm việc" value={values.work_form}
-              onChange={(val) => { handleSelect('work_form')(val); setWorkType(WORK_FORM_OPTIONS.find((o) => o.value === val)?.label ?? ''); }}
-              options={WORK_FORM_OPTIONS} required />
+              onChange={(val) => { handleSelect('work_form')(val); setWorkType(workFormOptions.find((o) => o.value === val)?.label ?? ''); }}
+              options={workFormOptions} required />
           </div>
         </div>
       );
@@ -823,8 +837,8 @@ export const EmployeeOnboardingForm: React.FC = () => {
         <div className="flex-1 flex flex-col gap-5 justify-evenly">
           <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center">Thông tin CCCD</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <TF label="Số CCCD" value={values.citizen_id} onChange={handleChange('citizen_id')} required placeholder="001234567890" error={getFieldError('citizen_id', values.citizen_id)} maxLength={12} />
-            <TF label="Số CMND cũ (nếu có)" value={values.old_id_number} onChange={handleChange('old_id_number')} placeholder="123456789" error={getFieldError('old_id_number', values.old_id_number)} maxLength={9} />
+            <TF label="Số CCCD" value={values.citizen_id} onChange={handleChange('citizen_id')} required placeholder="001234567890" error={getFieldError('citizen_id', values.citizen_id)} maxLength={formRules?.citizen_id_digits} />
+            <TF label="Số CMND cũ (nếu có)" value={values.old_id_number} onChange={handleChange('old_id_number')} placeholder="123456789" error={getFieldError('old_id_number', values.old_id_number)} maxLength={formRules?.old_id_digits} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -838,10 +852,13 @@ export const EmployeeOnboardingForm: React.FC = () => {
                     ? <p className="text-sm text-green-700 font-medium truncate">{citizenIdFile.name}</p>
                     : hasCitizenIdFile
                       ? <p className="text-sm text-green-700 font-medium truncate">Đã nộp CCCD trước đó (nhấn chọn tệp mới để đổi)</p>
-                      : <p className="text-sm text-gray-500">Nhấn để chọn file PDF (tối đa 15MB)</p>
+                      : <p className="text-sm text-gray-500">
+                          Nhấn để chọn file {citizenIdFileRule ? extList(citizenIdFileRule.extensions) : 'PDF'}
+                          {citizenIdFileRule ? ` (tối đa ${formatBytes(citizenIdFileRule.max_bytes)})` : ''}
+                        </p>
                   }
                 </div>
-                <input type="file" accept=".pdf" onChange={handleFileChange} className="hidden" />
+                <input type="file" accept={citizenIdFileRule ? citizenIdFileRule.extensions.join(',') : '.pdf'} onChange={handleFileChange} className="hidden" />
               </label>
             </div>
             <div>
@@ -854,10 +871,13 @@ export const EmployeeOnboardingForm: React.FC = () => {
                     ? <p className="text-sm text-green-700 font-medium truncate">{vneidScreenshotFile.name}</p>
                     : hasVneidScreenshot
                       ? <p className="text-sm text-green-700 font-medium truncate">Đã nộp ảnh trước đó (nhấn chọn tệp mới để đổi)</p>
-                      : <p className="text-sm text-gray-500">Nhấn để chọn ảnh hoặc PDF (JPG, PNG, PDF...)</p>
+                      : <p className="text-sm text-gray-500">
+                          {/* Backend chỉ nhận ảnh (không nhận PDF) — nhãn / accept theo đúng quy định đó. */}
+                          Nhấn để chọn ảnh{vneidRule ? ` (${extList(vneidRule.extensions)}, tối đa ${formatBytes(vneidRule.max_bytes)})` : ''}
+                        </p>
                   }
                 </div>
-                <input type="file" accept="image/jpeg,image/png,image/gif,image/webp,.heic,.heif,application/pdf" onChange={handleVneidScreenshotChange} className="hidden" />
+                <input type="file" accept={vneidRule ? [...vneidRule.mime_types, ...vneidRule.extensions].join(',') : 'image/*'} onChange={handleVneidScreenshotChange} className="hidden" />
               </label>
             </div>
           </div>
@@ -876,13 +896,13 @@ export const EmployeeOnboardingForm: React.FC = () => {
       case 3: return (
         <div className="flex-1 flex flex-col gap-5 justify-evenly">
           <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center">Địa chỉ & BHXH</h3>
-          <TF label="Địa chỉ thường trú" value={values.permanent_address} onChange={handleChange('permanent_address')} multiline rows={2} required placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" />
+          <TF label="Địa chỉ thường trú" value={values.permanent_address} onChange={handleChange('permanent_address')} multiline rows={2} required placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" maxLength={maxLen('permanent_address')} />
           <p className="text-xs text-gray-500 px-1 -mt-2">(Vui lòng tra cứu địa chỉ mới bằng cách đăng nhập ứng dụng VNeID để kiểm tra)</p>
-          <TF label="Địa chỉ hiện tại" value={values.current_address} onChange={handleChange('current_address')} multiline rows={2} required placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" />
+          <TF label="Địa chỉ hiện tại" value={values.current_address} onChange={handleChange('current_address')} multiline rows={2} required placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" maxLength={maxLen('current_address')} />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <TF label="Mã BHXH" value={values.social_insurance_number} onChange={handleChange('social_insurance_number')} placeholder="1234567890" error={getFieldError('social_insurance_number', values.social_insurance_number)} maxLength={10} />
+              <TF label="Mã BHXH" value={values.social_insurance_number} onChange={handleChange('social_insurance_number')} placeholder="1234567890" error={getFieldError('social_insurance_number', values.social_insurance_number)} maxLength={formRules?.social_insurance_digits} />
               <p className="text-xs text-gray-500 mt-1">
                 (Tra cứu tại{' '}
                 <a href="https://baohiemxahoi.gov.vn/tracuu/Pages/tra-cuu-ho-gia-dinh.aspx" target="_blank" rel="noreferrer" className="text-blue-500 underline">
@@ -891,7 +911,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
               </p>
             </div>
             <div>
-              <TF label="Mã số thuế" value={values.tax_code} onChange={handleChange('tax_code')} placeholder="0123456789" error={getFieldError('tax_code', values.tax_code)} maxLength={13} />
+              <TF label="Mã số thuế" value={values.tax_code} onChange={handleChange('tax_code')} placeholder="0123456789" error={getFieldError('tax_code', values.tax_code)} maxLength={formRules?.tax_code_max_digits} />
               <p className="text-xs text-gray-500 mt-1">
                 (Tra cứu tại{' '}
                 <a href="https://masothue.com/tra-cuu-ma-so-thue-ca-nhan" target="_blank" rel="noreferrer" className="text-blue-500 underline">
@@ -915,16 +935,16 @@ export const EmployeeOnboardingForm: React.FC = () => {
         <div className="flex-1 flex flex-col gap-5 justify-evenly">
           <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center">Người liên hệ khẩn cấp</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <TF label="Họ và tên" value={values.emergency_contact_name} onChange={handleChange('emergency_contact_name')} required placeholder="Nguyễn Văn B" error={getFieldError('emergency_contact_name', values.emergency_contact_name)} maxLength={50} />
-            <TF label="Mối quan hệ" value={values.emergency_contact_relationship} onChange={handleChange('emergency_contact_relationship')} required placeholder="Bố, mẹ, vợ, chồng..." error={getFieldError('emergency_contact_relationship', values.emergency_contact_relationship)} maxLength={30} />
+            <TF label="Họ và tên" value={values.emergency_contact_name} onChange={handleChange('emergency_contact_name')} required placeholder="Nguyễn Văn B" error={getFieldError('emergency_contact_name', values.emergency_contact_name)} maxLength={maxLen('emergency_contact_name')} />
+            <TF label="Mối quan hệ" value={values.emergency_contact_relationship} onChange={handleChange('emergency_contact_relationship')} required placeholder="Bố, mẹ, vợ, chồng..." error={getFieldError('emergency_contact_relationship', values.emergency_contact_relationship)} maxLength={maxLen('emergency_contact_relationship')} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <TF label="Số điện thoại" value={values.emergency_contact_phone} onChange={handleChange('emergency_contact_phone')} required placeholder="0987654321" error={getFieldError('emergency_contact_phone', values.emergency_contact_phone)} maxLength={10} />
+            <TF label="Số điện thoại" value={values.emergency_contact_phone} onChange={handleChange('emergency_contact_phone')} required placeholder="0987654321" error={getFieldError('emergency_contact_phone', values.emergency_contact_phone)} maxLength={formRules?.phone_digits} />
             <TF label="Ngày sinh" value={values.emergency_contact_dob} onChange={handleChange('emergency_contact_dob')} type="date" required error={getFieldError('emergency_contact_dob', values.emergency_contact_dob)} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <TF label="Nghề nghiệp" value={values.emergency_contact_occupation} onChange={handleChange('emergency_contact_occupation')} required placeholder="Giáo viên, Bác sĩ..." />
-            <TF label="Địa chỉ" value={values.emergency_contact_address} onChange={handleChange('emergency_contact_address')} required placeholder="Số nhà, đường, phường/xã..." />
+            <TF label="Nghề nghiệp" value={values.emergency_contact_occupation} onChange={handleChange('emergency_contact_occupation')} required placeholder="Giáo viên, Bác sĩ..." maxLength={maxLen('emergency_contact_occupation')} />
+            <TF label="Địa chỉ" value={values.emergency_contact_address} onChange={handleChange('emergency_contact_address')} required placeholder="Số nhà, đường, phường/xã..." maxLength={maxLen('emergency_contact_address')} />
           </div>
         </div>
       );
@@ -989,7 +1009,7 @@ export const EmployeeOnboardingForm: React.FC = () => {
             ['Ngày sinh', values.date_of_birth ? new Date(values.date_of_birth).toLocaleDateString('vi-VN') : null],
             ['Giới tính', values.gender === 'M' ? 'Nam' : values.gender === 'F' ? 'Nữ' : values.gender === 'O' ? 'Khác' : null],
             ['Số điện thoại', values.candidate_phone],
-            ['Trình độ học vấn', values.education_level],
+            ['Trình độ học vấn', values.education_level ? choiceLabel(choices?.education_level, values.education_level) : null],
             ['Dân tộc', values.ethnicity],
             ['Nơi khai sinh', values.birth_place],
             ['Quốc tịch', values.nationality],
@@ -1002,9 +1022,9 @@ export const EmployeeOnboardingForm: React.FC = () => {
             ['Phòng/Ban', values.sub_department],
             ['Bộ phận', values.section || null],
             ['Vị trí', values.position],
-            ['Cấp bậc', values.job_rank],
+            ['Cấp bậc', values.job_rank ? choiceLabel(choices?.rank, values.job_rank) : null],
             ['Team Bác sĩ', values.doctor_team],
-            ['Hình thức', WORK_FORM_OPTIONS.find(o => o.value === values.work_form)?.label || values.work_form || null],
+            ['Hình thức', values.work_form ? choiceLabel(workFormOptions, values.work_form) : null],
             ['Địa điểm', WORK_LOCATION_OPTIONS.find(o => o.value === values.work_location)?.label || values.work_location || null],
           ]}]),
           { title: 'CCCD', color: 'amber', fields: [

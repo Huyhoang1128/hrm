@@ -32,20 +32,8 @@ import {
   WORK_LOCATION_OPTIONS,
 } from '../constants/onboarding';
 import PdfFrame from '../components/Common/PdfFrame';
-import { employmentStatusLabel } from '../constants/employmentStatus';
-
-const EDUCATION_LEVEL_MAP: Record<string, string> = {
-  MASTER: 'Thạc sĩ',
-  BACHELOR: 'Cử nhân đại học',
-  ASSOCIATE: 'Cử nhân cao đẳng',
-  HIGH_SCHOOL: 'Trung cấp',
-  OTHER: 'Khác',
-};
-
-const displayEducationLevel = (value?: string | null): string => {
-  if (!value) return 'Chưa có dữ liệu';
-  return EDUCATION_LEVEL_MAP[value] ?? value;
-};
+import { useSystemRules } from '../services/systemRules.service';
+import { choiceLabel } from '../utils/hrChoices';
 
 // ============================================
 // TYPE DEFINITIONS
@@ -190,11 +178,6 @@ const MARITAL_STATUS_LABELS: Record<string, string> = {
   WIDOWED: 'Góa',
 };
 
-const WORK_FORM_LABELS: Record<string, string> = {
-  FULL_TIME: 'Full-time',
-  PART_TIME: 'Part-time',
-};
-
 
 const getStatusBadge = (status: string) => {
   const statusConfig = {
@@ -225,23 +208,6 @@ type EditSection =
   | 'emp_salary'
   | 'emp_file_status'
   | 'attached_files';
-
-const CONTRACT_OPTIONS = [
-  { value: 'PROBATION', label: 'Hợp đồng thử việc' },
-  { value: 'PROBATION_1M', label: 'Thử việc 1 tháng' },
-  { value: 'PROBATION_2M', label: 'Thử việc 2 tháng' },
-  { value: 'INTERN', label: 'Hợp đồng thực tập sinh' },
-  { value: 'COLLABORATOR', label: 'Hợp đồng cộng tác viên' },
-  { value: 'SIX_MONTH', label: 'Hợp đồng lao động 6 tháng' },
-  { value: 'ONE_YEAR', label: 'Hợp đồng lao động 12 tháng' },
-  { value: 'TWO_YEAR', label: 'Hợp đồng lao động 24 tháng' },
-  { value: 'THREE_YEAR', label: 'Hợp đồng lao động 36 tháng' },
-  { value: 'INDEFINITE', label: 'Hợp đồng vô thời hạn' },
-  { value: 'SERVICE', label: 'Hợp đồng dịch vụ' },
-  { value: 'CONFIDENTIALITY', label: 'Thoả thuận bảo mật' },
-  { value: 'COMPANY_RULES', label: 'Cam kết đọc hiểu nội quy công ty' },
-  { value: 'NURSING_COMMITMENT', label: 'Cam kết của CBNV Điều dưỡng' },
-];
 
 const withCurrentOption = (
   options: { value: string; label: string }[],
@@ -356,6 +322,14 @@ const OnboardingDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  // Danh sách lựa chọn (cấp bậc, trạng thái, loại HĐ, hình thức, học vấn, vùng/khối) và số chữ số
+  // điện thoại lấy từ backend (GET /api-hrm/system-rules/) — không chép cứng ở trang này.
+  const systemRules = useSystemRules();
+  const choices = systemRules?.choices ?? null;
+  const phoneDigits = systemRules?.onboarding?.phone_digits ?? null;
+  const CONTRACT_OPTIONS = choices?.contract_type ?? [];
+  const displayEducationLevel = (value?: string | null): string =>
+    value ? choiceLabel(choices?.education_level, value) : 'Chưa có dữ liệu';
   const userRole = user?.role?.toUpperCase() || 'USER';
   const isManager = user?.employee_profile?.is_manager || user?.hrm_user?.is_manager || false;
   const isEmployee = (userRole === 'STAFF' || userRole === 'CUSTOMER') && !isManager;
@@ -1017,19 +991,19 @@ const OnboardingDetail: React.FC = () => {
             />
             <InfoField label="Phòng ban" value={safeDisplay((employeeProfile as any)?.department?.name || onboarding.department?.name)} />
             <InfoField label="Vị trí" value={safeDisplay((employeeProfile as any)?.position?.title || onboarding.position?.title)} />
-            <InfoField label="Cấp bậc" value={safeDisplay(employeeProfile?.rank || onboarding.rank)} />
+            <InfoField label="Cấp bậc" value={safeDisplay(choiceLabel(choices?.rank, employeeProfile?.rank || onboarding.rank))} />
             <InfoField label="Bộ phận" value={safeDisplay(employeeProfile?.section || onboarding.section)} />
             <InfoField label="Quản lý" value={safeDisplay(onboarding.direct_manager?.full_name)} />
             <InfoField label="Team bác sĩ" value={safeDisplay(employeeProfile?.doctor_team || onboarding.doctor_team)} />
             <InfoField label="Ngày bắt đầu" value={employeeProfile?.start_date ? formatDate(employeeProfile.start_date) : formatDate(onboarding.start_date)} />
-            <InfoField label="Hình thức" value={(employeeProfile?.work_form || onboarding.work_form) ? (WORK_FORM_LABELS[employeeProfile?.work_form || onboarding.work_form!] || employeeProfile?.work_form || onboarding.work_form) : null} />
+            <InfoField label="Hình thức" value={(employeeProfile?.work_form || onboarding.work_form) ? choiceLabel(choices?.work_form, employeeProfile?.work_form || onboarding.work_form) : null} />
             <InfoField label="Địa điểm làm việc" value={(() => {
               const wl = (employeeProfile as any)?.work_location || (onboarding as any)?.work_location;
               return WORK_LOCATION_OPTIONS.find(o => o.value === wl)?.label || safeDisplay(wl);
             })()} />
             <InfoField label="Vùng/Miền" value={safeDisplay(employeeProfile?.region || onboarding.region)} />
             <InfoField label="Khối" value={safeDisplay(employeeProfile?.block || onboarding.block)} />
-            <InfoField label="Trạng thái" value={employmentStatusLabel(employeeProfile?.employment_status) || 'Đang làm việc'} />
+            <InfoField label="Trạng thái" value={choiceLabel(choices?.employment_status, employeeProfile?.employment_status) || 'Đang làm việc'} />
             <InfoField label="Ghi chú công việc" value={safeDisplay((employeeProfile as any)?.employment_status_notes || onboarding.employment_status_notes)} full />
           </div>
         </div>
@@ -1471,8 +1445,10 @@ const OnboardingDetail: React.FC = () => {
                 )}
                 {ef('Số điện thoại', 'phone_number', undefined, undefined, undefined, '0123456789', (v) => {
                   if (!/^\d*$/.test(v)) return 'Chỉ được nhập số';
-                  if (v.length > 10) return 'Tối đa 10 chữ số';
-                  if (v.length > 0 && v.length < 10) return `Còn thiếu ${10 - v.length} số`;
+                  // Số chữ số theo backend (system-rules "onboarding"); chưa tải được thì chỉ kiểm tra chữ số.
+                  if (phoneDigits === null) return '';
+                  if (v.length > phoneDigits) return `Tối đa ${phoneDigits} chữ số`;
+                  if (v.length > 0 && v.length < phoneDigits) return `Còn thiếu ${phoneDigits - v.length} số`;
                   return '';
                 })}
               </div>
@@ -1510,37 +1486,22 @@ const OnboardingDetail: React.FC = () => {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {ef('Vị trí', 'position_id', undefined, positionSelectOptions)}
-                {ef('Cấp bậc', 'rank')}
+                {ef('Cấp bậc', 'rank', undefined, withCurrentOption(choices?.rank ?? [], editData.rank))}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {ef('Bộ phận', 'section', undefined, withCurrentOption(allSections.map(s => ({ value: s.name, label: s.name })), editData.section))}
                 {ef('Team Bác sĩ', 'doctor_team')}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {ef('Hình thức làm việc', 'work_form', undefined, [
-                  { value: 'FULL_TIME', label: 'Full-time' },
-                  { value: 'PART_TIME', label: 'Part-time' },
-                ])}
+                {ef('Hình thức làm việc', 'work_form', undefined, withCurrentOption(choices?.work_form ?? [], editData.work_form))}
                 {ef('Địa điểm làm việc', 'work_location', undefined, WORK_LOCATION_OPTIONS)}
                 {ef('Ngày bắt đầu làm việc', 'start_date', 'date')}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {ef('Vùng/Miền', 'region', undefined, [
-                  { value: 'Miền Bắc', label: 'Miền Bắc' },
-                  { value: 'Miền Nam', label: 'Miền Nam' },
-                ])}
-                {ef('Khối', 'block', undefined, [
-                  { value: 'Khối Back office', label: 'Khối Back office' },
-                  { value: 'Khối Marketing', label: 'Khối Marketing' },
-                  { value: 'Khối Kinh doanh', label: 'Khối Kinh doanh' },
-                ])}
+                {ef('Vùng/Miền', 'region', undefined, withCurrentOption(choices?.region ?? [], editData.region))}
+                {ef('Khối', 'block', undefined, withCurrentOption(choices?.block ?? [], editData.block))}
               </div>
-              {ef('Trạng thái làm việc', 'employment_status', undefined, [
-                { value: 'ACTIVE', label: 'Đang làm việc' },
-                { value: 'PAUSED', label: 'Tạm dừng' },
-                { value: 'MATERNITY_LEAVE', label: 'Nghỉ thai sản' },
-                { value: 'INACTIVE', label: 'Đã nghỉ' },
-              ])}
+              {ef('Trạng thái làm việc', 'employment_status', undefined, choices?.employment_status ?? [])}
               {ef('Ghi chú tình trạng công việc', 'employment_status_notes', 'textarea')}
             </div>
           );
@@ -1573,7 +1534,7 @@ const OnboardingDetail: React.FC = () => {
           return (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {ef('Trình độ học vấn', 'education_level', undefined, undefined, undefined, 'Cử nhân đại học')}
+                {ef('Trình độ học vấn', 'education_level', undefined, withCurrentOption(choices?.education_level ?? [], editData.education_level))}
                 {ef('Năm tốt nghiệp', 'graduation_year', 'number', undefined, undefined, '2020')}
               </div>
               {ef('Trường đại học / cao đẳng', 'university', undefined, undefined, undefined, 'Đại học Bách Khoa Hà Nội')}

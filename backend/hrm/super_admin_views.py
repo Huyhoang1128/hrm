@@ -123,6 +123,13 @@ class SuperAdminEmployeeView(APIView):
         data = request.data.copy()
         vneid_file = request.FILES.get('vneid_screenshot')
         if vneid_file:
+            # Cùng giới hạn ảnh VNeID với form nhận việc (hrm/onboarding_rules.py).
+            from rest_framework import serializers as drf_serializers
+            from .onboarding_rules import validate_vneid_screenshot
+            try:
+                validate_vneid_screenshot(vneid_file)
+            except drf_serializers.ValidationError as e:
+                return Response({'vneid_screenshot': e.detail}, status=status.HTTP_400_BAD_REQUEST)
             try:
                 from .utils import upload_file_to_cloudfly
                 s3_key = upload_file_to_cloudfly(vneid_file, 'vneid_screenshots')

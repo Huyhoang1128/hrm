@@ -311,6 +311,12 @@ IMPORTANT_ALERT_INSURANCE_AFTER_MONTHS = int(os.environ.get('IMPORTANT_ALERT_INS
 IMPORTANT_ALERT_INSURANCE_DAYS = int(os.environ.get('IMPORTANT_ALERT_INSURANCE_DAYS', 10))
 IMPORTANT_ALERT_INSURANCE_OVERDUE_DAYS = int(os.environ.get('IMPORTANT_ALERT_INSURANCE_OVERDUE_DAYS', 30))
 
+# Hợp đồng (hrm/contract_rules.py) — web đọc qua GET /api-hrm/system-rules/ (section "hr").
+# "Sắp hết hạn": ngày kết thúc HĐ / thử việc trong [hôm nay, hôm nay + N ngày] (cảnh báo, lọc, nhãn).
+CONTRACT_EXPIRING_SOON_DAYS = int(os.environ.get('CONTRACT_EXPIRING_SOON_DAYS', 5))
+# Trang tái ký hợp đồng: mặc định liệt kê HĐ hết hạn trong N ngày tới.
+CONTRACT_RENEWAL_WINDOW_DAYS = int(os.environ.get('CONTRACT_RENEWAL_WINDOW_DAYS', 14))
+
 # Redis Configuration (for Celery if re-enabled in future)
 REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 

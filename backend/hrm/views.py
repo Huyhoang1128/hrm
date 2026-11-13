@@ -6,7 +6,8 @@ import re
 from users.utils import get_user_display_name
 from employee.models import EmployeeStatusHistory, TEMPORARILY_OFF_STATUSES
 from datetime import date
-from employee.models import PROBATION_CONTRACT_TYPES, NON_OFFICIAL_CONTRACT_TYPES, OFFICIAL_LABOR_CONTRACT_TYPES
+from employee.models import PROBATION_CONTRACT_TYPES, NON_OFFICIAL_CONTRACT_TYPES, OFFICIAL_LABOR_CONTRACT_TYPES, LABOR_CONTRACT_TYPES
+from employee.models import rank_label
 
 logger = logging.getLogger(__name__)
 
@@ -496,15 +497,6 @@ def _employee_stats_at(ref_date):
     }
 
 
-_EDUCATION_CODE_TO_FORM_LABEL = {
-    'MASTER': 'Thạc sĩ',
-    'BACHELOR': 'Cử nhân đại học',
-    'ASSOCIATE': 'Cử nhân cao đẳng',
-    'HIGH_SCHOOL': 'Trung cấp',
-    'OTHER': 'Khác',
-}
-
-
 def _self_update_prefill(onboarding) -> dict:
     """Thông tin cá nhân hiện có của NV, theo tên field của form onboarding — để form
     tự cập nhật hồ sơ điền sẵn, NV chỉ sửa chỗ sai (ô để trống sẽ ghi đè thành trống)."""
@@ -518,7 +510,8 @@ def _self_update_prefill(onboarding) -> dict:
         'candidate_phone': e.phone_number or '',
         'date_of_birth': iso(e.date_of_birth),
         'gender': e.gender or '',
-        'education_level': _EDUCATION_CODE_TO_FORM_LABEL.get(e.education_level or '', ''),
+        # Form nhận việc dùng mã EDUCATION_LEVEL (danh sách từ system-rules "choices").
+        'education_level': e.education_level or '',
         'ethnicity': e.ethnicity or '',
         'birth_place': e.birth_place or '',
         'nationality': e.nationality or '',
@@ -725,6 +718,15 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                     queryset = queryset.filter(end_date__gte=end_date_from)
                 if end_date_to:
                     queryset = queryset.filter(end_date__lte=end_date_to)
+
+        # ?expiring_soon=true: HĐ hoặc thử việc sắp hết hạn — cùng cửa sổ ngày với cảnh báo HĐ
+        # (CONTRACT_EXPIRING_SOON_DAYS, hrm/contract_rules.py) để web không tự tính số ngày.
+        if (self.request.query_params.get('expiring_soon') or '').lower() in ('1', 'true', 'yes'):
+            from .contract_rules import expiring_soon_window
+            window = expiring_soon_window(timezone.now().date())
+            queryset = queryset.filter(
+                Q(contract_end_date__range=window) | Q(probation_end_date__range=window)
+            )
         return queryset
 
     def perform_create(self, serializer):
@@ -8224,10 +8226,12 @@ class OnboardingProcessViewSet(viewsets.ModelViewSet):
                 if employee.is_hr:
                     qs = base_qs
                 else:
+                    from employee.models import MANAGER_RANKS, normalize_rank
                     MANAGER_POSITIONS = ['TP AI', 'Leader', 'Trưởng phòng tập sự', 'Phó phòng', 'Trưởng phòng', 'Phó Giám đốc', 'Giám đốc', 'Chủ tịch']
+                    # rank lưu mã (RANK_CHOICES); normalize_rank để bản ghi còn nhãn cũ vẫn khớp.
                     is_manager = (
                         (employee.position and employee.position.title in MANAGER_POSITIONS) or
-                        (employee.rank and employee.rank in MANAGER_POSITIONS)
+                        (employee.rank and normalize_rank(employee.rank) in MANAGER_RANKS)
                     )
 
                     if is_manager:
@@ -10229,8 +10233,9 @@ class EmployeeContractViewSet(viewsets.ModelViewSet):
             '{{chu_tai_khoan}}': employee.bank_account_holder or '',
             '{{phong_ban}}': employee.department.name if employee.department else '',
             '{{vi_tri}}': employee.position.title if employee.position else '',
-            '{{chuc_vu}}': employee.rank or '',
-            '{{rank}}': employee.rank or '',
+            # rank lưu mã -> in nhãn (Nhân viên, Trưởng phòng...) vào hợp đồng.
+            '{{chuc_vu}}': rank_label(employee.rank),
+            '{{rank}}': rank_label(employee.rank),
             '{{quan_ly_truc_tiep}}': employee.manager.full_name if employee.manager else '',
             '{{hinh_thuc_lam_viec}}': employee.work_form or '',
             '{{dia_diem_lam_viec}}': employee.work_location or '',
@@ -10775,38 +10780,34 @@ class EmployeeContractViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def expiring_soon(self, request):
-        """Lấy danh sách hợp đồng sắp hết hạn trong 7 ngày."""
-        import datetime
-        today = timezone.now().date()
-        in_7_days = today + datetime.timedelta(days=7)
+        """Lấy danh sách hợp đồng sắp hết hạn (CONTRACT_EXPIRING_SOON_DAYS ngày — hrm/contract_rules.py)."""
+        from .contract_rules import expiring_soon_days, expiring_soon_window
+        start, end = expiring_soon_window(timezone.now().date())
 
         contracts = EmployeeContract.objects.filter(
             status='SIGNED',
-            end_date__range=[today, in_7_days]
+            end_date__range=[start, end]
         ).select_related('employee', 'onboarding_process')
 
         return Response({
             'success': True,
+            'days': expiring_soon_days(),
             'count': contracts.count(),
             'data': EmployeeContractSerializer(contracts, many=True).data
         })
 
     @action(detail=False, methods=['get'], url_path='renewal-candidates')
     def renewal_candidates(self, request):
-        """Lấy danh sách hợp đồng cần tái ký trong N ngày tới (mặc định 14 ngày)."""
+        """Lấy danh sách hợp đồng cần tái ký trong N ngày tới (mặc định CONTRACT_RENEWAL_WINDOW_DAYS)."""
         from datetime import timedelta
+        from .contract_rules import resolve_renewal_window_days
 
-        raw_days = request.query_params.get('days', '14')
-        try:
-            days = int(raw_days)
-        except (TypeError, ValueError):
-            days = 14
-        days = max(1, min(days, 90))
+        days = resolve_renewal_window_days(request.query_params.get('days'))
 
         today = timezone.now().date()
         deadline = today + timedelta(days=days)
 
-        labor_contract_types = sorted(NON_OFFICIAL_CONTRACT_TYPES | OFFICIAL_LABOR_CONTRACT_TYPES | {'SERVICE'})
+        labor_contract_types = sorted(LABOR_CONTRACT_TYPES)
 
         qs = (
             EmployeeContract.objects
@@ -10831,12 +10832,12 @@ class EmployeeContractViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get', 'post'], url_path='expiring-alert')
     def expiring_alert(self, request):
         """
-        GET  → Trả về danh sách hợp đồng SIGNED hết hạn trong 5 ngày
-               kèm trạng thái dismissed_today của user hiện tại.
+        GET  → Trả về danh sách hợp đồng SIGNED hết hạn trong CONTRACT_EXPIRING_SOON_DAYS ngày
+               (hrm/contract_rules.py) kèm trạng thái dismissed_today của user hiện tại.
         POST → Đánh dấu user đã dismiss cảnh báo hôm nay (lưu vào cache).
         """
         from django.core.cache import cache
-        from datetime import timedelta
+        from .contract_rules import expiring_soon_days, expiring_soon_window
 
         user_id = request.user.id
         today_str = timezone.now().date().isoformat()
@@ -10847,25 +10848,24 @@ class EmployeeContractViewSet(viewsets.ModelViewSet):
             return Response({'success': True, 'dismissed_today': True})
 
         dismissed_today = bool(cache.get(cache_key))
-        today = timezone.now().date()
-        in_5_days = today + timedelta(days=5)
+        today, deadline = expiring_soon_window(timezone.now().date())
 
         employee = Employee.objects.filter(user=request.user).first()
         if not employee:
             return Response({
                 'dismissed_today': dismissed_today,
+                'days': expiring_soon_days(),
                 'contracts': [],
             })
 
-        LABOR_CONTRACT_TYPES = sorted(NON_OFFICIAL_CONTRACT_TYPES | OFFICIAL_LABOR_CONTRACT_TYPES | {'SERVICE'})
         qs = (
             EmployeeContract.objects
             .filter(
                 employee=employee,
                 status='SIGNED',
-                contract_type__in=LABOR_CONTRACT_TYPES,
+                contract_type__in=sorted(LABOR_CONTRACT_TYPES),
                 end_date__gte=today,
-                end_date__lte=in_5_days,
+                end_date__lte=deadline,
             )
             .select_related('employee')
             .order_by('end_date')
@@ -10873,6 +10873,7 @@ class EmployeeContractViewSet(viewsets.ModelViewSet):
         serializer = EmployeeContractSerializer(qs, many=True, context={'request': request})
         return Response({
             'dismissed_today': dismissed_today,
+            'days': expiring_soon_days(),
             'contracts': serializer.data,
         })
 
