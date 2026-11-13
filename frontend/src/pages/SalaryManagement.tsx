@@ -21,7 +21,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { employeesAPI } from '../utils/api';
 import type { Department, Employee } from '../utils/api';
-import { salaryService, SalaryFormulaUpdateData, SalaryRecord, PenaltyRecord, CommissionRecord, type BulkSalaryConfigRecord, type PayslipEmailBatchStatus, type DepartmentPayslipRecipientsResponse, type CompanyPayslipRecipientsResponse, type MonthlySalaryInputRecord } from '../services/salary.service';
+import { salaryService, SalaryFormulaUpdateData, SalaryRecord, PenaltyRecord, type BulkSalaryConfigRecord, type PayslipEmailBatchStatus, type DepartmentPayslipRecipientsResponse, type CompanyPayslipRecipientsResponse } from '../services/salary.service';
+import { getSystemRules, useSystemRules, type SystemRules } from '../services/systemRules.service';
 import { SelectBox } from '../components/LandingLayout/SelectBox';
 import PayrollFinalizeBar from '../components/PayrollFinalizeBar';
 import { useLockBodyScroll } from '../hooks/useLockBodyScroll';
@@ -41,30 +42,37 @@ const TABS = [
   { key: 'view', label: 'Bảng lương', icon: TableCellsIcon },
 ];
 
-function getStandardWorkDays(year: number, month: number): number {
-  const daysInMonth = new Date(year, month, 0).getDate();
-  let sundays = 0;
-  for (let d = 1; d <= daysInMonth; d++) {
-    if (new Date(year, month - 1, d).getDay() === 0) sundays++;
-  }
-  return Math.max(daysInMonth - sundays - 1, 1);
-}
+/** Quy định lương từ backend (section "payroll" của GET /api-hrm/system-rules/). */
+type PayrollRulesSection = NonNullable<SystemRules['payroll']>;
+
+/** "8%" / "10,5%" từ tỷ lệ backend trả (0.08, 0.105). */
+const formatPercent = (rate: number) => `${(Math.round(rate * 10000) / 100).toLocaleString('vi-VN')}%`;
 
 /**
- * Tháng đã chốt lương: dùng cấu hình lương của nhân viên LÚC CHỐT (đi kèm dòng —
- * record.employee_snapshot) thay cho cấu hình hiện tại, để phiếu lương / Excel của tháng
- * đã chốt không đổi khi chính sách phụ cấp, thuế, mức đóng BH thay đổi sau đó.
+ * Chi tiết thuế TNCN của dòng lương — đọc đúng số backend đã tính (thu nhập chịu thuế, giảm trừ,
+ * thuế từng bậc theo biểu thuế của tháng, tỷ lệ khấu trừ cố định). Web không giữ biểu thuế riêng:
+ * mọi phương pháp FLAT_* đều hiển thị theo tỷ lệ backend trả.
  */
-const employeeForRecord = (record: SalaryRecord, employee?: Employee): Employee | undefined => {
-  const snapshot = record.employee_snapshot;
-  if (!snapshot) return employee;
-  return { ...(employee ?? {}), ...snapshot } as Employee;
-};
-
-const getStandardWorkDaysFromRecord = (record: SalaryRecord): number => {
-  const backendStandardDays = toNumber((record as unknown as Record<string, unknown>)['cong_chuan'], 0);
-  if (backendStandardDays > 0) return backendStandardDays;
-  return getStandardWorkDays(record.year, record.month);
+const taxDetailFromRecord = (record: SalaryRecord): TaxCalculationDetail => {
+  const isFlat = String(record.tax_method ?? '').toUpperCase().startsWith('FLAT_');
+  return {
+    taxMode: isFlat ? 'flat' : 'progressive',
+    flatRate: record.thue_suat_co_dinh ?? null,
+    grossIncome: Math.round(record.tong_thu_nhap_chiu_thue ?? 0),
+    insuranceDeduction: Math.round(record.bao_hiem_bat_buoc ?? 0),
+    personalDeduction: Math.round(record.giam_tru_ban_than ?? 0),
+    dependentDeduction: Math.round(record.giam_tru_nguoi_phu_thuoc ?? 0),
+    taxableIncome: Math.round(record.thu_nhap_tinh_thue ?? 0),
+    totalTax: record.phieu_luong.thue_tncn,
+    breakdown: (record.bac_thue_tncn ?? []).map((item) => ({
+      bracketNumber: item.bac,
+      fromAmount: item.tu,
+      toAmount: item.den ?? Number.POSITIVE_INFINITY,
+      rate: item.thue_suat * 100,
+      taxableAmount: item.thu_nhap_trong_bac,
+      taxAmount: Math.round(item.thue),
+    })),
+  };
 };
 
 type SalaryTabKey = 'config' | 'view';
@@ -80,6 +88,8 @@ interface TaxTooltipProps {
 
 const TaxTooltip: React.FC<TaxTooltipProps> = ({ taxDetail }) => {
   const [showDetail, setShowDetail] = useState(false);
+  // Tỷ lệ khấu trừ cố định do backend trả kèm dòng lương (không ghi cứng 10%)
+  const flatRateText = taxDetail.flatRate != null ? formatPercent(taxDetail.flatRate) : '';
   const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({ visibility: 'hidden' });
   const btnRef = React.useRef<HTMLButtonElement>(null);
   const popupRef = React.useRef<HTMLDivElement>(null);
@@ -159,8 +169,8 @@ const TaxTooltip: React.FC<TaxTooltipProps> = ({ taxDetail }) => {
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
               <div className="space-y-2 text-sm">
                 <p className="text-xs text-indigo-700 bg-indigo-50 rounded px-2 py-1">
-                  {taxDetail.taxMode === 'flat_10'
-                    ? 'Công thức: Thuế TNCN = 10% × Tổng thu nhập chịu thuế trong tháng'
+                  {taxDetail.taxMode === 'flat'
+                    ? `Công thức: Thuế TNCN = ${flatRateText} × Tổng thu nhập chịu thuế trong tháng`
                     : 'Công thức: Thuế TNCN = Σ(Thu nhập trong từng bậc × Thuế suất bậc đó)'}
                 </p>
                 <div className="flex justify-between">
@@ -188,11 +198,11 @@ const TaxTooltip: React.FC<TaxTooltipProps> = ({ taxDetail }) => {
               </div>
               <div className="border-t pt-3">
                 <p className="font-semibold text-gray-900 text-xs mb-2">
-                  {taxDetail.taxMode === 'flat_10' ? 'Chi tiết tính thuế 10%:' : 'Áp dụng bảng thuế lũy tiến:'}
+                  {taxDetail.taxMode === 'flat' ? `Chi tiết tính thuế ${flatRateText}:` : 'Áp dụng bảng thuế lũy tiến:'}
                 </p>
-                {taxDetail.taxMode === 'flat_10' ? (
+                {taxDetail.taxMode === 'flat' ? (
                   <div className="text-xs rounded-md border border-gray-200 bg-gray-50 px-2 py-2 text-gray-700 flex items-center justify-between">
-                    <span>10% × {formatCurrency(taxDetail.taxableIncome)}</span>
+                    <span>{flatRateText} × {formatCurrency(taxDetail.taxableIncome)}</span>
                     <span className="font-bold text-indigo-600">{formatCurrency(taxDetail.totalTax)}</span>
                   </div>
                 ) : taxDetail.breakdown.length > 0 ? (
@@ -238,55 +248,10 @@ interface PayslipDetailModalProps {
   onClose: () => void;
   employee?: Employee;
   penalties?: PenaltyRecord[];
-  commissions?: CommissionRecord[];
   onEmailQueued?: (employeeId: number) => void;
 }
 
-const getSalesCommissionAmount = (record: SalaryRecord, commissions?: CommissionRecord[]) => {
-  const fromMonthlyInput = (record as unknown as Record<string, number | null>)['luong_doanh_so_input'];
-  if (fromMonthlyInput !== null && fromMonthlyInput !== undefined) {
-    return toNumber(fromMonthlyInput, 0);
-  }
-  const commissionTotal = commissions?.reduce((sum, item) => {
-    return item.employee === record.employee_id ? sum + toNumber(item.amount) : sum;
-  }, 0) ?? 0;
-  if (commissionTotal > 0) return commissionTotal;
-  return (record as unknown as Record<string, number>)['luong_doanh_so'] ?? 0;
-};
-
-const getMonthlyInputIncomeBreakdown = (record: SalaryRecord, commissions?: CommissionRecord[]) => {
-  const asNumberOrNull = (value: unknown): number | null => {
-    if (value === null || value === undefined || value === '') return null;
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  };
-
-  const luongOtInput = asNumberOrNull((record as unknown as Record<string, unknown>)['luong_ot_input']);
-  const banSanPhamInput = asNumberOrNull((record as unknown as Record<string, unknown>)['ban_san_pham_input']);
-  const phuMoInput = asNumberOrNull((record as unknown as Record<string, unknown>)['phu_mo_input']);
-  const trucCaInput = asNumberOrNull((record as unknown as Record<string, unknown>)['truc_ca_input']);
-  const thuongInput = asNumberOrNull((record as unknown as Record<string, unknown>)['thuong_input']);
-
-  const luongDoanhSo = getSalesCommissionAmount(record, commissions);
-  const luongOt = luongOtInput ?? (record.luong_tang_ca ?? 0);
-  const banSanPham = banSanPhamInput ?? 0;
-  const phuMo = phuMoInput ?? 0;
-  const trucCa = trucCaInput ?? (record.truc_toi ?? 0);
-  const thuong = thuongInput ?? ((record as unknown as Record<string, number>)['thuong'] ?? 0);
-  const thuNhapKhac = (record as unknown as Record<string, number>)['thu_nhap_khac'] ?? 0;
-
-  return {
-    luongDoanhSo,
-    luongOt,
-    banSanPham,
-    phuMo,
-    trucCa,
-    thuong,
-    thuNhapKhac,
-  };
-};
-
-const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose, employee, penalties, commissions, onEmailQueued }) => {
+const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose, employee, onEmailQueued }) => {
   useLockBodyScroll(true);
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [emailAddr, setEmailAddr] = useState(employee?.personal_email ?? '');
@@ -294,98 +259,59 @@ const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose
   const [emailBody, setEmailBody] = useState('');
   const [emailSending, setEmailSending] = useState(false);
   const [emailResult, setEmailResult] = useState<{ ok: boolean; msg: string } | null>(null);
-  const stdDays = getStandardWorkDaysFromRecord(record);
-  const payslipComputation = calculatePayslipNetPayable(record, employee, commissions);
-  const payrollTax = payslipComputation.payrollTax;
-  const nptCount = payrollTax.dependentCount;
-  const mucLuongDongBH = payrollTax.insuranceSalaryBase;
-  const workdayBreakdown = getWorkdaySalaryBreakdown(record, employee);
+  // Tỷ lệ BH chỉ để ghi nhãn; số tiền BH lấy từ dòng lương backend.
+  const insuranceRates = useSystemRules()?.payroll?.insurance_rates ?? null;
+
+  // Mọi dòng phiếu lương do backend tính (backend/salary/payslip.py) — cùng số với bảng lương,
+  // Excel, tổng lương, email; web không tự tính lại phụ cấp / BH / thực lĩnh.
+  const p = record.phieu_luong;
+  const stdDays = record.cong_chuan ?? '—';
+  const nptCount = record.so_nguoi_phu_thuoc ?? 0;
+  const mucLuongDongBH = record.muc_luong_dong_bh ?? 0;
+  const allowanceDetails = record.cach_tinh_phu_cap ?? null;
 
   // Section III
-  const luongNgayCongThucTe = workdayBreakdown.tongLuongNgayCong;
-  const luongCongThuViec = workdayBreakdown.luongCongThuViec;
-  const luongCongChinhThuc = workdayBreakdown.luongCongChinhThuc;
-  const congThuViec = workdayBreakdown.congThuViec;
-  const congChinhThuc = workdayBreakdown.congChinhThuc;
-  const probationRatePercent = workdayBreakdown.probationRatePercent;
-  const hasProbationDays = workdayBreakdown.hasProbationDays;
-  const incomeBreakdown = getMonthlyInputIncomeBreakdown(record, commissions);
-  const luongDoanhSo = incomeBreakdown.luongDoanhSo;
-  const luongOt = incomeBreakdown.luongOt;
-  const banSanPham = incomeBreakdown.banSanPham;
-  const phuMo = incomeBreakdown.phuMo;
-  const trucCa = incomeBreakdown.trucCa;
-  const thuNhapKhac = incomeBreakdown.thuNhapKhac;
-  const thuong = incomeBreakdown.thuong;
-  const tongLuongIII = luongNgayCongThucTe + luongDoanhSo + luongOt + banSanPham + phuMo + trucCa + thuNhapKhac;
+  const luongNgayCongThucTe = p.luong_ngay_cong;
+  const luongCongThuViec = Math.round(record.luong_ngay_cong_thu_viec ?? 0);
+  const luongCongChinhThuc = Math.round(record.luong_ngay_cong_chinh_thuc ?? 0);
+  const congThuViec = record.cong_thu_viec ?? 0;
+  const congChinhThuc = record.cong_chinh_thuc ?? 0;
+  const probationRatePercent = record.probation_rate_percent ?? 0;
+  const hasProbationDays = congThuViec > 0;
+  const luongDoanhSo = p.luong_doanh_so;
+  const luongOt = p.luong_ot;
+  const banSanPham = p.ban_san_pham;
+  const phuMo = p.phu_mo;
+  const trucCa = p.truc_ca;
+  const thuNhapKhac = p.thu_nhap_khac;
+  const thuong = p.thuong;
 
-  // Deductions: use saved payroll config if available, otherwise calculate from standard rates
-  const savedAdjustments = employeeForRecord(record, employee)?.salary_adjustments as Record<string, unknown> | undefined;
-  const savedConfig = savedAdjustments?.payroll_config as Record<string, unknown> | undefined;
+  // Section IV
+  const phuCapGuiXe = p.phu_cap_gui_xe;
+  const phuCapAnTrua = p.phu_cap_an_trua;
+  const phuCapTrachNhiem = p.phu_cap_trach_nhiem;
+  const phuCapLivestream = p.phu_cap_livestream;
+  const soPhienLivestream = Math.max(record.so_phien_livestream ?? 0, 0);
+  const phuCapKhacRemainder = p.phu_cap_khac;
+  const tongThuNhapVI = p.tong_thu_nhap_vi;
 
-  // Parking allowance: recalculate from policy if configured, else use stored value
-  const savedParkingPolicyRaw = savedConfig?.parkingAllowancePolicy as Record<string, unknown> | undefined;
-  const parkingPolicy: ParkingAllowancePolicy | null = savedParkingPolicyRaw
-    ? {
-        mode: savedParkingPolicyRaw.mode === 'daily' ? 'daily' : savedParkingPolicyRaw.mode === 'monthly' ? 'monthly' : 'none',
-        daily_rate: toNumber(savedParkingPolicyRaw.daily_rate, 5000),
-        monthly_rate: toNumber(savedParkingPolicyRaw.monthly_rate, 0),
-      }
-    : null;
-  const phuCapGuiXe = parkingPolicy ? calculateParkingAllowance(parkingPolicy, record.ngay_cong) : (record.phu_cap_gui_xe ?? 0);
-
-  // Lunch allowance: recalculate from policy + actual work days
-  const savedLunchPolicyRaw = (savedConfig?.lunchAllowancePolicy as Record<string, unknown> | undefined);
-  const lunchPolicy: LunchAllowancePolicy | null = savedLunchPolicyRaw
-    ? {
-        mode: savedLunchPolicyRaw.mode === 'actual_working_day' ? 'actual_working_day' : 'fixed',
-        fixed_amount: toNumber(savedLunchPolicyRaw.fixed_amount),
-        amount_per_work_day: toNumber(savedLunchPolicyRaw.amount_per_work_day),
-        monthly_cap: toNumber(savedLunchPolicyRaw.monthly_cap, MAX_LUNCH_ALLOWANCE_CAP),
-      }
-    : null;
-  const phuCapAnTrua = toNumber(
-    (record as unknown as Record<string, unknown>)['phu_cap_an_trua'],
-    lunchPolicy ? calculateLunchAllowance(lunchPolicy, record.tong_cong ?? 0, stdDays) : 0,
-  );
-
-  // Responsibility allowance: recalculate from policy
-  const savedRespPolicyRaw = savedConfig?.responsibilityAllowancePolicy as Record<string, unknown> | undefined;
-  const respPolicy: ResponsibilityAllowancePolicy | null = savedRespPolicyRaw
-    ? {
-        mode: savedRespPolicyRaw.mode === 'fixed' ? 'fixed' : savedRespPolicyRaw.mode === 'actual_working_day' ? 'actual_working_day' : 'none',
-        monthly_max: toNumber(savedRespPolicyRaw.monthly_max),
-      }
-    : null;
-  const phuCapTrachNhiem = respPolicy ? calculateResponsibilityAllowance(respPolicy, record.tong_cong ?? 0, stdDays) : 0;
-  const phuCapLivestream = toNumber((record as unknown as Record<string, number>)['phu_cap_livestream'], 0);
-  const soPhienLivestream = Math.max(toNumber((record as unknown as Record<string, number>)['so_phien_livestream'], 0), 0);
-
-  const phuCapKhacFromRecord = (record as unknown as Record<string, number>)['phu_cap_khac'] ?? 0;
-  const phuCapKhacRemainder = Math.max(
-    phuCapKhacFromRecord,
-    Math.max((record.phu_cap ?? 0) - phuCapGuiXe - phuCapAnTrua - phuCapTrachNhiem - phuCapLivestream, 0),
-  );
-  const tongPhuCapIV = phuCapGuiXe + phuCapAnTrua + phuCapTrachNhiem + phuCapLivestream + phuCapKhacRemainder;
-  const tongThuNhapVI = tongLuongIII + tongPhuCapIV + thuong;
-
-  const bhxh = payrollTax.socialInsurance;
-  const bhyt = payrollTax.healthInsurance;
-  const bhtn = payrollTax.unemploymentInsurance;
-  const tongBH = payrollTax.insuranceTotal;
-  const congDoan = toNumber((record as unknown as Record<string, number>)['cong_doan'], 
-    (savedConfig?.deductions as Record<string, number> | undefined)?.unionFee ?? 0);
-  const phatDiMuon = record.tong_phat ?? 0;
-  const phatBienBan = record.tong_phat_bienban ?? 0;
-  const phatThieuCong = record.phat_thieu_cong ?? 0;
-  const tongGiamTruVII = tongBH + congDoan + phatDiMuon + phatBienBan + phatThieuCong;
-  const dieuChinhVIII = (record as unknown as Record<string, number>)['dieu_chinh'] ?? 0;
-  const tamUng = record.tam_ung ?? 0;
-  const taxDetail = payrollTax.taxDetail;
-  const thue = payrollTax.taxAmount;
+  // Section VII–XII
+  const bhxh = p.bhxh;
+  const bhyt = p.bhyt;
+  const bhtn = p.bhtn;
+  const tongBH = p.tong_bh;
+  const congDoan = p.cong_doan;
+  const phatDiMuon = p.tong_phat;
+  const phatBienBan = p.tong_phat_bienban;
+  const phatThieuCong = p.phat_thieu_cong;
+  const tongGiamTruVII = p.tong_giam_tru_vii;
+  const dieuChinhVIII = p.dieu_chinh;
+  const tamUng = p.tam_ung;
+  const taxDetail = taxDetailFromRecord(record);
+  const thue = p.thue_tncn;
   const contractStatusText = record.contract_status === 'THU_VIEC' ? 'Thử việc' : 'Chính thức';
-  const luongThucLinh = payslipComputation.luongThucLinh;
-  const conPhaiTT = payslipComputation.conPhaiThanhToan;
+  const luongThucLinh = p.luong_thuc_linh;
+  const conPhaiTT = p.con_phai_thanh_toan;
 
   const fmt = (v: number) => v ? Math.round(v).toLocaleString('vi-VN') : '—';
 
@@ -744,9 +670,9 @@ const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose
               <tr>
                 <td className="border border-gray-300 px-3 py-2 text-center text-gray-500">14</td>
                 <td className="border border-gray-300 px-3 py-2 text-gray-700">
-                  {parkingPolicy?.mode === 'daily'
-                    ? `Phụ cấp gửi xe (${Math.ceil(record.ngay_cong)} ngày × ${parkingPolicy.daily_rate.toLocaleString('vi-VN')}đ)`
-                    : parkingPolicy?.mode === 'monthly'
+                  {allowanceDetails?.gui_xe?.mode === 'daily'
+                    ? `Phụ cấp gửi xe (${allowanceDetails.gui_xe.so_ngay} ngày × ${allowanceDetails.gui_xe.don_gia.toLocaleString('vi-VN')}đ)`
+                    : allowanceDetails?.gui_xe?.mode === 'monthly'
                     ? 'Phụ cấp gửi xe (vé tháng)'
                     : 'Phụ cấp gửi xe'}
                 </td>
@@ -755,8 +681,8 @@ const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose
               <tr>
                 <td className="border border-gray-300 px-3 py-2 text-center text-gray-500">15</td>
                 <td className="border border-gray-300 px-3 py-2 text-gray-700">
-                  {lunchPolicy?.mode === 'actual_working_day'
-                    ? `Phụ cấp ăn trưa (${record.tong_cong ?? 0}/${stdDays} công × ${Math.round(Math.min(toNumber(lunchPolicy.monthly_cap, MAX_LUNCH_ALLOWANCE_CAP), MAX_LUNCH_ALLOWANCE_CAP) / stdDays).toLocaleString('vi-VN')}đ)`
+                  {allowanceDetails?.an_trua
+                    ? `Phụ cấp ăn trưa (${allowanceDetails.an_trua.so_cong}/${allowanceDetails.an_trua.cong_chuan} công × ${Math.round(allowanceDetails.an_trua.muc_ngay).toLocaleString('vi-VN')}đ)`
                     : 'Phụ cấp ăn trưa'}
                 </td>
                 <td className="border border-gray-300 px-3 py-2 text-right text-gray-800">{phuCapAnTrua ? fmt(phuCapAnTrua) : '—'}</td>
@@ -770,8 +696,8 @@ const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose
               <tr>
                 <td className="border border-gray-300 px-3 py-2 text-center text-gray-500">16</td>
                 <td className="border border-gray-300 px-3 py-2 text-gray-700">
-                  {respPolicy?.mode === 'actual_working_day'
-                    ? `Phụ cấp trách nhiệm (${record.tong_cong ?? 0}/${stdDays} công × ${Math.round(respPolicy.monthly_max / stdDays).toLocaleString('vi-VN')}đ)`
+                  {allowanceDetails?.trach_nhiem
+                    ? `Phụ cấp trách nhiệm (${allowanceDetails.trach_nhiem.so_cong}/${allowanceDetails.trach_nhiem.cong_chuan} công × ${Math.round(allowanceDetails.trach_nhiem.muc_ngay).toLocaleString('vi-VN')}đ)`
                     : 'Phụ cấp trách nhiệm / chức vụ'}
                 </td>
                 <td className="border border-gray-300 px-3 py-2 text-right text-gray-800">{phuCapTrachNhiem ? fmt(phuCapTrachNhiem) : '—'}</td>
@@ -815,7 +741,9 @@ const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose
               </tr>
               <tr>
                 <td className="border border-gray-300 px-3 py-2 text-center text-gray-500">19</td>
-                <td className="border border-gray-300 px-3 py-2 text-gray-700">BHXH (10.5%)</td>
+                <td className="border border-gray-300 px-3 py-2 text-gray-700">
+                  BHXH{insuranceRates ? ` (${formatPercent(insuranceRates.total)})` : ''}
+                </td>
                 <td className="border border-gray-300 px-3 py-2 text-right text-red-600">{fmt(tongBH)}</td>
               </tr>
               <tr>
@@ -864,7 +792,9 @@ const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose
                 <td className="border border-gray-300 px-3 py-2 text-gray-700">
                   THUẾ TNCN{' '}
                   <span className="text-xs text-gray-500">
-                    {taxDetail.taxMode === 'flat_10' ? '(10% trên thu nhập tháng)' : `(NPT: ${nptCount} người)`}
+                    {taxDetail.taxMode === 'flat'
+                      ? `(${taxDetail.flatRate != null ? formatPercent(taxDetail.flatRate) : 'khấu trừ cố định'} trên thu nhập tháng)`
+                      : `(NPT: ${nptCount} người)`}
                   </span>
                 </td>
                 <td className="border border-gray-300 px-3 py-2 text-right text-gray-500 flex items-center justify-end gap-2">
@@ -1077,7 +1007,6 @@ interface PayrollOutput {
   socialInsurance: number;
   healthInsurance: number;
   unemploymentInsurance: number;
-  attendancePenalty: number;
   taxableIncome: number;
   insuranceSalaryBase: number;
   personalDeduction: number;
@@ -1106,49 +1035,46 @@ interface ResponsibilityAllowancePolicy {
   monthly_max: number;
 }
 
-const MAX_LUNCH_ALLOWANCE_CAP = 500000;
-const BASE_SALARY_EFFECTIVE_2024_07_01 = 2340000;
-const BASE_SALARY_BEFORE_2024_07_01 = 1800000;
-const PERSONAL_DEDUCTION_2026 = 15500000;
-const PERSONAL_DEDUCTION_LEGACY = 11000000;
-const DEPENDENT_DEDUCTION_2026 = 6200000;
-const DEPENDENT_DEDUCTION_LEGACY = 4400000;
+/**
+ * Phần "xem trước" khi cấu hình lương 1 nhân viên cần quy định lương của backend (tỷ lệ BH, biểu
+ * thuế, giảm trừ gia cảnh, lương cơ sở / tối thiểu vùng, trần PC ăn trưa...) và công chuẩn của
+ * tháng hiện tại — KHÔNG ghi cứng trên web để khi backend / cấu hình bảng thuế đổi thì web theo.
+ */
+interface PayrollPreviewContext {
+  rules: PayrollRulesSection;
+  standardDays: { year: number; month: number; days: number };
+}
 
-const REGIONAL_MINIMUM_2026: Record<'I' | 'II' | 'III' | 'IV', number> = {
-  I: 5310000,
-  II: 4730000,
-  III: 4140000,
-  IV: 3700000,
+const usePayrollPreviewContext = (): { context: PayrollPreviewContext | null; failed: boolean } => {
+  const [state, setState] = useState<{ context: PayrollPreviewContext | null; failed: boolean }>({
+    context: null,
+    failed: false,
+  });
+  useEffect(() => {
+    let alive = true;
+    const today = new Date();
+    Promise.all([
+      getSystemRules(),
+      salaryService.getStandardWorkDays({ year: today.getFullYear(), month: today.getMonth() + 1 }),
+    ])
+      .then(([rules, std]) => {
+        if (!alive) return;
+        setState(rules.payroll
+          ? {
+              context: { rules: rules.payroll, standardDays: { year: std.year, month: std.month, days: std.standard_work_days } },
+              failed: false,
+            }
+          : { context: null, failed: true });
+      })
+      .catch(() => {
+        if (alive) setState({ context: null, failed: true });
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return state;
 };
-
-const REGIONAL_MINIMUM_2024: Record<'I' | 'II' | 'III' | 'IV', number> = {
-  I: 4960000,
-  II: 4410000,
-  III: 3860000,
-  IV: 3450000,
-};
-
-const EMPLOYEE_SOCIAL_INSURANCE_RATE = 0.08;
-const EMPLOYEE_HEALTH_INSURANCE_RATE = 0.015;
-const EMPLOYEE_UNEMPLOYMENT_INSURANCE_RATE = 0.01;
-
-const PIT_BRACKETS_2026 = [
-  { limit: 10000000, rate: 0.05 },
-  { limit: 30000000, rate: 0.1 },
-  { limit: 60000000, rate: 0.2 },
-  { limit: 100000000, rate: 0.3 },
-  { limit: Number.POSITIVE_INFINITY, rate: 0.35 },
-];
-
-const PIT_BRACKETS_LEGACY = [
-  { limit: 5000000, rate: 0.05 },
-  { limit: 10000000, rate: 0.1 },
-  { limit: 18000000, rate: 0.15 },
-  { limit: 32000000, rate: 0.2 },
-  { limit: 52000000, rate: 0.25 },
-  { limit: 80000000, rate: 0.3 },
-  { limit: Number.POSITIVE_INFINITY, rate: 0.35 },
-];
 
 const DEFAULT_SALARY_CONFIG: SalaryConfigurationValues = {
   effectiveDate: new Date().toISOString().slice(0, 10),
@@ -1177,11 +1103,13 @@ const DEFAULT_SALARY_CONFIG: SalaryConfigurationValues = {
     mode: 'fixed',
     fixed_amount: 0,
     amount_per_work_day: 0,
-    monthly_cap: MAX_LUNCH_ALLOWANCE_CAP,
+    // 0 = theo trần chung của backend (payroll.lunch_allowance_max_cap) — đúng cách backend hiểu
+    monthly_cap: 0,
   },
   parkingAllowancePolicy: {
     mode: 'none',
-    daily_rate: 5000,
+    // Chọn "Vé ngày" thì gợi ý mức gửi xe/ngày của chính sách chấm công (backend)
+    daily_rate: 0,
     monthly_rate: 0,
   },
   responsibilityAllowancePolicy: {
@@ -1196,8 +1124,9 @@ const DEFAULT_SALARY_CONFIG: SalaryConfigurationValues = {
     innovationBonus: 0,
   },
   timeAttendance: {
-    workingDays: 26,
-    workingHours: 208,
+    // 0 = chưa nhập → xem trước theo công chuẩn tháng hiện tại do backend tính
+    workingDays: 0,
+    workingHours: 0,
     overtimeHours: 0,
     paidLeaveDays: 0,
     unpaidLeaveDays: 0,
@@ -1243,48 +1172,33 @@ const parseDate = (dateText: string) => {
   return Number.isNaN(date.getTime()) ? new Date() : date;
 };
 
-const getTaxYear = (effectiveDate: string) => parseDate(effectiveDate).getFullYear();
-
-const getBaseSalaryByEffectiveDate = (effectiveDate: string) => {
+/** Dòng của bảng lương cơ sở / tối thiểu vùng (backend, mới nhất trước) áp cho ngày hiệu lực. */
+const historyEntryForDate = <T extends { effective_from: string | null }>(history: T[], effectiveDate: string): T | undefined => {
   const effective = parseDate(effectiveDate);
-  const policyDate = new Date('2024-07-01');
-  return effective >= policyDate ? BASE_SALARY_EFFECTIVE_2024_07_01 : BASE_SALARY_BEFORE_2024_07_01;
+  return history.find((entry) => entry.effective_from === null || parseDate(entry.effective_from) <= effective)
+    ?? history[history.length - 1];
 };
 
-const getRegionalMinimumByEffectiveDate = (effectiveDate: string, region: 'I' | 'II' | 'III' | 'IV') => {
-  const effective = parseDate(effectiveDate);
-  const policyDate = new Date('2026-01-01');
-  if (effective >= policyDate) {
-    return REGIONAL_MINIMUM_2026[region];
-  }
-  return REGIONAL_MINIMUM_2024[region];
-};
-
-const inferRegionByMinimum = (regionalMinimum: number): 'I' | 'II' | 'III' | 'IV' => {
+const inferRegionByMinimum = (
+  regionalMinimum: number,
+  rules: PayrollRulesSection | null,
+): 'I' | 'II' | 'III' | 'IV' => {
   const regions: Array<'I' | 'II' | 'III' | 'IV'> = ['I', 'II', 'III', 'IV'];
-  if (regions.some((region) => REGIONAL_MINIMUM_2026[region] === regionalMinimum)) {
-    return regions.find((region) => REGIONAL_MINIMUM_2026[region] === regionalMinimum) || 'I';
-  }
-  if (regions.some((region) => REGIONAL_MINIMUM_2024[region] === regionalMinimum)) {
-    return regions.find((region) => REGIONAL_MINIMUM_2024[region] === regionalMinimum) || 'I';
+  for (const entry of rules?.regional_minimum_history ?? []) {
+    const match = regions.find((region) => entry.by_region[region] === regionalMinimum);
+    if (match) return match;
   }
   return 'I';
 };
 
-const calculateProgressiveTax = (taxableIncome: number, brackets: Array<{ limit: number; rate: number }>) => {
-  let remaining = Math.max(taxableIncome, 0);
-  let previousLimit = 0;
+/** Thuế luỹ tiến theo biểu thuế backend trả (cùng cách tính với backend: từng bậc [min, max]). */
+const calculateProgressiveTax = (taxableIncome: number, brackets: PayrollRulesSection['tax']['brackets']) => {
   let totalTax = 0;
-
   for (const bracket of brackets) {
-    if (remaining <= 0) break;
-    const bracketRange = bracket.limit - previousLimit;
-    const taxableAtThisBracket = Math.min(remaining, bracketRange);
-    totalTax += taxableAtThisBracket * bracket.rate;
-    remaining -= taxableAtThisBracket;
-    previousLimit = bracket.limit;
+    if (taxableIncome <= bracket.min) break;
+    const amount = (bracket.max === null ? taxableIncome : Math.min(taxableIncome, bracket.max)) - bracket.min;
+    if (amount > 0) totalTax += amount * bracket.rate;
   }
-
   return Math.max(totalTax, 0);
 };
 
@@ -1298,7 +1212,10 @@ interface TaxBracketBreakdown {
 }
 
 interface TaxCalculationDetail {
-  taxMode: 'progressive' | 'flat_10';
+  /** flat: mọi phương pháp khấu trừ cố định FLAT_* của backend */
+  taxMode: 'progressive' | 'flat';
+  /** Tỷ lệ khấu trừ cố định backend đã áp (phương pháp flat) */
+  flatRate: number | null;
   grossIncome: number;
   insuranceDeduction: number;
   personalDeduction: number;
@@ -1307,350 +1224,6 @@ interface TaxCalculationDetail {
   totalTax: number;
   breakdown: TaxBracketBreakdown[];
 }
-
-interface PayrollTaxComputation {
-  taxDetail: TaxCalculationDetail;
-  taxAmount: number;
-  dependentCount: number;
-  insuranceSalaryBase: number;
-  socialInsurance: number;
-  healthInsurance: number;
-  unemploymentInsurance: number;
-  insuranceTotal: number;
-}
-
-const calculateTaxBreakdown = (
-  grossIncome: number,
-  insuranceDeduction: number,
-  personalDeduction: number,
-  dependentDeduction: number,
-  brackets: Array<{ limit: number; rate: number }>,
-  dependentCount: number = 0
-): TaxCalculationDetail => {
-  const taxableIncome = Math.max(
-    grossIncome - insuranceDeduction - personalDeduction - dependentDeduction,
-    0
-  );
-
-  let remaining = taxableIncome;
-  let previousLimit = 0;
-  let totalTax = 0;
-  const breakdown: TaxBracketBreakdown[] = [];
-
-  brackets.forEach((bracket, index) => {
-    if (remaining <= 0) return;
-    const bracketRange = bracket.limit - previousLimit;
-    const taxableAtThisBracket = Math.min(remaining, bracketRange);
-    const taxAmount = taxableAtThisBracket * bracket.rate;
-    
-    breakdown.push({
-      bracketNumber: index + 1,
-      fromAmount: previousLimit,
-      toAmount: bracket.limit,
-      rate: bracket.rate * 100,
-      taxableAmount: taxableAtThisBracket,
-      taxAmount: Math.round(taxAmount),
-    });
-
-    totalTax += taxAmount;
-    remaining -= taxableAtThisBracket;
-    previousLimit = bracket.limit;
-  });
-
-  return {
-    taxMode: 'progressive',
-    grossIncome,
-    insuranceDeduction: Math.round(insuranceDeduction),
-    personalDeduction: Math.round(personalDeduction),
-    dependentDeduction: Math.round(dependentDeduction),
-    taxableIncome: Math.round(taxableIncome),
-    totalTax: Math.round(totalTax),
-    breakdown,
-  };
-};
-
-const calculateBreakdownFromTaxableIncome = (
-  taxableIncome: number,
-  brackets: Array<{ limit: number; rate: number }>,
-): { breakdown: TaxBracketBreakdown[]; totalTax: number } => {
-  let remaining = Math.max(taxableIncome, 0);
-  let previousLimit = 0;
-  let totalTax = 0;
-  const breakdown: TaxBracketBreakdown[] = [];
-
-  brackets.forEach((bracket, index) => {
-    if (remaining <= 0) return;
-    const bracketRange = bracket.limit - previousLimit;
-    const taxableAtThisBracket = Math.min(remaining, bracketRange);
-    const taxAmount = taxableAtThisBracket * bracket.rate;
-
-    breakdown.push({
-      bracketNumber: index + 1,
-      fromAmount: previousLimit,
-      toAmount: bracket.limit,
-      rate: bracket.rate * 100,
-      taxableAmount: taxableAtThisBracket,
-      taxAmount: Math.round(taxAmount),
-    });
-
-    totalTax += taxAmount;
-    remaining -= taxableAtThisBracket;
-    previousLimit = bracket.limit;
-  });
-
-  return {
-    breakdown,
-    totalTax: Math.round(totalTax),
-  };
-};
-
-const getProbationRatePercent = (record: SalaryRecord, employee?: Employee) => {
-  const fromRecord = toNumber((record as unknown as Record<string, number>)['probation_rate_percent'], 0);
-  if (fromRecord > 0) return fromRecord;
-
-  const rateCode = String(employeeForRecord(record, employee)?.probation_rate ?? '').toUpperCase();
-  if (rateCode === 'OPTION_3') return 100;
-  if (rateCode === 'OPTION_1' || rateCode === 'OPTION_2') return 85;
-  return 85;
-};
-
-interface WorkdaySalaryBreakdown {
-  congThuViec: number;
-  congChinhThuc: number;
-  probationRatePercent: number;
-  luongCongThuViec: number;
-  luongCongChinhThuc: number;
-  tongLuongNgayCong: number;
-  hasProbationDays: boolean;
-}
-
-const getWorkdaySalaryBreakdown = (record: SalaryRecord, employee?: Employee): WorkdaySalaryBreakdown => {
-  const stdDays = getStandardWorkDaysFromRecord(record);
-  const luongCoBan = record.luong_co_ban ?? 0;
-  const daySalary = stdDays > 0 ? (luongCoBan / stdDays) : 0;
-
-  const tongCong = toNumber(record.tong_cong, 0);
-  const congThuViec = Math.max(toNumber((record as unknown as Record<string, number>)['cong_thu_viec'], 0), 0);
-  const congChinhThucRaw = Math.max(toNumber(record.cong_chinh_thuc, 0), 0);
-  const hasSplitDays = congThuViec > 0 || congChinhThucRaw > 0;
-  const congChinhThuc = hasSplitDays ? congChinhThucRaw : Math.max(tongCong, 0);
-  const probationRatePercent = getProbationRatePercent(record, employee);
-
-  const luongCongThuViecFallback = Math.round(daySalary * congThuViec * (probationRatePercent / 100));
-  const luongCongChinhThucFallback = Math.round(daySalary * congChinhThuc);
-  const tongLuongFallback = Math.round(daySalary * Math.max(tongCong, 0));
-
-  const luongCongThuViec = Math.round(toNumber(
-    (record as unknown as Record<string, number>)['luong_ngay_cong_thu_viec'],
-    luongCongThuViecFallback,
-  ));
-  const luongCongChinhThuc = Math.round(toNumber(
-    (record as unknown as Record<string, number>)['luong_ngay_cong_chinh_thuc'],
-    luongCongChinhThucFallback,
-  ));
-  const tongLuongNgayCong = Math.round(toNumber(
-    (record as unknown as Record<string, number>)['luong_ngay_cong'],
-    congThuViec > 0 ? (luongCongThuViec + luongCongChinhThuc) : tongLuongFallback,
-  ));
-
-  return {
-    congThuViec,
-    congChinhThuc,
-    probationRatePercent,
-    luongCongThuViec,
-    luongCongChinhThuc,
-    tongLuongNgayCong,
-    hasProbationDays: congThuViec > 0,
-  };
-};
-
-const getGrossIncomeForTaxFromRecord = (record: SalaryRecord, employee?: Employee, commissions?: CommissionRecord[]) => {
-  const workdayBreakdown = getWorkdaySalaryBreakdown(record, employee);
-  const luongNgayCongThucTe = workdayBreakdown.tongLuongNgayCong;
-  const incomeBreakdown = getMonthlyInputIncomeBreakdown(record, commissions);
-  const luongDoanhSo = incomeBreakdown.luongDoanhSo;
-  const luongOt = incomeBreakdown.luongOt;
-  const banSanPham = incomeBreakdown.banSanPham;
-  const phuMo = incomeBreakdown.phuMo;
-  const trucCa = incomeBreakdown.trucCa;
-  const thuNhapKhac = incomeBreakdown.thuNhapKhac;
-  const thuong = incomeBreakdown.thuong;
-  const phuCapAnTrua = toNumber((record as unknown as Record<string, number>)['phu_cap_an_trua'], 0);
-  const taxableAllowance = Math.max((record.phu_cap ?? 0) - phuCapAnTrua, 0);
-  return luongNgayCongThucTe + taxableAllowance + luongDoanhSo + luongOt + banSanPham + phuMo + trucCa + thuNhapKhac + thuong;
-};
-
-const calculatePayrollTaxFromRecord = (record: SalaryRecord, employee?: Employee, commissions?: CommissionRecord[]): PayrollTaxComputation => {
-  const savedAdjustments = employeeForRecord(record, employee)?.salary_adjustments as Record<string, unknown> | undefined;
-  const savedOutput = savedAdjustments?.payroll_output_preview as Record<string, number> | undefined;
-  const savedConfig = savedAdjustments?.payroll_config as Record<string, unknown> | undefined;
-  const savedTaxPolicy = savedConfig?.taxPolicy as Record<string, unknown> | undefined;
-  const mucLuongDongBHFromEmployee = Math.max(toNumber(employeeForRecord(record, employee)?.social_insurance_contribution_level), 0);
-
-  const mucLuongDongBH = (record as unknown as Record<string, number>)['muc_luong_dong_bh']
-    ?? savedOutput?.insuranceSalaryBase
-    ?? (mucLuongDongBHFromEmployee || (record.luong_co_ban ?? 0));
-
-  const socialInsurance = Math.round(savedOutput?.socialInsurance ?? mucLuongDongBH * EMPLOYEE_SOCIAL_INSURANCE_RATE);
-  const healthInsurance = Math.round(savedOutput?.healthInsurance ?? mucLuongDongBH * EMPLOYEE_HEALTH_INSURANCE_RATE);
-  const unemploymentInsurance = Math.round(savedOutput?.unemploymentInsurance ?? mucLuongDongBH * EMPLOYEE_UNEMPLOYMENT_INSURANCE_RATE);
-  const insuranceTotal = socialInsurance + healthInsurance + unemploymentInsurance;
-
-  const taxYear = new Date(`${record.year}-${String(record.month).padStart(2, '0')}-01`).getFullYear();
-  const brackets = taxYear >= 2026 ? PIT_BRACKETS_2026 : PIT_BRACKETS_LEGACY;
-  const personalDeduction = toNumber(
-    record.giam_tru_ban_than,
-    taxYear >= 2026 ? PERSONAL_DEDUCTION_2026 : PERSONAL_DEDUCTION_LEGACY,
-  );
-  const dependentCount = Math.max(
-    toNumber(record.so_nguoi_phu_thuoc, toNumber(savedTaxPolicy?.dependentCount, 0)),
-    0,
-  );
-  const dependentDeduction = toNumber(
-    record.giam_tru_nguoi_phu_thuoc,
-    dependentCount * (taxYear >= 2026 ? DEPENDENT_DEDUCTION_2026 : DEPENDENT_DEDUCTION_LEGACY),
-  );
-  const insuranceForTax = toNumber(record.bao_hiem_bat_buoc, insuranceTotal);
-  const grossIncomeForTax = toNumber(record.tong_thu_nhap_chiu_thue, getGrossIncomeForTaxFromRecord(record, employee, commissions));
-  const taxMethod = String((record as unknown as Record<string, unknown>)['tax_method'] ?? '').toUpperCase();
-
-  if (taxMethod === 'FLAT_10_PROBATION' || taxMethod === 'FLAT_10_NON_OFFICIAL') {
-    const flatTaxAmount = record.thue_tncn != null
-      ? Math.max(toNumber(record.thue_tncn), 0)
-      : Math.round(Math.max(grossIncomeForTax, 0) * 0.1);
-    const flatTaxDetail: TaxCalculationDetail = {
-      taxMode: 'flat_10',
-      grossIncome: Math.round(grossIncomeForTax),
-      insuranceDeduction: Math.round(insuranceForTax),
-      personalDeduction: 0,
-      dependentDeduction: 0,
-      taxableIncome: Math.round(Math.max(grossIncomeForTax, 0)),
-      totalTax: Math.round(flatTaxAmount),
-      breakdown: [],
-    };
-    return {
-      taxDetail: flatTaxDetail,
-      taxAmount: flatTaxDetail.totalTax,
-      dependentCount,
-      insuranceSalaryBase: Math.round(mucLuongDongBH),
-      socialInsurance,
-      healthInsurance,
-      unemploymentInsurance,
-      insuranceTotal,
-    };
-  }
-
-  const taxDetail = calculateTaxBreakdown(
-    grossIncomeForTax,
-    insuranceForTax,
-    personalDeduction,
-    dependentDeduction,
-    brackets,
-    dependentCount,
-  );
-  const backendTaxAmount = record.thue_tncn != null ? Math.max(toNumber(record.thue_tncn), 0) : null;
-  const backendTaxableIncome = record.thu_nhap_tinh_thue != null ? Math.max(toNumber(record.thu_nhap_tinh_thue), 0) : null;
-  const backendBreakdown = backendTaxableIncome != null
-    ? calculateBreakdownFromTaxableIncome(backendTaxableIncome, brackets)
-    : null;
-  const effectiveTaxDetail: TaxCalculationDetail = backendTaxAmount != null
-    ? {
-        ...taxDetail,
-        taxMode: 'progressive',
-        taxableIncome: backendTaxableIncome ?? taxDetail.taxableIncome,
-        totalTax: backendTaxAmount,
-        breakdown: backendBreakdown?.breakdown ?? taxDetail.breakdown,
-      }
-    : taxDetail;
-
-  return {
-    taxDetail: effectiveTaxDetail,
-    taxAmount: effectiveTaxDetail.totalTax,
-    dependentCount,
-    insuranceSalaryBase: Math.round(mucLuongDongBH),
-    socialInsurance,
-    healthInsurance,
-    unemploymentInsurance,
-    insuranceTotal,
-  };
-};
-
-const calculatePayslipNetPayable = (record: SalaryRecord, employee?: Employee, commissions?: CommissionRecord[]) => {
-  const stdDays = getStandardWorkDaysFromRecord(record);
-  const workdayBreakdown = getWorkdaySalaryBreakdown(record, employee);
-  const luongNgayCongThucTe = workdayBreakdown.tongLuongNgayCong;
-  const incomeBreakdown = getMonthlyInputIncomeBreakdown(record, commissions);
-  const luongDoanhSo = incomeBreakdown.luongDoanhSo;
-  const luongOt = incomeBreakdown.luongOt;
-  const banSanPham = incomeBreakdown.banSanPham;
-  const phuMo = incomeBreakdown.phuMo;
-  const trucCa = incomeBreakdown.trucCa;
-  const thuNhapKhac = incomeBreakdown.thuNhapKhac;
-  const thuong = incomeBreakdown.thuong;
-  const tongLuongIII = luongNgayCongThucTe + luongDoanhSo + luongOt + banSanPham + phuMo + trucCa + thuNhapKhac;
-
-  const payrollTax = calculatePayrollTaxFromRecord(record, employee, commissions);
-  const savedAdjustments = employeeForRecord(record, employee)?.salary_adjustments as Record<string, unknown> | undefined;
-  const savedConfig = savedAdjustments?.payroll_config as Record<string, unknown> | undefined;
-
-  const savedParkingPolicyRaw = savedConfig?.parkingAllowancePolicy as Record<string, unknown> | undefined;
-  const parkingPolicy: ParkingAllowancePolicy | null = savedParkingPolicyRaw
-    ? {
-        mode: savedParkingPolicyRaw.mode === 'daily' ? 'daily' : savedParkingPolicyRaw.mode === 'monthly' ? 'monthly' : 'none',
-        daily_rate: toNumber(savedParkingPolicyRaw.daily_rate, 5000),
-        monthly_rate: toNumber(savedParkingPolicyRaw.monthly_rate, 0),
-      }
-    : null;
-  const phuCapGuiXe = parkingPolicy ? calculateParkingAllowance(parkingPolicy, record.ngay_cong) : (record.phu_cap_gui_xe ?? 0);
-
-  const savedLunchPolicyRaw = (savedConfig?.lunchAllowancePolicy as Record<string, unknown> | undefined);
-  const lunchPolicy: LunchAllowancePolicy | null = savedLunchPolicyRaw
-    ? {
-        mode: savedLunchPolicyRaw.mode === 'actual_working_day' ? 'actual_working_day' : 'fixed',
-        fixed_amount: toNumber(savedLunchPolicyRaw.fixed_amount),
-        amount_per_work_day: toNumber(savedLunchPolicyRaw.amount_per_work_day),
-        monthly_cap: toNumber(savedLunchPolicyRaw.monthly_cap, MAX_LUNCH_ALLOWANCE_CAP),
-      }
-    : null;
-  const phuCapAnTrua = toNumber(
-    (record as unknown as Record<string, unknown>)['phu_cap_an_trua'],
-    lunchPolicy ? calculateLunchAllowance(lunchPolicy, record.tong_cong ?? 0, stdDays) : 0,
-  );
-
-  const savedRespPolicyRaw = savedConfig?.responsibilityAllowancePolicy as Record<string, unknown> | undefined;
-  const respPolicy: ResponsibilityAllowancePolicy | null = savedRespPolicyRaw
-    ? {
-        mode: savedRespPolicyRaw.mode === 'fixed' ? 'fixed' : savedRespPolicyRaw.mode === 'actual_working_day' ? 'actual_working_day' : 'none',
-        monthly_max: toNumber(savedRespPolicyRaw.monthly_max),
-      }
-    : null;
-  const phuCapTrachNhiem = respPolicy ? calculateResponsibilityAllowance(respPolicy, record.tong_cong ?? 0, stdDays) : 0;
-  const phuCapLivestream = toNumber((record as unknown as Record<string, number>)['phu_cap_livestream'], 0);
-
-  const phuCapKhacFromRecord = (record as unknown as Record<string, number>)['phu_cap_khac'] ?? 0;
-  const phuCapKhacRemainder = Math.max(
-    phuCapKhacFromRecord,
-    Math.max((record.phu_cap ?? 0) - phuCapGuiXe - phuCapAnTrua - phuCapTrachNhiem - phuCapLivestream, 0),
-  );
-  const tongPhuCapIV = phuCapGuiXe + phuCapAnTrua + phuCapTrachNhiem + phuCapLivestream + phuCapKhacRemainder;
-  const tongThuNhapVI = tongLuongIII + tongPhuCapIV + thuong;
-
-  const congDoan = toNumber((record as unknown as Record<string, number>)['cong_doan'],
-    (savedConfig?.deductions as Record<string, number> | undefined)?.unionFee ?? 0);
-
-  const tongGiamTruVII = payrollTax.insuranceTotal + congDoan + (record.tong_phat ?? 0) + (record.tong_phat_bienban ?? 0)
-    + (record.phat_thieu_cong ?? 0);
-  const dieuChinhVIII = (record as unknown as Record<string, number>)['dieu_chinh'] ?? 0;
-  const tamUng = record.tam_ung ?? 0;
-  const luongThucLinh = tongThuNhapVI - tongGiamTruVII + dieuChinhVIII;
-  const conPhaiThanhToan = luongThucLinh - tamUng - payrollTax.taxAmount;
-
-  return {
-    luongThucLinh,
-    conPhaiThanhToan,
-    payrollTax,
-  };
-};
 
 const asRecord = (value: unknown): Record<string, any> => {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
@@ -1669,8 +1242,17 @@ const formatNumber = (value: number | null | undefined) => {
   return value.toLocaleString('vi-VN');
 };
 
-const calculateLunchAllowance = (policy: LunchAllowancePolicy, actualWorkDays: number, standardWorkDays: number) => {
-  const cap = Math.min(Math.max(toNumber(policy.monthly_cap, MAX_LUNCH_ALLOWANCE_CAP), 0), MAX_LUNCH_ALLOWANCE_CAP);
+/** Trần PC ăn trưa thực áp — như backend: trần riêng để trống / 0 = trần chung, lớn hơn trần chung thì hạ xuống. */
+const effectiveLunchCap = (policy: LunchAllowancePolicy, maxCap: number) =>
+  policy.monthly_cap > 0 ? Math.min(policy.monthly_cap, maxCap) : maxCap;
+
+const calculateLunchAllowance = (
+  policy: LunchAllowancePolicy,
+  actualWorkDays: number,
+  standardWorkDays: number,
+  maxCap: number,
+) => {
+  const cap = effectiveLunchCap(policy, maxCap);
   if (policy.mode === 'actual_working_day') {
     const ratePerDay = standardWorkDays > 0 ? cap / standardWorkDays : 0;
     return Math.min(Math.max(actualWorkDays, 0) * ratePerDay, cap);
@@ -1694,8 +1276,10 @@ const calculateParkingAllowance = (policy: ParkingAllowancePolicy, actualWorkDay
   return 0;
 };
 
-const calculateActualWorkDays = (timeAttendance: SalaryConfigurationValues['timeAttendance']) => {
-  return Math.max(timeAttendance.workingDays - timeAttendance.unpaidLeaveDays, 0);
+/** Ngày công dùng để xem trước: số đã nhập, chưa nhập (0) thì theo công chuẩn tháng của backend. */
+const calculateActualWorkDays = (timeAttendance: SalaryConfigurationValues['timeAttendance'], standardWorkDays: number) => {
+  const workingDays = timeAttendance.workingDays > 0 ? timeAttendance.workingDays : standardWorkDays;
+  return Math.max(workingDays - timeAttendance.unpaidLeaveDays, 0);
 };
 
 const CONTRACT_TYPE_LABELS: Record<string, string> = {
@@ -1716,7 +1300,7 @@ const WORK_LOCATION_LABELS: Record<string, string> = {
   VP_HCM: 'Văn phòng TP. Hồ Chí Minh',
 };
 
-const parseEmployeeSalaryConfig = (employee: Employee): SalaryConfigurationValues => {
+const parseEmployeeSalaryConfig = (employee: Employee, rules: PayrollRulesSection | null = null): SalaryConfigurationValues => {
   const adjustments = asRecord(employee.salary_adjustments);
   const savedConfig = asRecord(adjustments.payroll_config);
   const savedLunchPolicy = asRecord(savedConfig.lunchAllowancePolicy);
@@ -1725,14 +1309,12 @@ const parseEmployeeSalaryConfig = (employee: Employee): SalaryConfigurationValue
     mode: savedLunchPolicy.mode === 'actual_working_day' ? 'actual_working_day' : 'fixed',
     fixed_amount: toNumber(savedLunchPolicy.fixed_amount, toNumber(savedConfig.allowances?.lunch)),
     amount_per_work_day: toNumber(savedLunchPolicy.amount_per_work_day),
-    monthly_cap: Math.min(
-      Math.max(toNumber(savedLunchPolicy.monthly_cap, MAX_LUNCH_ALLOWANCE_CAP), 0),
-      MAX_LUNCH_ALLOWANCE_CAP
-    ),
+    // Để trống / 0 = trần chung của backend (như backend hiểu); hạ về trần chung khi tính
+    monthly_cap: Math.max(toNumber(savedLunchPolicy.monthly_cap, 0), 0),
   };
 
   const taxPolicyConfig = asRecord(savedConfig.taxPolicy);
-  const inferredRegion = inferRegionByMinimum(toNumber(savedConfig.baseSalary?.regionalMinimum));
+  const inferredRegion = inferRegionByMinimum(toNumber(savedConfig.baseSalary?.regionalMinimum), rules);
   const insuranceContributionFromEmployee = Math.max(
     toNumber(employee.social_insurance_contribution_level),
     0,
@@ -1775,16 +1357,8 @@ const parseEmployeeSalaryConfig = (employee: Employee): SalaryConfigurationValue
       amount:
         toNumber(savedConfig.baseSalary?.amount, employee.basic_salary ?? DEFAULT_SALARY_CONFIG.baseSalary.amount),
       factor: toNumber(savedConfig.baseSalary?.factor, DEFAULT_SALARY_CONFIG.baseSalary.factor),
-      regionalMinimum: toNumber(
-        savedConfig.baseSalary?.regionalMinimum,
-        getRegionalMinimumByEffectiveDate(
-          (savedConfig.effectiveDate as string | undefined) ||
-            employee.official_start_date ||
-            employee.start_date ||
-            DEFAULT_SALARY_CONFIG.effectiveDate,
-          inferredRegion
-        )
-      ),
+      // Xem trước luôn tính lại theo vùng + ngày hiệu lực từ bảng của backend (calculatePayrollOutput)
+      regionalMinimum: toNumber(savedConfig.baseSalary?.regionalMinimum, 0),
     },
     allowances: {
       lunch: toNumber(savedConfig.allowances?.lunch),
@@ -1800,7 +1374,8 @@ const parseEmployeeSalaryConfig = (employee: Employee): SalaryConfigurationValue
       const mode = p.mode as string | undefined;
       return {
         mode: (mode === 'daily' || mode === 'monthly' ? mode : 'none') as ParkingAllowancePolicy['mode'],
-        daily_rate: toNumber(p.daily_rate, 5000),
+        // Chưa có đơn giá thì backend trả 0đ — không tự giả định mức gửi xe
+        daily_rate: toNumber(p.daily_rate, 0),
         monthly_rate: toNumber(p.monthly_rate, 0),
       };
     })(),
@@ -1868,11 +1443,25 @@ const parseEmployeeSalaryConfig = (employee: Employee): SalaryConfigurationValue
   };
 };
 
-const calculatePayrollOutput = (config: SalaryConfigurationValues, employee?: Employee): PayrollOutput => {
-  const actualWorkDays = calculateActualWorkDays(config.timeAttendance);
-  const lunchAllowance = calculateLunchAllowance(config.lunchAllowancePolicy, actualWorkDays, config.timeAttendance.workingDays);
+/**
+ * Xem trước lương của cấu hình đang sửa (chưa lưu). Tỷ lệ BH, biểu thuế, giảm trừ gia cảnh, lương cơ
+ * sở / tối thiểu vùng, trần PC ăn trưa, công chuẩn đều lấy từ backend (ctx) — không ghi cứng.
+ * Không tự đặt tiền phạt chấm công: backend phạt theo bậc phút đi muộn khi chốt công.
+ * Bảng lương thật do backend tính (salary/payslip.py), không dùng hàm này.
+ */
+const calculatePayrollOutput = (
+  config: SalaryConfigurationValues,
+  employee: Employee | undefined,
+  ctx: PayrollPreviewContext,
+): PayrollOutput => {
+  const { rules } = ctx;
+  const standardWorkDays = ctx.standardDays.days;
+  const actualWorkDays = calculateActualWorkDays(config.timeAttendance, standardWorkDays);
+  const lunchAllowance = calculateLunchAllowance(
+    config.lunchAllowancePolicy, actualWorkDays, standardWorkDays, rules.lunch_allowance_max_cap,
+  );
   const parkingAllowance = calculateParkingAllowance(config.parkingAllowancePolicy, actualWorkDays);
-  const responsibilityAllowance = calculateResponsibilityAllowance(config.responsibilityAllowancePolicy, actualWorkDays, config.timeAttendance.workingDays);
+  const responsibilityAllowance = calculateResponsibilityAllowance(config.responsibilityAllowancePolicy, actualWorkDays, standardWorkDays);
   const allowanceTotal =
     config.allowances.transport +
     config.allowances.phone +
@@ -1888,15 +1477,11 @@ const calculatePayrollOutput = (config: SalaryConfigurationValues, employee?: Em
     config.adjustments.irregularRewardPenalty -
     config.adjustments.retroactiveCollect;
 
-  const attendancePenalty =
-    config.timeAttendance.unpaidLeaveDays * 200000 + config.timeAttendance.lateEarlyCount * 50000;
-
-  const baseSalaryReference = getBaseSalaryByEffectiveDate(config.effectiveDate);
-  const regionalMinimum = getRegionalMinimumByEffectiveDate(config.effectiveDate, config.taxPolicy.region);
-  const taxYear = getTaxYear(config.effectiveDate);
-  const personalDeduction = taxYear >= 2026 ? PERSONAL_DEDUCTION_2026 : PERSONAL_DEDUCTION_LEGACY;
-  const dependentDeductionPerPerson = taxYear >= 2026 ? DEPENDENT_DEDUCTION_2026 : DEPENDENT_DEDUCTION_LEGACY;
-  const dependentDeduction = Math.max(config.taxPolicy.dependentCount, 0) * dependentDeductionPerPerson;
+  const baseSalaryReference = historyEntryForDate(rules.base_salary_history, config.effectiveDate)?.amount ?? 0;
+  const regionalMinimum = historyEntryForDate(rules.regional_minimum_history, config.effectiveDate)
+    ?.by_region[config.taxPolicy.region] ?? 0;
+  const personalDeduction = rules.tax.personal_deduction;
+  const dependentDeduction = Math.max(config.taxPolicy.dependentCount, 0) * rules.tax.dependent_deduction;
   const insuranceSalaryRaw = employee?.social_insurance_contribution_level != null
     ? Math.max(toNumber(employee.social_insurance_contribution_level), 0)
     : (
@@ -1904,26 +1489,26 @@ const calculatePayrollOutput = (config: SalaryConfigurationValues, employee?: Em
         ? Math.max(config.taxPolicy.insuranceSalaryOverride, 0)
         : Math.max(config.baseSalary.amount * config.baseSalary.factor, 0)
     );
-  const socialInsuranceSalaryCap = 20 * baseSalaryReference;
-  const unemploymentInsuranceSalaryCap = 20 * regionalMinimum;
+  const socialInsuranceSalaryCap = rules.insurance_salary_cap_multiplier * baseSalaryReference;
+  const unemploymentInsuranceSalaryCap = rules.insurance_salary_cap_multiplier * regionalMinimum;
   const insuranceSalaryForSocialAndHealth = Math.min(insuranceSalaryRaw, socialInsuranceSalaryCap);
   const insuranceSalaryForUnemployment = Math.min(insuranceSalaryRaw, unemploymentInsuranceSalaryCap);
 
-  const socialInsurance = insuranceSalaryForSocialAndHealth * EMPLOYEE_SOCIAL_INSURANCE_RATE;
-  const healthInsurance = insuranceSalaryForSocialAndHealth * EMPLOYEE_HEALTH_INSURANCE_RATE;
-  const unemploymentInsurance = insuranceSalaryForUnemployment * EMPLOYEE_UNEMPLOYMENT_INSURANCE_RATE;
+  const socialInsurance = insuranceSalaryForSocialAndHealth * rules.insurance_rates.bhxh;
+  const healthInsurance = insuranceSalaryForSocialAndHealth * rules.insurance_rates.bhyt;
+  const unemploymentInsurance = insuranceSalaryForUnemployment * rules.insurance_rates.bhtn;
 
   const grossIncome = config.baseSalary.amount * config.baseSalary.factor + allowanceTotal + variableTotal + adjustmentTotal;
   const taxableIncome = Math.max(
     grossIncome - socialInsurance - healthInsurance - unemploymentInsurance - personalDeduction - dependentDeduction,
     0
   );
-  const pit = calculateProgressiveTax(taxableIncome, taxYear >= 2026 ? PIT_BRACKETS_2026 : PIT_BRACKETS_LEGACY);
+  const pit = calculateProgressiveTax(taxableIncome, rules.tax.brackets);
 
   const configuredDeductions =
     config.deductions.unionFee + config.deductions.advancePenaltyCompensation;
   const totalDeductions =
-    pit + socialInsurance + healthInsurance + unemploymentInsurance + configuredDeductions + attendancePenalty;
+    pit + socialInsurance + healthInsurance + unemploymentInsurance + configuredDeductions;
   const netSalary = Math.max(grossIncome - totalDeductions, 0);
 
   return {
@@ -1932,7 +1517,6 @@ const calculatePayrollOutput = (config: SalaryConfigurationValues, employee?: Em
     socialInsurance,
     healthInsurance,
     unemploymentInsurance,
-    attendancePenalty,
     taxableIncome,
     insuranceSalaryBase: insuranceSalaryRaw,
     personalDeduction,
@@ -2019,19 +1603,79 @@ interface EditModalProps {
   onClose: () => void;
   onSave: (id: number, data: SalaryFormulaUpdateData) => Promise<void>;
   saving: boolean;
+  /** Quy định lương + công chuẩn tháng từ backend; null khi đang tải / lỗi */
+  previewContext: PayrollPreviewContext | null;
+  previewFailed: boolean;
 }
 
-const EditSalaryModal: React.FC<EditModalProps> = ({ employee, onClose, onSave, saving }) => {
+/** "2026-01-01" → "01/01/2026" */
+const formatIsoDate = (value: string) => value.split('-').reverse().join('/');
+
+/**
+ * Phần xem trước cần quy định lương của backend: chưa tải xong thì chưa mở form (không xem trước /
+ * lưu bằng số đoán).
+ */
+const EditSalaryModal: React.FC<EditModalProps> = ({ previewContext, previewFailed, ...props }) => {
+  if (previewContext) return <EditSalaryModalForm {...props} ctx={previewContext} />;
+  return <EditSalaryModalPending failed={previewFailed} onClose={props.onClose} />;
+};
+
+const EditSalaryModalPending: React.FC<{ failed: boolean; onClose: () => void }> = ({ failed, onClose }) => {
   useLockBodyScroll(true);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
+        <div className="flex items-center gap-2 text-sm text-gray-700">
+          {failed ? (
+            <ExclamationCircleIcon className="h-5 w-5 text-red-500 flex-shrink-0" />
+          ) : (
+            <ArrowPathIcon className="h-5 w-5 text-primary-400 animate-spin flex-shrink-0" />
+          )}
+          {failed ? 'Không tải được quy định lương từ máy chủ. Vui lòng tải lại trang.' : 'Đang tải quy định lương...'}
+        </div>
+        <div className="flex justify-end">
+          <button onClick={onClose} className="px-4 py-2 text-sm rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50">
+            Đóng
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const EditSalaryModalForm: React.FC<Omit<EditModalProps, 'previewContext' | 'previewFailed'> & { ctx: PayrollPreviewContext }> = ({
+  employee,
+  onClose,
+  onSave,
+  saving,
+  ctx,
+}) => {
+  useLockBodyScroll(true);
+  const { rules } = ctx;
+  const standardWorkDays = ctx.standardDays.days;
+  const standardDaysLabel = `${standardWorkDays} công chuẩn tháng ${String(ctx.standardDays.month).padStart(2, '0')}/${ctx.standardDays.year}`;
+  const maxLunchCap = rules.lunch_allowance_max_cap;
+  const initialConfig = useCallback((): SalaryConfigurationValues => {
+    const parsed = parseEmployeeSalaryConfig(employee, rules);
+    // Chưa nhập ngày công xem trước → điền công chuẩn tháng hiện tại do backend tính
+    if (parsed.timeAttendance.workingDays <= 0) {
+      parsed.timeAttendance = { ...parsed.timeAttendance, workingDays: standardWorkDays };
+    }
+    return parsed;
+  }, [employee, rules, standardWorkDays]);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [config, setConfig] = useState<SalaryConfigurationValues>(() => parseEmployeeSalaryConfig(employee));
+  const [config, setConfig] = useState<SalaryConfigurationValues>(initialConfig);
 
   useEffect(() => {
     setValidationError(null);
-    setConfig(parseEmployeeSalaryConfig(employee));
-  }, [employee]);
+    setConfig(initialConfig());
+  }, [initialConfig]);
 
-  const payrollOutput = useMemo(() => calculatePayrollOutput(config, employee), [config, employee]);
+  const payrollOutput = useMemo(() => calculatePayrollOutput(config, employee, ctx), [config, employee, ctx]);
+  const actualWorkDays = calculateActualWorkDays(config.timeAttendance, standardWorkDays);
+  const regionalMinimumEntry = historyEntryForDate(rules.regional_minimum_history, config.effectiveDate);
+  const latestBaseSalary = rules.base_salary_history[0];
+  const latestRegionalMinimum = rules.regional_minimum_history[0];
 
   const updateGroup = <T extends keyof SalaryConfigurationValues>(group: T, value: SalaryConfigurationValues[T]) => {
     setConfig((previous) => ({ ...previous, [group]: value }));
@@ -2040,18 +1684,19 @@ const EditSalaryModal: React.FC<EditModalProps> = ({ employee, onClose, onSave, 
   const lunchPreview = useMemo(
     () => calculateLunchAllowance(
       config.lunchAllowancePolicy,
-      calculateActualWorkDays(config.timeAttendance),
-      config.timeAttendance.workingDays,
+      calculateActualWorkDays(config.timeAttendance, standardWorkDays),
+      standardWorkDays,
+      maxLunchCap,
     ),
-    [config.lunchAllowancePolicy, config.timeAttendance]
+    [config.lunchAllowancePolicy, config.timeAttendance, standardWorkDays, maxLunchCap]
   );
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setValidationError(null);
 
-    if (config.lunchAllowancePolicy.monthly_cap > MAX_LUNCH_ALLOWANCE_CAP) {
-      setValidationError('Trần phụ cấp ăn trưa không được vượt quá 500.000đ/tháng.');
+    if (config.lunchAllowancePolicy.monthly_cap > maxLunchCap) {
+      setValidationError(`Trần phụ cấp ăn trưa không được vượt quá ${maxLunchCap.toLocaleString('vi-VN')}đ/tháng.`);
       return;
     }
 
@@ -2103,7 +1748,7 @@ const EditSalaryModal: React.FC<EditModalProps> = ({ employee, onClose, onSave, 
       },
       lunchAllowancePolicy: {
         ...config.lunchAllowancePolicy,
-        monthly_cap: Math.min(config.lunchAllowancePolicy.monthly_cap, MAX_LUNCH_ALLOWANCE_CAP),
+        monthly_cap: Math.min(config.lunchAllowancePolicy.monthly_cap, maxLunchCap),
       },
     };
 
@@ -2113,7 +1758,8 @@ const EditSalaryModal: React.FC<EditModalProps> = ({ employee, onClose, onSave, 
       salary_notes: `Hiệu lực từ ${config.effectiveDate}`,
       allowance_notes:
         config.lunchAllowancePolicy.mode === 'actual_working_day'
-          ? `Phụ cấp trưa: theo ngày công thực tế, tối đa ${Math.min(config.lunchAllowancePolicy.monthly_cap, MAX_LUNCH_ALLOWANCE_CAP).toLocaleString('vi-VN')}đ/tháng (${config.timeAttendance.workingDays} công chuẩn)`
+          // Backend chia theo công chuẩn của từng tháng lương — không ghi 1 số công chuẩn cố định
+          ? `Phụ cấp trưa: theo ngày công thực tế, tối đa ${effectiveLunchCap(config.lunchAllowancePolicy, maxLunchCap).toLocaleString('vi-VN')}đ/tháng (chia theo công chuẩn từng tháng)`
           : `Phụ cấp trưa cố định: ${lunchPreview.toLocaleString('vi-VN')}đ/tháng`,
       salary_adjustments: {
         ...existingAdjustments,
@@ -2241,7 +1887,11 @@ const EditSalaryModal: React.FC<EditModalProps> = ({ employee, onClose, onSave, 
               </div>
             </div>
             <p className="text-xs text-gray-500">
-              Tự động theo vùng lương và ngày hiệu lực (NĐ 293/2025/NĐ-CP, áp dụng từ 01/01/2026).
+              Tự động theo vùng lương và ngày hiệu lực
+              {regionalMinimumEntry?.legal_basis && regionalMinimumEntry.effective_from
+                ? ` (${regionalMinimumEntry.legal_basis}, áp dụng từ ${formatIsoDate(regionalMinimumEntry.effective_from)})`
+                : ''}
+              .
             </p>
           </SectionCard>
 
@@ -2299,23 +1949,23 @@ const EditSalaryModal: React.FC<EditModalProps> = ({ employee, onClose, onSave, 
                           onChange={(value) =>
                             updateGroup('lunchAllowancePolicy', {
                               ...config.lunchAllowancePolicy,
-                              monthly_cap: Math.min(Math.max(value, 0), MAX_LUNCH_ALLOWANCE_CAP),
+                              monthly_cap: Math.min(Math.max(value, 0), maxLunchCap),
                             })
                           }
                         />
                         <div className="rounded-md border border-amber-200 bg-white px-3 py-2">
                           <p className="text-xs text-gray-500">Mức/ngày công</p>
                           <p className="text-sm font-semibold text-amber-700">
-                            {config.timeAttendance.workingDays > 0
-                              ? formatCurrency(Math.round(Math.min(config.lunchAllowancePolicy.monthly_cap, MAX_LUNCH_ALLOWANCE_CAP) / config.timeAttendance.workingDays))
+                            {standardWorkDays > 0
+                              ? formatCurrency(Math.round(effectiveLunchCap(config.lunchAllowancePolicy, maxLunchCap) / standardWorkDays))
                               : '—'}
                           </p>
-                          <p className="text-xs text-gray-400">{config.timeAttendance.workingDays} công chuẩn</p>
+                          <p className="text-xs text-gray-400">{standardDaysLabel}</p>
                         </div>
                         <div className="rounded-md border border-amber-300 bg-amber-100 px-3 py-2">
                           <p className="text-xs text-gray-500">Tạm tính</p>
                           <p className="text-sm font-bold text-amber-800">{formatCurrency(lunchPreview)}</p>
-                          <p className="text-xs text-gray-500">{formatNumber(calculateActualWorkDays(config.timeAttendance))} ngày công</p>
+                          <p className="text-xs text-gray-500">{formatNumber(actualWorkDays)} ngày công</p>
                         </div>
                       </>
                     ) : (
@@ -2331,12 +1981,12 @@ const EditSalaryModal: React.FC<EditModalProps> = ({ employee, onClose, onSave, 
                           }
                         />
                         <NumberField
-                          label="Trần/tháng (tối đa 500.000)"
+                          label={`Trần/tháng (tối đa ${maxLunchCap.toLocaleString('vi-VN')})`}
                           value={config.lunchAllowancePolicy.monthly_cap}
                           onChange={(value) =>
                             updateGroup('lunchAllowancePolicy', {
                               ...config.lunchAllowancePolicy,
-                              monthly_cap: Math.min(Math.max(value, 0), MAX_LUNCH_ALLOWANCE_CAP),
+                              monthly_cap: Math.min(Math.max(value, 0), maxLunchCap),
                             })
                           }
                         />
@@ -2367,6 +2017,10 @@ const EditSalaryModal: React.FC<EditModalProps> = ({ employee, onClose, onSave, 
                         updateGroup('parkingAllowancePolicy', {
                           ...config.parkingAllowancePolicy,
                           mode: value as ParkingAllowancePolicy['mode'],
+                          // Chọn vé ngày mà chưa có giá → gợi ý mức gửi xe/ngày của chính sách chấm công (backend)
+                          daily_rate: value === 'daily' && config.parkingAllowancePolicy.daily_rate <= 0
+                            ? rules.parking_allowance_per_day
+                            : config.parkingAllowancePolicy.daily_rate,
                         })
                       }
                     />
@@ -2382,10 +2036,10 @@ const EditSalaryModal: React.FC<EditModalProps> = ({ employee, onClose, onSave, 
                         <div className="rounded-md border border-blue-300 bg-blue-100 px-3 py-2">
                           <p className="text-xs text-gray-500">Tạm tính</p>
                           <p className="text-sm font-bold text-blue-800">
-                            {formatCurrency(calculateParkingAllowance(config.parkingAllowancePolicy, calculateActualWorkDays(config.timeAttendance)))}
+                            {formatCurrency(calculateParkingAllowance(config.parkingAllowancePolicy, actualWorkDays))}
                           </p>
                           <p className="text-xs text-gray-500">
-                            {Math.ceil(calculateActualWorkDays(config.timeAttendance))} ngày × {config.parkingAllowancePolicy.daily_rate.toLocaleString('vi-VN')}đ
+                            {Math.ceil(actualWorkDays)} ngày × {config.parkingAllowancePolicy.daily_rate.toLocaleString('vi-VN')}đ
                           </p>
                         </div>
                       </>
@@ -2442,11 +2096,11 @@ const EditSalaryModal: React.FC<EditModalProps> = ({ employee, onClose, onSave, 
                           <div className="rounded-md border border-purple-200 bg-white px-3 py-2">
                             <p className="text-xs text-gray-500">Mức/ngày công</p>
                             <p className="text-sm font-semibold text-purple-700">
-                              {config.timeAttendance.workingDays > 0
-                                ? formatCurrency(Math.round(config.responsibilityAllowancePolicy.monthly_max / config.timeAttendance.workingDays))
+                              {standardWorkDays > 0
+                                ? formatCurrency(Math.round(config.responsibilityAllowancePolicy.monthly_max / standardWorkDays))
                                 : '—'}
                             </p>
-                            <p className="text-xs text-gray-400">{config.timeAttendance.workingDays} công chuẩn</p>
+                            <p className="text-xs text-gray-400">{standardDaysLabel}</p>
                           </div>
                         )}
                         <div className="rounded-md border border-purple-300 bg-purple-100 px-3 py-2">
@@ -2454,12 +2108,12 @@ const EditSalaryModal: React.FC<EditModalProps> = ({ employee, onClose, onSave, 
                           <p className="text-sm font-bold text-purple-800">
                             {formatCurrency(calculateResponsibilityAllowance(
                               config.responsibilityAllowancePolicy,
-                              calculateActualWorkDays(config.timeAttendance),
-                              config.timeAttendance.workingDays,
+                              actualWorkDays,
+                              standardWorkDays,
                             ))}
                           </p>
                           {config.responsibilityAllowancePolicy.mode === 'actual_working_day' && (
-                            <p className="text-xs text-gray-500">{formatNumber(calculateActualWorkDays(config.timeAttendance))} ngày công</p>
+                            <p className="text-xs text-gray-500">{formatNumber(actualWorkDays)} ngày công</p>
                           )}
                         </div>
                       </>
@@ -2645,8 +2299,12 @@ const EditSalaryModal: React.FC<EditModalProps> = ({ employee, onClose, onSave, 
               />
             </div>
             <p className="text-xs text-gray-500">
-              Áp dụng tự động: lương cơ sở 2.340.000đ (từ 01/07/2024), lương tối thiểu vùng mới (từ 01/01/2026),
-              giảm trừ gia cảnh 15.500.000đ + 6.200.000đ/người phụ thuộc, biểu thuế lũy tiến 5 bậc cho kỳ thuế 2026.
+              {/* Số liệu từ quy định lương của backend (biểu thuế đang áp cho bảng lương) */}
+              Áp dụng tự động: lương cơ sở {formatCurrency(latestBaseSalary?.amount)}
+              {latestBaseSalary?.effective_from ? ` (từ ${formatIsoDate(latestBaseSalary.effective_from)})` : ''}, lương tối thiểu vùng mới
+              {latestRegionalMinimum?.effective_from ? ` (từ ${formatIsoDate(latestRegionalMinimum.effective_from)})` : ''},
+              giảm trừ gia cảnh {formatCurrency(rules.tax.personal_deduction)} + {formatCurrency(rules.tax.dependent_deduction)}/người phụ thuộc,
+              biểu thuế lũy tiến {rules.tax.brackets.length} bậc cho kỳ thuế {rules.tax.as_of.slice(0, 4)}.
             </p>
           </SectionCard>
 
@@ -3038,154 +2696,56 @@ const PAYROLL_SUM_KEYS = [
 
 type PayrollExcelRow = Record<string, string | number>;
 
-/** Gắn số liệu "Dữ liệu lương tháng" (nhập tay) vào dòng lương — như trang Bảng lương. */
-const mergeMonthlyInputs = (records: SalaryRecord[], monthlyInputs: MonthlySalaryInputRecord[]): SalaryRecord[] => {
-  const monthlyInputMap = new Map<number, MonthlySalaryInputRecord>();
-  monthlyInputs.forEach((item) => {
-    monthlyInputMap.set(item.employee, item);
-  });
-
-  const mergedResults = records.map((record) => {
-    const monthlyInput = monthlyInputMap.get(record.employee_id);
-    // Dòng của tháng đã chốt đã ghép dữ liệu lương tháng lúc chốt
-    if (!monthlyInput || record.payroll_finalized) return record;
-    return {
-      ...record,
-      luong_doanh_so_input: monthlyInput.luong_doanh_so,
-      luong_ot_input: monthlyInput.luong_ot,
-      ban_san_pham_input: monthlyInput.ban_san_pham,
-      phu_mo_input: monthlyInput.phu_mo,
-      truc_ca_input: monthlyInput.truc_ca,
-      thuong_input: monthlyInput.thuong,
-    } as SalaryRecord;
-  });
-  return mergedResults;
-};
-
-/** Một dòng Excel của bảng lương (số đã làm tròn). */
-const buildPayrollExcelRow = (
-  record: SalaryRecord,
-  employee: Employee | undefined,
-  recordCommissions: CommissionRecord[],
-): PayrollExcelRow => {
-  const payslipComputation = calculatePayslipNetPayable(record, employee, recordCommissions);
-  const payrollTax = payslipComputation.payrollTax;
-
-  const stdDays = getStandardWorkDaysFromRecord(record);
-  const workdayBreakdown = getWorkdaySalaryBreakdown(record, employee);
-  const luongCoBan = record.luong_co_ban ?? 0;
-  const luongNgayCongThucTe = workdayBreakdown.tongLuongNgayCong;
-  const incomeBreakdown = getMonthlyInputIncomeBreakdown(record, recordCommissions);
-  const luongDoanhSo = incomeBreakdown.luongDoanhSo;
-  const luongOt = incomeBreakdown.luongOt;
-  const banSanPham = incomeBreakdown.banSanPham;
-  const phuMo = incomeBreakdown.phuMo;
-  const trucCa = incomeBreakdown.trucCa;
-  const thuNhapKhac = incomeBreakdown.thuNhapKhac;
-  const thuong = incomeBreakdown.thuong;
-  const tongLuongIII = luongNgayCongThucTe + luongDoanhSo + luongOt + banSanPham + phuMo + trucCa + thuNhapKhac;
-
-  const savedAdjustments = employeeForRecord(record, employee)?.salary_adjustments as Record<string, unknown> | undefined;
-  const savedConfig = savedAdjustments?.payroll_config as Record<string, unknown> | undefined;
-
-  const savedParkingPolicyRaw = savedConfig?.parkingAllowancePolicy as Record<string, unknown> | undefined;
-  const parkingPolicy: ParkingAllowancePolicy | null = savedParkingPolicyRaw
-    ? {
-        mode: savedParkingPolicyRaw.mode === 'daily' ? 'daily' : savedParkingPolicyRaw.mode === 'monthly' ? 'monthly' : 'none',
-        daily_rate: toNumber(savedParkingPolicyRaw.daily_rate, 5000),
-        monthly_rate: toNumber(savedParkingPolicyRaw.monthly_rate, 0),
-      }
-    : null;
-  const phuCapGuiXe = parkingPolicy ? calculateParkingAllowance(parkingPolicy, record.ngay_cong) : (record.phu_cap_gui_xe ?? 0);
-
-  const savedLunchPolicyRaw = (savedConfig?.lunchAllowancePolicy as Record<string, unknown> | undefined);
-  const lunchPolicy: LunchAllowancePolicy | null = savedLunchPolicyRaw
-    ? {
-        mode: savedLunchPolicyRaw.mode === 'actual_working_day' ? 'actual_working_day' : 'fixed',
-        fixed_amount: toNumber(savedLunchPolicyRaw.fixed_amount),
-        amount_per_work_day: toNumber(savedLunchPolicyRaw.amount_per_work_day),
-        monthly_cap: toNumber(savedLunchPolicyRaw.monthly_cap, MAX_LUNCH_ALLOWANCE_CAP),
-      }
-    : null;
-  const phuCapAnTrua = toNumber(
-    (record as unknown as Record<string, unknown>)['phu_cap_an_trua'],
-    lunchPolicy ? calculateLunchAllowance(lunchPolicy, record.tong_cong ?? 0, stdDays) : 0,
-  );
-
-  const savedRespPolicyRaw = savedConfig?.responsibilityAllowancePolicy as Record<string, unknown> | undefined;
-  const respPolicy: ResponsibilityAllowancePolicy | null = savedRespPolicyRaw
-    ? {
-        mode: savedRespPolicyRaw.mode === 'fixed' ? 'fixed' : savedRespPolicyRaw.mode === 'actual_working_day' ? 'actual_working_day' : 'none',
-        monthly_max: toNumber(savedRespPolicyRaw.monthly_max),
-      }
-    : null;
-  const phuCapTrachNhiem = respPolicy ? calculateResponsibilityAllowance(respPolicy, record.tong_cong ?? 0, stdDays) : 0;
-  const phuCapLivestream = toNumber((record as unknown as Record<string, number>)['phu_cap_livestream'], 0);
-
-  const phuCapKhacFromRecord = (record as unknown as Record<string, number>)['phu_cap_khac'] ?? 0;
-  const phuCapKhacRemainder = Math.max(
-    phuCapKhacFromRecord,
-    Math.max((record.phu_cap ?? 0) - phuCapGuiXe - phuCapAnTrua - phuCapTrachNhiem - phuCapLivestream, 0),
-  );
-  const tongPhuCapIV = phuCapGuiXe + phuCapAnTrua + phuCapTrachNhiem + phuCapLivestream + phuCapKhacRemainder;
-  const tongThuNhapVI = tongLuongIII + tongPhuCapIV + thuong;
-
-  const bhxh = payrollTax.socialInsurance;
-  const bhyt = payrollTax.healthInsurance;
-  const bhtn = payrollTax.unemploymentInsurance;
-  const tongBH = payrollTax.insuranceTotal;
-  const congDoan = toNumber((record as unknown as Record<string, number>)['cong_doan'],
-    (savedConfig?.deductions as Record<string, number> | undefined)?.unionFee ?? 0);
-  const tongPhat = record.tong_phat ?? 0;
-  const tongPhatBienBan = record.tong_phat_bienban ?? 0;
-  const tongPhatThieuCong = record.phat_thieu_cong ?? 0;
-  const tongGiamTruVII = tongBH + congDoan + tongPhat + tongPhatBienBan + tongPhatThieuCong;
-  const dieuChinhVIII = (record as unknown as Record<string, number>)['dieu_chinh'] ?? 0;
-  const tamUng = record.tam_ung ?? 0;
-  const thue = payrollTax.taxAmount;
-
-  const rowData = {
+/**
+ * Một dòng Excel của bảng lương — đúng các dòng phiếu lương backend đã tính (record.phieu_luong,
+ * backend/salary/payslip.py, đã gồm dữ liệu lương tháng nhập tay), nên Excel / bảng / phiếu lương /
+ * tổng lương luôn cùng số.
+ */
+const payrollRowValues = (record: SalaryRecord) => {
+  const p = record.phieu_luong;
+  return {
     ma_nv: record.ma_nv,
     ho_va_ten: record.ho_va_ten,
     phong_ban: record.phong_ban ?? '',
     year: record.year,
     month: record.month,
-    luong_co_ban: Math.round(luongCoBan),
-    cong_chuan: stdDays,
+    luong_co_ban: Math.round(record.luong_co_ban ?? 0),
+    cong_chuan: record.cong_chuan ?? 0,
     tong_cong: record.tong_cong ?? 0,
-    luong_ngay_cong: Math.round(luongNgayCongThucTe),
-    luong_doanh_so: Math.round(luongDoanhSo),
-    luong_ot: Math.round(luongOt),
-    ban_san_pham: Math.round(banSanPham),
-    phu_mo: Math.round(phuMo),
-    truc_ca: Math.round(trucCa),
-    thu_nhap_khac: Math.round(thuNhapKhac),
-    tong_luong_iii: Math.round(tongLuongIII),
-    phu_cap_gui_xe: Math.round(phuCapGuiXe),
-    phu_cap_an_trua: Math.round(phuCapAnTrua),
-    phu_cap_trach_nhiem: Math.round(phuCapTrachNhiem),
-    phu_cap_livestream: Math.round(phuCapLivestream),
-    phu_cap_khac: Math.round(phuCapKhacRemainder),
-    tong_phu_cap_iv: Math.round(tongPhuCapIV),
-    thuong: Math.round(thuong),
-    tong_thu_nhap_vi: Math.round(tongThuNhapVI),
-    bhxh: Math.round(bhxh),
-    bhyt: Math.round(bhyt),
-    bhtn: Math.round(bhtn),
-    tong_bh: Math.round(tongBH),
-    cong_doan: Math.round(congDoan),
-    tong_phat: Math.round(tongPhat),
-    tong_phat_bienban: Math.round(tongPhatBienBan),
-    phat_thieu_cong: Math.round(tongPhatThieuCong),
-    tong_giam_tru_vii: Math.round(tongGiamTruVII),
-    dieu_chinh: Math.round(dieuChinhVIII),
-    thue_tncn: Math.round(thue),
-    tam_ung: Math.round(tamUng),
-    luong_thuc_linh: Math.round(payslipComputation.luongThucLinh),
-    con_phai_thanh_toan: Math.round(payslipComputation.conPhaiThanhToan),
+    luong_ngay_cong: p.luong_ngay_cong,
+    luong_doanh_so: p.luong_doanh_so,
+    luong_ot: p.luong_ot,
+    ban_san_pham: p.ban_san_pham,
+    phu_mo: p.phu_mo,
+    truc_ca: p.truc_ca,
+    thu_nhap_khac: p.thu_nhap_khac,
+    tong_luong_iii: p.tong_luong_iii,
+    phu_cap_gui_xe: p.phu_cap_gui_xe,
+    phu_cap_an_trua: p.phu_cap_an_trua,
+    phu_cap_trach_nhiem: p.phu_cap_trach_nhiem,
+    phu_cap_livestream: p.phu_cap_livestream,
+    phu_cap_khac: p.phu_cap_khac,
+    tong_phu_cap_iv: p.tong_phu_cap_iv,
+    thuong: p.thuong,
+    tong_thu_nhap_vi: p.tong_thu_nhap_vi,
+    bhxh: p.bhxh,
+    bhyt: p.bhyt,
+    bhtn: p.bhtn,
+    tong_bh: p.tong_bh,
+    cong_doan: p.cong_doan,
+    tong_phat: p.tong_phat,
+    tong_phat_bienban: p.tong_phat_bienban,
+    phat_thieu_cong: p.phat_thieu_cong,
+    tong_giam_tru_vii: p.tong_giam_tru_vii,
+    dieu_chinh: p.dieu_chinh,
+    thue_tncn: p.thue_tncn,
+    tam_ung: p.tam_ung,
+    luong_thuc_linh: p.luong_thuc_linh,
+    con_phai_thanh_toan: p.con_phai_thanh_toan,
   };
-  return rowData;
 };
+
+const buildPayrollExcelRow = (record: SalaryRecord): PayrollExcelRow => payrollRowValues(record);
 
 const styleHeaderRow = (ws: Worksheet) => {
   ws.getRow(1).eachCell((cell) => {
@@ -3267,6 +2827,8 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
     defaultPayrollDate.setMonth(defaultPayrollDate.getMonth() - 1);
   }
   const [activeTab, setActiveTab] = useState<SalaryTabKey>(defaultTab);
+  // Quy định lương + công chuẩn tháng từ backend cho phần xem trước cấu hình lương
+  const { context: payrollPreviewContext, failed: payrollPreviewFailed } = usePayrollPreviewContext();
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
@@ -3282,12 +2844,10 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
 
   const SALARY_PAGE_SIZE = 20;
   const [salaryRecords, setSalaryRecords] = useState<SalaryRecord[]>([]);
-  const [salaryCommissions, setSalaryCommissions] = useState<CommissionRecord[]>([]);
   const [salaryPage, setSalaryPage] = useState(1);
   const [payslipRecord, setPayslipRecord] = useState<SalaryRecord | null>(null);
   const [payslipEmployee, setPayslipEmployee] = useState<Employee | null>(null);
   const [payslipPenalties, setPayslipPenalties] = useState<PenaltyRecord[]>([]);
-  const [payslipCommissions, setPayslipCommissions] = useState<CommissionRecord[]>([]);
   const [loadingSalary, setLoadingSalary] = useState(false);
   const [salaryError, setSalaryError] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<number>(defaultPayrollDate.getFullYear());
@@ -3543,128 +3103,8 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  const payrollDetailRows = useMemo(() => {
-    return salaryRecords.map((record) => {
-      const employee = employees.find((e) => e.id === record.employee_id);
-      const recordCommissions = salaryCommissions.filter((item) => item.employee === record.employee_id);
-      const payslipComputation = calculatePayslipNetPayable(record, employee, recordCommissions);
-      const payrollTax = payslipComputation.payrollTax;
-
-      const stdDays = getStandardWorkDaysFromRecord(record);
-      const workdayBreakdown = getWorkdaySalaryBreakdown(record, employee);
-      const luongCoBan = record.luong_co_ban ?? 0;
-      const luongNgayCongThucTe = workdayBreakdown.tongLuongNgayCong;
-      const incomeBreakdown = getMonthlyInputIncomeBreakdown(record, recordCommissions);
-      const luongDoanhSo = incomeBreakdown.luongDoanhSo;
-      const luongOt = incomeBreakdown.luongOt;
-      const banSanPham = incomeBreakdown.banSanPham;
-      const phuMo = incomeBreakdown.phuMo;
-      const trucCa = incomeBreakdown.trucCa;
-      const thuNhapKhac = incomeBreakdown.thuNhapKhac;
-      const thuong = incomeBreakdown.thuong;
-      const tongLuongIII = luongNgayCongThucTe + luongDoanhSo + luongOt + banSanPham + phuMo + trucCa + thuNhapKhac;
-
-      const savedAdjustments = employeeForRecord(record, employee)?.salary_adjustments as Record<string, unknown> | undefined;
-      const savedConfig = savedAdjustments?.payroll_config as Record<string, unknown> | undefined;
-
-      const savedParkingPolicyRaw = savedConfig?.parkingAllowancePolicy as Record<string, unknown> | undefined;
-      const parkingPolicy: ParkingAllowancePolicy | null = savedParkingPolicyRaw
-        ? {
-            mode: savedParkingPolicyRaw.mode === 'daily' ? 'daily' : savedParkingPolicyRaw.mode === 'monthly' ? 'monthly' : 'none',
-            daily_rate: toNumber(savedParkingPolicyRaw.daily_rate, 5000),
-            monthly_rate: toNumber(savedParkingPolicyRaw.monthly_rate, 0),
-          }
-        : null;
-      const phuCapGuiXe = parkingPolicy ? calculateParkingAllowance(parkingPolicy, record.ngay_cong) : (record.phu_cap_gui_xe ?? 0);
-
-      const savedLunchPolicyRaw = (savedConfig?.lunchAllowancePolicy as Record<string, unknown> | undefined);
-      const lunchPolicy: LunchAllowancePolicy | null = savedLunchPolicyRaw
-        ? {
-            mode: savedLunchPolicyRaw.mode === 'actual_working_day' ? 'actual_working_day' : 'fixed',
-            fixed_amount: toNumber(savedLunchPolicyRaw.fixed_amount),
-            amount_per_work_day: toNumber(savedLunchPolicyRaw.amount_per_work_day),
-            monthly_cap: toNumber(savedLunchPolicyRaw.monthly_cap, MAX_LUNCH_ALLOWANCE_CAP),
-          }
-        : null;
-      const phuCapAnTrua = toNumber(
-        (record as unknown as Record<string, unknown>)['phu_cap_an_trua'],
-        lunchPolicy ? calculateLunchAllowance(lunchPolicy, record.tong_cong ?? 0, stdDays) : 0,
-      );
-
-      const savedRespPolicyRaw = savedConfig?.responsibilityAllowancePolicy as Record<string, unknown> | undefined;
-      const respPolicy: ResponsibilityAllowancePolicy | null = savedRespPolicyRaw
-        ? {
-            mode: savedRespPolicyRaw.mode === 'fixed' ? 'fixed' : savedRespPolicyRaw.mode === 'actual_working_day' ? 'actual_working_day' : 'none',
-            monthly_max: toNumber(savedRespPolicyRaw.monthly_max),
-          }
-        : null;
-      const phuCapTrachNhiem = respPolicy ? calculateResponsibilityAllowance(respPolicy, record.tong_cong ?? 0, stdDays) : 0;
-      const phuCapLivestream = toNumber((record as unknown as Record<string, number>)['phu_cap_livestream'], 0);
-
-      const phuCapKhacFromRecord = (record as unknown as Record<string, number>)['phu_cap_khac'] ?? 0;
-      const phuCapKhacRemainder = Math.max(
-        phuCapKhacFromRecord,
-        Math.max((record.phu_cap ?? 0) - phuCapGuiXe - phuCapAnTrua - phuCapTrachNhiem - phuCapLivestream, 0),
-      );
-      const tongPhuCapIV = phuCapGuiXe + phuCapAnTrua + phuCapTrachNhiem + phuCapLivestream + phuCapKhacRemainder;
-      const tongThuNhapVI = tongLuongIII + tongPhuCapIV + thuong;
-
-      const bhxh = payrollTax.socialInsurance;
-      const bhyt = payrollTax.healthInsurance;
-      const bhtn = payrollTax.unemploymentInsurance;
-      const tongBH = payrollTax.insuranceTotal;
-      const congDoan = toNumber((record as unknown as Record<string, number>)['cong_doan'],
-        (savedConfig?.deductions as Record<string, number> | undefined)?.unionFee ?? 0);
-      const tongPhat = record.tong_phat ?? 0;
-      const tongPhatBienBan = record.tong_phat_bienban ?? 0;
-      const tongPhatThieuCong = record.phat_thieu_cong ?? 0;
-      const tongGiamTruVII = tongBH + congDoan + tongPhat + tongPhatBienBan + tongPhatThieuCong;
-      const dieuChinhVIII = (record as unknown as Record<string, number>)['dieu_chinh'] ?? 0;
-      const tamUng = record.tam_ung ?? 0;
-      const thue = payrollTax.taxAmount;
-
-      return {
-        ma_nv: record.ma_nv,
-        ho_va_ten: record.ho_va_ten,
-        phong_ban: record.phong_ban ?? '',
-        year: record.year,
-        month: record.month,
-        luong_co_ban: Math.round(luongCoBan),
-        cong_chuan: stdDays,
-        tong_cong: Math.round(record.tong_cong ?? 0),
-        luong_ngay_cong: Math.round(luongNgayCongThucTe),
-        luong_doanh_so: Math.round(luongDoanhSo),
-        luong_ot: Math.round(luongOt),
-        ban_san_pham: Math.round(banSanPham),
-        phu_mo: Math.round(phuMo),
-        truc_ca: Math.round(trucCa),
-        thu_nhap_khac: Math.round(thuNhapKhac),
-        tong_luong_iii: Math.round(tongLuongIII),
-        phu_cap_gui_xe: Math.round(phuCapGuiXe),
-        phu_cap_an_trua: Math.round(phuCapAnTrua),
-        phu_cap_trach_nhiem: Math.round(phuCapTrachNhiem),
-        phu_cap_livestream: Math.round(phuCapLivestream),
-        phu_cap_khac: Math.round(phuCapKhacRemainder),
-        tong_phu_cap_iv: Math.round(tongPhuCapIV),
-        thuong: Math.round(thuong),
-        tong_thu_nhap_vi: Math.round(tongThuNhapVI),
-        bhxh: Math.round(bhxh),
-        bhyt: Math.round(bhyt),
-        bhtn: Math.round(bhtn),
-        tong_bh: Math.round(tongBH),
-        cong_doan: Math.round(congDoan),
-        tong_phat: Math.round(tongPhat),
-        tong_phat_bienban: Math.round(tongPhatBienBan),
-        phat_thieu_cong: Math.round(tongPhatThieuCong),
-        tong_giam_tru_vii: Math.round(tongGiamTruVII),
-        dieu_chinh: Math.round(dieuChinhVIII),
-        thue_tncn: Math.round(thue),
-        tam_ung: Math.round(tamUng),
-        luong_thuc_linh: Math.round(payslipComputation.luongThucLinh),
-        con_phai_thanh_toan: Math.round(payslipComputation.conPhaiThanhToan),
-      };
-    });
-  }, [salaryRecords, employees, salaryCommissions]);
+  // Tổng lương = cộng đúng các dòng phiếu lương backend (khớp Excel / bảng lương)
+  const payrollDetailRows = useMemo(() => salaryRecords.map(payrollRowValues), [salaryRecords]);
 
   const handleExportPayrollExcel = async () => {
     if (!salaryRecords.length || exportingPayroll) return;
@@ -3673,11 +3113,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
     try {
       const ExcelJS = (await import('exceljs')).default;
       const wb = new ExcelJS.Workbook();
-      const rows = salaryRecords.map((record) => buildPayrollExcelRow(
-        record,
-        employees.find((e) => e.id === record.employee_id),
-        salaryCommissions.filter((item) => item.employee === record.employee_id),
-      ));
+      const rows = salaryRecords.map(buildPayrollExcelRow);
       writePayrollSheet(wb.addWorksheet('Bang Luong Chi Tiet'), rows);
 
       const monthText = String(selectedMonth).padStart(2, '0');
@@ -3712,21 +3148,13 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
       const ExcelJS = (await import('exceljs')).default;
       const perMonth: Array<MonthRows<PayrollExcelRow>> = [];
       for (const period of months) {
-        const [salaryRes, commissions, monthlyInputs] = await Promise.all([
-          salaryService.getSalaryByDepartment({ ...period, legal_entity: rangeExport.legalEntity || undefined }),
-          salaryService.listCommissions(period),
-          salaryService.listMonthlyInputs(period),
-        ]);
-        const records = mergeMonthlyInputs(salaryRes.results ?? [], monthlyInputs);
+        // Dòng lương backend đã ghép dữ liệu lương tháng nhập tay + tính phiếu lương
+        const salaryRes = await salaryService.getSalaryByDepartment({ ...period, legal_entity: rangeExport.legalEntity || undefined });
         perMonth.push({
           period,
-          rows: records.map((record) => ({
+          rows: (salaryRes.results ?? []).map((record) => ({
             legalEntity: record.phap_nhan_con ?? '',
-            row: buildPayrollExcelRow(
-              record,
-              employees.find((e) => e.id === record.employee_id),
-              commissions.filter((item) => item.employee === record.employee_id),
-            ),
+            row: buildPayrollExcelRow(record),
           })),
         });
       }
@@ -3792,7 +3220,7 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
     setDeptRecipientsPreviewError(null);
     setEmailStatusFromQueueMap({});
     try {
-      const [salaryRes, commissionRes, monthlyInputRes, emailStatusRes] = await Promise.allSettled([
+      const [salaryRes, emailStatusRes] = await Promise.allSettled([
         salaryService.getSalaryByDepartment({
           year: selectedYear,
           month: selectedMonth,
@@ -3801,8 +3229,6 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
           employment_filter: employmentFilterView || undefined,
           refresh: payrollLiveMode ? 1 : undefined,
         }),
-        salaryService.listCommissions({ year: selectedYear, month: selectedMonth }),
-        salaryService.listMonthlyInputs({ year: selectedYear, month: selectedMonth }),
         salaryService.getDepartmentPayslipEmailStatuses({
           year: selectedYear,
           month: selectedMonth,
@@ -3815,11 +3241,10 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
 
       const res = salaryRes.value;
 
-      const monthlyInputs = monthlyInputRes.status === 'fulfilled' ? monthlyInputRes.value : [];
-      setSalaryRecords(mergeMonthlyInputs(res.results ?? [], monthlyInputs));
+      // Dòng lương backend đã ghép dữ liệu lương tháng nhập tay và tính sẵn phiếu lương
+      setSalaryRecords(res.results ?? []);
       setLeftPayable({ count: res.left_payable_count ?? 0, amount: res.left_payable_amount ?? 0 });
       setPayrollFinalize({ isFinalized: !!res.is_finalized, finalizedAt: res.finalized_at ?? null });
-      setSalaryCommissions(commissionRes.status === 'fulfilled' ? commissionRes.value : []);
 
       if (emailStatusRes.status === 'fulfilled') {
         const nextMap: Record<number, 'PENDING' | 'PROCESSING' | 'SENT' | 'FAILED'> = {};
@@ -3840,7 +3265,6 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
         setSalaryError('Không thể tải dữ liệu bảng lương. Vui lòng thử lại.');
       }
       setSalaryRecords([]);
-      setSalaryCommissions([]);
       setEmailStatusFromQueueMap({});
     } finally {
       setLoadingSalary(false);
@@ -4236,8 +3660,11 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-100">
                       {employees.map((employee) => {
-                        const employeeConfig = parseEmployeeSalaryConfig(employee);
-                        const output = calculatePayrollOutput(employeeConfig, employee);
+                        const employeeConfig = parseEmployeeSalaryConfig(employee, payrollPreviewContext?.rules ?? null);
+                        // Xem trước theo quy định lương backend; đang tải thì để trống, không đoán số
+                        const output = payrollPreviewContext
+                          ? calculatePayrollOutput(employeeConfig, employee, payrollPreviewContext)
+                          : null;
 
                         return (
                           <tr key={employee.id} className="hover:bg-gray-50 transition-colors">
@@ -4265,10 +3692,10 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-700">{employeeConfig.effectiveDate || '—'}</td>
                             <td className="px-4 py-3 text-right text-sm font-medium text-gray-700">
-                              {formatCurrency(output.grossIncome)}
+                              {formatCurrency(output?.grossIncome)}
                             </td>
                             <td className="px-4 py-3 text-right text-sm font-semibold text-indigo-700">
-                              {formatCurrency(output.netSalary)}
+                              {formatCurrency(output?.netSalary)}
                             </td>
                             <td className="px-4 py-3 text-center">
                               <button
@@ -4641,12 +4068,9 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                     <tbody className="bg-white divide-y divide-gray-100">
                       {pagedSalaryRecords.map((record) => {
                         const employee = employees.find((e) => e.id === record.employee_id);
-                        const recordCommissions = salaryCommissions.filter((item) => item.employee === record.employee_id);
-                        const incomeBreakdown = getMonthlyInputIncomeBreakdown(record, recordCommissions);
-                        const payslipComputation = calculatePayslipNetPayable(record, employee, recordCommissions);
-                        const recordTaxComputation = payslipComputation.payrollTax;
-                        const recordTax = recordTaxComputation.taxAmount;
-                        const recordNetPayable = payslipComputation.conPhaiThanhToan;
+                        // Mọi số do backend tính (backend/salary/payslip.py) — cùng số với phiếu lương / Excel
+                        const recordTax = record.phieu_luong.thue_tncn;
+                        const recordNetPayable = record.con_phai_thanh_toan;
 
                         return (
                         <tr key={record.employee_id} className="hover:bg-gray-50 transition-colors">
@@ -4660,12 +4084,12 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                           <td className="px-3 py-3 text-right text-gray-700">{formatCurrency((record as unknown as Record<string, number>)['phu_cap_an_trua'] ?? 0)}</td>
                           <td className="px-3 py-3 text-right text-gray-700">{formatCurrency((record as unknown as Record<string, number>)['phu_cap_livestream'] ?? 0)}</td>
                           <td className="px-3 py-3 text-right text-gray-700">{formatNumber(record.tong_cong)}</td>
-                          <td className="px-3 py-3 text-right text-blue-600">{formatCurrency(incomeBreakdown.luongOt)}</td>
+                          <td className="px-3 py-3 text-right text-blue-600">{formatCurrency(record.phieu_luong.luong_ot)}</td>
                           <td className="px-3 py-3 text-right text-red-600">{formatCurrency((record.tong_phat ?? 0) + (record.tong_phat_bienban ?? 0) + (record.phat_thieu_cong ?? 0))}</td>
                           <td className="px-3 py-3 font-semibold text-red-700 bg-red-50">
                             <div className="flex items-center justify-end gap-1.5">
                               {formatCurrency(recordTax)}
-                              <TaxTooltip taxDetail={recordTaxComputation.taxDetail} />
+                              <TaxTooltip taxDetail={taxDetailFromRecord(record)} />
                             </div>
                           </td>
                           <td className="px-3 py-3 text-right font-semibold text-indigo-700 bg-indigo-50">
@@ -4686,7 +4110,6 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
                               onClick={async () => {
                                 _closeActiveTaxTooltip?.();
                                 setPayslipRecord(record);
-                                setPayslipCommissions(salaryCommissions.filter((item) => item.employee === record.employee_id));
                                 setPayslipPenalties([]);
 
                                 // Lấy thông tin nhân viên đầy đủ (có personal_email) nếu chưa có trong danh sách hiện tại
@@ -4882,6 +4305,8 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
           onClose={() => setEditEmployee(null)}
           onSave={handleSave}
           saving={saving}
+          previewContext={payrollPreviewContext}
+          previewFailed={payrollPreviewFailed}
         />,
         document.body,
       )}
@@ -4891,14 +4316,13 @@ const SalaryManagement: React.FC<SalaryManagementProps> = ({
           record={payslipRecord}
           employee={payslipEmployee ?? undefined}
           penalties={payslipPenalties}
-          commissions={payslipCommissions}
           onEmailQueued={(employeeId) => {
             setEmailStatusFromQueueMap((prev) => ({
               ...prev,
               [employeeId]: 'PENDING',
             }));
           }}
-          onClose={() => { setPayslipRecord(null); setPayslipEmployee(null); setPayslipPenalties([]); setPayslipCommissions([]); }}
+          onClose={() => { setPayslipRecord(null); setPayslipEmployee(null); setPayslipPenalties([]); }}
         />,
         document.body,
       )}
