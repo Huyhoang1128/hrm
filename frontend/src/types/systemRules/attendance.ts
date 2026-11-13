@@ -38,6 +38,10 @@ export interface AttendanceRules {
     online_quota_override: { min: number; max: number; step: number };
     /** Chế độ con nhỏ: số phút mỗi chiều (validator + mặc định của model). */
     child_care_allowance_minutes: { min: number; max: number; default: number };
+    /** Ân hạn "đi làm trở lại": số giờ sau giờ vào ca của ngày làm việc kế tiếp. */
+    return_to_work_grace_hours: number;
+    /** Mốc dự phòng 'HH:MM' khi không tra được giờ vào ca. */
+    return_to_work_fallback_time: string;
   };
   /** Ca làm / trực tối. */
   shift?: {

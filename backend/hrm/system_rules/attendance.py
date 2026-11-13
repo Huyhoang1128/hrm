@@ -62,6 +62,7 @@ def attendance_rules(request):
     """Quy định chấm công / nghỉ chung cho mọi nhân viên (không phụ thuộc người / tháng)."""
     from django.utils import timezone
 
+    from hrm.deadline_utils import RETURN_TO_WORK_FALLBACK_TIME, RETURN_TO_WORK_GRACE_HOURS
     from hrm.penalty_config import PENALTY_AMOUNT_PER_VIOLATION, is_penalty_configured
     from hrm.registration_serializers import RegistrationRequestCreateSerializer
     from hrm.shift_config_utils import FULL_DAY_HOURS_THRESHOLD
@@ -83,6 +84,10 @@ def attendance_rules(request):
         'online_quota_override': _online_quota_override_rule(),
         # Chế độ con nhỏ (ChildCareRegime.allowance_minutes): khoảng theo validator + mặc định.
         'child_care_allowance_minutes': _child_care_minutes_rule(),
+        # Ân hạn "đi làm trở lại" (deadline_utils.unauthorized_absence_deadline): số giờ sau giờ vào
+        # ca của ngày làm việc kế tiếp + mốc dự phòng khi không tra được giờ vào ca.
+        'return_to_work_grace_hours': RETURN_TO_WORK_GRACE_HOURS,
+        'return_to_work_fallback_time': RETURN_TO_WORK_FALLBACK_TIME.strftime('%H:%M'),
     }
 
 

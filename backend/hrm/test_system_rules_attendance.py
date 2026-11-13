@@ -149,3 +149,21 @@ class ConfigOptionRulesTests(TestCase):
         self.assertEqual(rule['min'], 1)
         self.assertEqual(rule['max'], 240)
         self.assertEqual(rule['default'], ChildCareRegime._meta.get_field('allowance_minutes').get_default())
+
+
+class ReturnToWorkGraceRulesTests(TestCase):
+    """Mốc ân hạn "đi làm trở lại" (báo cáo Mở khoá quá mốc / Đối soát vi phạm) — 1 hằng số backend."""
+
+    def test_section_matches_deadline_constants(self):
+        from hrm.deadline_utils import RETURN_TO_WORK_FALLBACK_TIME, RETURN_TO_WORK_GRACE_HOURS
+
+        section = build_rules(_admin_request(), {'attendance'})['attendance']
+        self.assertEqual(section['return_to_work_grace_hours'], RETURN_TO_WORK_GRACE_HOURS)
+        self.assertEqual(section['return_to_work_fallback_time'], RETURN_TO_WORK_FALLBACK_TIME.strftime('%H:%M'))
+
+    def test_deadline_without_shift_uses_fallback_time(self):
+        from hrm.deadline_utils import RETURN_TO_WORK_FALLBACK_TIME, unauthorized_absence_deadline
+
+        deadline = unauthorized_absence_deadline(datetime.date(2026, 11, 2), None)
+        from django.utils import timezone
+        self.assertEqual(timezone.localtime(deadline).time(), RETURN_TO_WORK_FALLBACK_TIME)

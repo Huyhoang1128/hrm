@@ -1768,12 +1768,16 @@ const AttendanceManagement: React.FC = () => {
           // ShiftRegistrationDay (mô hình requires_manager_approval): mặc
           // định Ca 1, chỉ có hiệu lực Ca 2 khi quản lý trực tiếp duyệt
           // TRƯỚC 0h ngày áp dụng (duyệt ở trang Phê duyệt).
-          await shiftRegistrationService.registerCa2({
+          const ca2 = await shiftRegistrationService.registerCa2({
             employee_id: currentEmployee.id,
             date: dateStr,
           });
           await refreshAllData();
-          showNotify('success', 'Thành công', `Đã gửi đăng ký ${ca2RegLabel}, chờ quản lý trực tiếp duyệt trước 0h ngày áp dụng.`);
+          // Hạn duyệt do backend trả (day_registration_deadline) — không ghi cứng "trước 0h".
+          const ca2Deadline = ca2?.registration_deadline
+            ? ` trước ${new Date(ca2.registration_deadline).toLocaleString('vi-VN')}`
+            : '';
+          showNotify('success', 'Thành công', `Đã gửi đăng ký ${ca2RegLabel}, chờ quản lý trực tiếp duyệt${ca2Deadline}.`);
         } else if (selectedReason === 'overtime') {
           // 1. Phân đoạn gửi Đơn Tăng ca (Overtime)
           const overtimeData = {
