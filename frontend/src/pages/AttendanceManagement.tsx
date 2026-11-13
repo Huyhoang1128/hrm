@@ -74,16 +74,19 @@ function extractApiErrorMessage(error: any, fallback: string): string {
 
 
 
-/** Ngày `date` có rơi vào khung làm online KHÔNG tính hạn mức không — chỉ áp
- * cho phòng ban bật Department.online_weekend_unlimited (vd Kế toán): cả ngày
- * Chủ nhật, và buổi chiều thứ 7 tuần 2/4 (buổi sáng thứ 7 vẫn tính). Khớp
- * backend stats_utils.online_quota_amount(). */
-const onlineFreeSlot = (date: Date | null, unlimited?: boolean) => {
-  if (!date || !unlimited) return { sunday: false, satAfternoon: false };
-  const wd = date.getDay(); // 0 = Chủ nhật, 6 = Thứ 7
-  if (wd === 0) return { sunday: true, satAfternoon: false };
-  const occurrence = Math.floor((date.getDate() - 1) / 7) + 1;
-  return { sunday: false, satAfternoon: wd === 6 && (occurrence === 2 || occurrence === 4) };
+/** Số ngày mỗi buổi làm online (morning / afternoon / full_day — đúng id lựa chọn buổi) TÍNH VÀO
+ * hạn mức ở ngày `date`. Backend tính sẵn cho mọi ngày của tháng (API stats:
+ * online_quota_cost_by_date = stats_utils.online_quota_amount — xét lịch phòng ban THEO NGÀY,
+ * miễn Chủ nhật / chiều T7 tuần 2-4, NV làm chiều T7 mọi tuần...), web không tự suy luật.
+ * null = chưa có dữ liệu (đang tải / ngày ngoài tháng đang xem). */
+type OnlineQuotaCost = { morning: number; afternoon: number; full_day: number };
+const onlineQuotaCostOn = (
+  date: Date | null,
+  costByDate?: Record<string, OnlineQuotaCost> | null,
+): OnlineQuotaCost | null => {
+  if (!date || !costByDate) return null;
+  const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return costByDate[key] ?? null;
 };
 
 /** Lựa chọn giờ cho đơn Quên chấm công / Lỗi máy chấm công, dựng từ cấu hình ca đang áp dụng cho
@@ -3617,10 +3620,12 @@ const AttendanceManagement: React.FC = () => {
                                 const remainingOnline: number | null = attendanceStats?.remaining_online_work ?? null;
                                 const quotaCount = remainingOnline != null && maxOnline != null
                                   ? `${remainingOnline}/${maxOnline} ngày` : null;
-                                const freeSlot = onlineFreeSlot(selectedDate, attendanceStats?.online_weekend_unlimited);
-                                // Chủ nhật / chiều T7 tuần 2-4 không tính hạn mức -> không khoá thẻ
+                                const cost = onlineQuotaCostOn(selectedDate, attendanceStats?.online_quota_cost_by_date);
+                                // Khoá thẻ khi cả buổi "rẻ" nhất của ngày này vẫn vượt số còn lại — ngày/buổi
+                                // được miễn hạn mức có giá 0 nên không bao giờ bị khoá.
+                                const cheapest = cost ? Math.min(cost.morning, cost.afternoon, cost.full_day) : null;
                                 const isOnlineQuotaExhausted =
-                                  remainingOnline != null && remainingOnline <= 0 && !freeSlot.sunday && !freeSlot.satAfternoon;
+                                  remainingOnline != null && cheapest != null && cheapest > remainingOnline;
                                 return (
                                   <button
                                     type="button"
@@ -3645,10 +3650,10 @@ const AttendanceManagement: React.FC = () => {
                                         <p className="mt-1 text-sm text-gray-500">
                                           {isOnlineQuotaExhausted
                                             ? 'Đã hết lượt làm online tháng này'
-                                            : freeSlot.sunday
-                                              ? 'Làm việc từ xa (Chủ nhật — không tính hạn mức)'
-                                              : freeSlot.satAfternoon
-                                                ? `Làm việc từ xa (buổi chiều không tính hạn mức${quotaCount ? ` · còn ${quotaCount}` : ''})`
+                                            : cost?.full_day === 0
+                                              ? 'Làm việc từ xa (ngày này không tính hạn mức)'
+                                              : cost && (cost.morning === 0 || cost.afternoon === 0)
+                                                ? `Làm việc từ xa (buổi ${cost.afternoon === 0 ? 'chiều' : 'sáng'} không tính hạn mức${quotaCount ? ` · còn ${quotaCount}` : ''})`
                                                 : quotaCount ? `Làm việc từ xa (Còn ${quotaCount})` : 'Làm việc từ xa'}
                                         </p>
                                       </div>
@@ -3753,18 +3758,20 @@ const AttendanceManagement: React.FC = () => {
                                   : (attendanceStats?.remaining_online_work ?? null);
                                 
                                 let filtered = [...reasons];
-                                const freeSlotReasons = isLeave
-                                  ? { sunday: false, satAfternoon: false }
-                                  : onlineFreeSlot(selectedDate, attendanceStats?.online_weekend_unlimited);
-                                if (freeSlotReasons.sunday) {
-                                  // Chủ nhật không tính hạn mức -> giữ đủ sáng/chiều/cả ngày
-                                } else if (freeSlotReasons.satAfternoon) {
-                                  // Chiều T7 tuần 2/4 miễn hạn mức; sáng & cả ngày đều chỉ tính 0.5
-                                  if (remaining != null && remaining < 0.5) {
-                                    filtered = filtered.filter(r => r.id === 'afternoon');
+                                if (isLeave) {
+                                  // Nghỉ phép: cả ngày = 1 ngày phép
+                                  if (remaining != null && remaining < 1.0) {
+                                    filtered = filtered.filter(r => r.id !== 'full_day');
                                   }
-                                } else if (remaining != null && remaining < 1.0) {
-                                  filtered = filtered.filter(r => r.id !== 'full_day');
+                                } else {
+                                  // Online: mỗi buổi tính bao nhiêu ở ngày này do backend trả — chỉ giữ buổi còn đủ hạn mức
+                                  const cost = onlineQuotaCostOn(selectedDate, attendanceStats?.online_quota_cost_by_date);
+                                  if (remaining != null && cost) {
+                                    filtered = filtered.filter(r => {
+                                      const c = cost[r.id as keyof OnlineQuotaCost];
+                                      return c == null || c <= remaining;
+                                    });
+                                  }
                                 }
 
                                 // Kiểm tra các ca đã có dữ liệu (chính xác hơn)

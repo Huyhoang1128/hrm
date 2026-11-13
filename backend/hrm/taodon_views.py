@@ -2065,6 +2065,13 @@ class AttendanceExplanationViewSet(BulkRejectMixin, FinalizationLockMixin, views
             from .stats_utils import online_quota_amount
             approved_online_work += online_quota_amount(ev.employee, ev.event_date, ev.data)
 
+        # Mỗi buổi làm online tính bao nhiêu vào hạn mức, theo từng ngày của tháng (người đang
+        # xem) — web dùng thay cho luật tự suy "Chủ nhật / chiều T7 tuần 2-4".
+        online_quota_cost_by_date = None
+        if quota_employee is not None:
+            from .stats_utils import online_quota_cost_for_month
+            online_quota_cost_by_date = online_quota_cost_for_month(quota_employee, int(year), int(month))
+
         # Hạn mức theo từng loại: số còn lại / tối đa lấy theo giỏ của đúng người đang xem.
         explanation_quota = None
         if quota_employee is not None:
@@ -2104,6 +2111,9 @@ class AttendanceExplanationViewSet(BulkRejectMixin, FinalizationLockMixin, views
                 # hạn (Department.online_weekend_unlimited) — FE dùng để KHÔNG khoá
                 # thẻ "Làm việc online" ở những ngày đó dù đã hết lượt tháng.
                 'online_weekend_unlimited': online_weekend_unlimited,
+                # {'YYYY-MM-DD': {'morning', 'afternoon', 'full_day'}} — số ngày mỗi buổi online tính
+                # vào hạn mức (stats_utils.online_quota_amount); None khi không xem theo 1 người.
+                'online_quota_cost_by_date': online_quota_cost_by_date,
             },
         })
 

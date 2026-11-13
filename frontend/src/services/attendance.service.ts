@@ -570,6 +570,9 @@ class AttendanceService {
       remaining_online_work?: number;
       // Phòng ban được làm online chiều T7 tuần 2/4 & Chủ nhật không giới hạn
       online_weekend_unlimited?: boolean;
+      // {'YYYY-MM-DD': {morning, afternoon, full_day}} — số ngày mỗi buổi online tính vào hạn mức
+      // ở từng ngày của tháng (backend stats_utils.online_quota_amount); null khi không xem theo 1 người.
+      online_quota_cost_by_date?: Record<string, { morning: number; afternoon: number; full_day: number }> | null;
       approved_online_work?: number;
       approved_leave?: number;
       max_leave_per_month?: number;
