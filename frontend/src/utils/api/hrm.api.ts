@@ -42,6 +42,8 @@ export const employeesAPI = {
     is_active?: boolean;
     end_date_from?: string;
     end_date_to?: string;
+    /** YYYY-MM: chỉ người thuộc phạm vi chốt công của tháng (backend _active_in_month_q). */
+    active_in_month?: string;
   }): Promise<{
     count: number;
     next: string | null;
