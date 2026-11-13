@@ -306,14 +306,29 @@ class ChangePasswordView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
 
+# Luồng quên mật khẩu bằng OTP qua SĐT (/api/users/forgot-password/ + verify-otp/ + reset-password/)
+# TẮT: chưa có dịch vụ gửi OTP, mã cũ là hằng số "8888" và verify-otp trả về ACCESS TOKEN thật của
+# tài khoản -> ai biết SĐT (username) là đăng nhập được tài khoản đó. Web không dùng luồng này (web
+# dùng /api-hrm/forgot-password/). Bật lại chỉ khi có OTP ngẫu nhiên gửi thật + không trả access token.
+OTP_PASSWORD_RESET_DISABLED_MESSAGE = (
+    'Chức năng đặt lại mật khẩu qua OTP chưa được bật. Vui lòng liên hệ phòng Nhân sự để được cấp lại mật khẩu.'
+)
+
+
+def _otp_reset_disabled_response():
+    return Response({'error': OTP_PASSWORD_RESET_DISABLED_MESSAGE}, status=status.HTTP_410_GONE)
+
+
 class ForgotPasswordView(APIView):
     """
-    API to initiate forgot password process.
-    Sends OTP to user's phone number (default OTP: 8888).
+    (ĐÃ TẮT — xem OTP_PASSWORD_RESET_DISABLED_MESSAGE) Bắt đầu quên mật khẩu bằng OTP qua SĐT.
     """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        return _otp_reset_disabled_response()
+
+    def _legacy_post(self, request):  # giữ để tham khảo khi làm OTP thật; không được gọi
         try:
             phone_number = request.data.get('phone_number')
 
@@ -354,11 +369,15 @@ class ForgotPasswordView(APIView):
 
 class VerifyOTPView(APIView):
     """
-    API to verify OTP and generate reset token.
+    (ĐÃ TẮT — xem OTP_PASSWORD_RESET_DISABLED_MESSAGE) Xác thực OTP. Bản cũ so với hằng số "8888" và
+    trả về access token thật của tài khoản.
     """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        return _otp_reset_disabled_response()
+
+    def _legacy_post(self, request):  # giữ để tham khảo khi làm OTP thật; không được gọi
         try:
             phone_number = request.data.get('phone_number')
             otp_code = request.data.get('otp_code')
