@@ -307,13 +307,16 @@ def _build_default_payslip_body(record: dict, year: int, month: int) -> str:
         "  CÁC KHOẢN THU NHẬP",
         "────────────────────────────────────────",
         f"  Lương ngày công    : {_fmtN(p['luong_ngay_cong'])}",
-        *([f"  └─ Lương công TV ({round(probation_rate_percent)}%): {_fmtN(luong_ngay_cong_thu_viec)}"] if has_probation else []),
+        *([f"  └─ Lương công TV ({record.get('ty_le_thu_viec_text') or f'{round(probation_rate_percent)}%'}): "
+            f"{_fmtN(luong_ngay_cong_thu_viec)}"] if has_probation else []),
         *([f"  └─ Lương công CT    : {_fmtN(luong_ngay_cong_chinh_thuc)}"] if has_probation else []),
         *([f"  Lương doanh số     : {_fmtN(p['luong_doanh_so'])}"] if p['luong_doanh_so'] else []),
         *([f"  Lương OT           : {_fmtN(p['luong_ot'])}"] if p['luong_ot'] else []),
         *([f"  Bán sản phẩm       : {_fmtN(p['ban_san_pham'])}"] if p['ban_san_pham'] else []),
         *([f"  Phụ mổ             : {_fmtN(p['phu_mo'])}"] if p['phu_mo'] else []),
-        *([f"  Trực Ca            : {_fmtN(p['truc_ca'])}"] if p['truc_ca'] else []),
+        *([f"  Trực Ca            : {_fmtN(p['truc_ca'])}"
+            + (f" ({record['cach_tinh_truc_toi']})" if record.get('cach_tinh_truc_toi') and record.get('truc_ca_input') is None else '')]
+          if p['truc_ca'] else []),
         *([f"  Thu nhập khác      : {_fmtN(p['thu_nhap_khac'])}"] if p['thu_nhap_khac'] else []),
         *([f"  Thưởng             : {_fmtN(p['thuong'])}"] if p['thuong'] else []),
         "────────────────────────────────────────",

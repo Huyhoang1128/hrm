@@ -1910,7 +1910,7 @@ class AttendancePolicyConfigInline(admin.StackedInline):
     fields = (
         "max_explanation_quota",
         "penalty_multiplier_threshold", "penalty_multiplier_value",
-        "parking_allowance_per_day",
+        "parking_allowance_per_day", "night_duty_allowance_per_session",
         "live_prime_time_allowance", "live_prime_start_hour", "live_prime_end_hour",
         "max_live_prime_time_pct", "max_ot_live_pct",
         "incomplete_no_expl_deduction", "incomplete_approved_deduction",
@@ -2018,6 +2018,7 @@ class AttendancePolicyConfigAdmin(admin.ModelAdmin):
         ("Phụ cấp", {
             "fields": (
                 "parking_allowance_per_day",
+                "night_duty_allowance_per_session",
                 "live_prime_time_allowance",
                 "live_prime_start_hour", "live_prime_end_hour",
                 "max_live_prime_time_pct", "max_ot_live_pct",

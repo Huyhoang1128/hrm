@@ -901,8 +901,14 @@ const Approvals: React.FC = () => {
         }
       };
 
-      const m0 = filterMonth;
-      const y0 = filterYear;
+      const todayForWf = new Date();
+      // "Tất cả tháng" (MONTH_ALL = 0, mặc định của tab Chờ duyệt): API chốt công bắt buộc có
+      // tháng (month=0 -> 400, trước đây nuốt lỗi nên đơn chốt công chờ duyệt KHÔNG BAO GIỜ hiện
+      // ở tab mặc định) -> lấy tháng hiện tại + tháng liền trước (đơn chốt công chờ duyệt luôn
+      // thuộc tháng đang chạy hoặc tháng vừa đóng).
+      const isAllMonths = filterMonth === MONTH_ALL;
+      const m0 = isAllMonths ? todayForWf.getMonth() + 1 : filterMonth;
+      const y0 = isAllMonths ? todayForWf.getFullYear() : filterYear;
 
       // Đầu tháng mới (ngày ≤ 15) mà đang xem đúng tháng hiện tại (chưa đổi
       // filter thủ công) → chốt công của tháng VỪA ĐÓNG thường vẫn còn đơn
@@ -910,12 +916,11 @@ const Approvals: React.FC = () => {
       // hiện các đơn này mặc định — giữ nguyên hành vi cũ, dù initialMonth/
       // initialYear của trang giờ luôn là tháng hiện tại (không lùi tháng nữa,
       // xem giải thích ở khai báo initialMonth/initialYear phía trên).
-      const todayForWf = new Date();
       const isEarlyInMonth = todayForWf.getDate() <= 15;
       const isViewingCurrentMonth =
         m0 === todayForWf.getMonth() + 1 && y0 === todayForWf.getFullYear();
       const monthsToFetch = [{ m: m0, y: y0 }];
-      if (isEarlyInMonth && isViewingCurrentMonth) {
+      if ((isEarlyInMonth && isViewingCurrentMonth) || isAllMonths) {
         monthsToFetch.push(
           m0 === 1 ? { m: 12, y: y0 - 1 } : { m: m0 - 1, y: y0 }
         );

@@ -79,6 +79,20 @@ export interface SalaryRecord {
   cong_thu_viec?: number;
   cong_chinh_thuc: number;
   probation_rate_percent?: number;
+  /** Lựa chọn "tháng đầu X%, tháng sau Y%": công thử việc thuộc 1 tháng đầu, tỷ lệ sau tháng đầu. */
+  cong_thu_viec_thang_dau?: number;
+  probation_rate_percent_after_first_month?: number;
+  /** Câu tỷ lệ thử việc do backend tạo ("85%" / "85% tháng đầu (14 công), 100% (8 công)"). */
+  ty_le_thu_viec_text?: string;
+  /** Tiền trực tối = số buổi (truc_toi) × đơn giá; câu "3 buổi × 150.000" (null khi không tự tính). */
+  don_gia_truc_toi?: number;
+  tien_truc_toi?: number;
+  cach_tinh_truc_toi?: string | null;
+  /** Mức đóng BH sau khi áp trần luật + ghi chú khi có áp trần. */
+  muc_dong_bhxh_bhyt?: number;
+  muc_dong_bhtn?: number;
+  vung_luong_toi_thieu?: string;
+  ghi_chu_tran_bh?: string | null;
   luong_ngay_cong_thu_viec?: number;
   luong_ngay_cong_chinh_thuc?: number;
   luong_ngay_cong?: number;

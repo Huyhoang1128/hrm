@@ -51,7 +51,7 @@ _DEFAULT_TAX_BRACKETS_LEGACY = (
 _DEFAULT_FAMILY_DEDUCTIONS_NEW = (Decimal('15500000'), Decimal('6200000'))
 _DEFAULT_FAMILY_DEDUCTIONS_LEGACY = (Decimal('11000000'), Decimal('4400000'))
 
-# ── Bảng lương theo luật chỉ phần xem trước cấu hình lương dùng ──────────────
+# ── Bảng lương theo luật (trần đóng BH khi tính lương + xem trước cấu hình lương) ──
 # Mới nhất trước; effective_from=None = áp cho mọi ngày trước mốc của dòng phía trên.
 BASE_SALARY_HISTORY = (
     {'effective_from': dt.date(2024, 7, 1), 'amount': Decimal('2340000')},
@@ -148,3 +148,40 @@ def history_value_for_date(history, day: dt.date) -> dict:
         if entry['effective_from'] is None or entry['effective_from'] <= day:
             return entry
     return history[-1]
+
+
+# ── Trần mức lương đóng BH (Luật BHXH, Luật Việc làm) ─────────────────────────
+# BHXH + BHYT: tối đa INSURANCE_SALARY_CAP_MULTIPLIER × lương cơ sở;
+# BHTN: tối đa INSURANCE_SALARY_CAP_MULTIPLIER × lương tối thiểu vùng (vùng của nhân viên).
+INSURANCE_REGIONS = ('I', 'II', 'III', 'IV')
+DEFAULT_INSURANCE_REGION = 'I'
+
+
+def resolve_insurance_region(salary_adjustments) -> str:
+    """Vùng lương tối thiểu của nhân viên — đúng như trang Cấu hình lương: taxPolicy.region, không có
+    thì suy từ baseSalary.regionalMinimum (số đã chọn khớp vùng nào), không nữa thì vùng I."""
+    adjustments = salary_adjustments if isinstance(salary_adjustments, dict) else {}
+    config = adjustments.get('payroll_config') if isinstance(adjustments.get('payroll_config'), dict) else {}
+    tax_policy = config.get('taxPolicy') if isinstance(config.get('taxPolicy'), dict) else {}
+    region = str(tax_policy.get('region') or '').upper()
+    if region in INSURANCE_REGIONS:
+        return region
+    base_salary = config.get('baseSalary') if isinstance(config.get('baseSalary'), dict) else {}
+    try:
+        regional_minimum = Decimal(str(base_salary.get('regionalMinimum') or 0))
+    except Exception:
+        regional_minimum = Decimal('0')
+    if regional_minimum > 0:
+        for entry in REGIONAL_MINIMUM_HISTORY:
+            for name, amount in entry['by_region'].items():
+                if amount == regional_minimum:
+                    return name
+    return DEFAULT_INSURANCE_REGION
+
+
+def insurance_salary_caps(day: dt.date, region: str) -> tuple:
+    """(trần mức đóng BHXH+BHYT, trần mức đóng BHTN) áp cho ngày `day`."""
+    base_salary = history_value_for_date(BASE_SALARY_HISTORY, day)['amount']
+    by_region = history_value_for_date(REGIONAL_MINIMUM_HISTORY, day)['by_region']
+    regional_minimum = by_region.get(region) or by_region[DEFAULT_INSURANCE_REGION]
+    return (base_salary * INSURANCE_SALARY_CAP_MULTIPLIER, regional_minimum * INSURANCE_SALARY_CAP_MULTIPLIER)

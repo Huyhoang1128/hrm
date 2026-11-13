@@ -36,6 +36,7 @@ _DEFAULT_POLICY = {
     "penalty_multiplier_threshold":   7,
     "penalty_multiplier_value":       2.0,
     "parking_allowance_per_day":      5_000,
+    "night_duty_allowance_per_session": 0,
     "live_prime_time_allowance":      100_000,
     "live_prime_start_hour":          21,
     "live_prime_end_hour":            23,
@@ -807,30 +808,14 @@ class HRMAttendanceEngine:
     @staticmethod
     def _get_applicable_shifts(employee, first_day: datetime.date, last_day: datetime.date) -> list:
         """
-        Pre-fetch tất cả ShiftConfig áp dụng cho employee trong khoảng [first_day, last_day].
-        Trả về list đã sort theo start_time (ưu tiên: cá nhân > vị trí > phòng ban > chung).
-        Gọi một lần mỗi tháng để tránh N+1 query trong vòng lặp ngày.
+        Engine này KHÔNG tự tính lại phút muộn / về sớm theo ca: luôn dùng số phút đã lưu trên bản ghi
+        chấm công (Attendance.late_minutes / early_leave_minutes) — do engine chính tính, đã xét đăng ký
+        ca, ca theo ngày, ca tự nhận diện.
+
+        Trước đây hàm này truy vấn ShiftConfig theo field apply_to_all (đã bỏ) nên luôn lỗi rồi trả []
+        -> trên thực tế luôn dùng số đã lưu. Giữ đúng hành vi đó (quyết định 2026-11-13), bỏ truy vấn lỗi.
         """
-        try:
-            from .models import ShiftConfig
-            from django.db.models import Q
-
-            q_emp  = Q(apply_to_employees=employee)
-            q_pos  = Q(apply_to_positions=employee.position) if getattr(employee, "position", None) else Q(pk__in=[])
-            q_dept = Q(apply_to_departments=employee.department) if getattr(employee, "department", None) else Q(pk__in=[])
-            q_all  = Q(apply_to_all=True)
-
-            return list(
-                ShiftConfig.objects.filter(is_active=True)
-                .filter(Q(effective_from__isnull=True) | Q(effective_from__lte=last_day))
-                .filter(Q(effective_to__isnull=True)   | Q(effective_to__gte=first_day))
-                .filter(q_emp | q_pos | q_dept | q_all)
-                .distinct()
-                .order_by("start_time")
-            )
-        except Exception as exc:
-            logger.warning("_get_applicable_shifts failed: %s", exc)
-            return []
+        return []
 
     @staticmethod
     def _resolve_shift_for_attendance(attendance, attendance_date: datetime.date, shift_configs: list):

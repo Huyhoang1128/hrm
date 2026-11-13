@@ -164,6 +164,13 @@ class AttendancePolicyConfig(models.Model):
         default=5000, verbose_name="Phụ cấp gửi xe (VNĐ/ngày)"
     )
 
+    # Trực tối: bảng chốt công lưu SỐ BUỔI (truc_toi); tiền trực = số buổi × đơn giá này.
+    # 0 = không tự tính (HR nhập tay số tiền ở "Dữ liệu lương tháng" -> Trực ca).
+    night_duty_allowance_per_session = models.PositiveIntegerField(
+        default=0, verbose_name="Đơn giá trực tối (VNĐ/buổi)",
+        help_text="Tiền trực tối = số buổi trực trong bảng chốt công × đơn giá. 0 = không tự tính.",
+    )
+
     # Phụ cấp livestream
     live_prime_time_allowance    = models.PositiveIntegerField(
         default=100_000, verbose_name="Phụ cấp phiên live 21h-23h (VNĐ/phiên)"
@@ -213,6 +220,7 @@ class AttendancePolicyConfig(models.Model):
             "penalty_multiplier_threshold":   self.penalty_multiplier_threshold,
             "penalty_multiplier_value":       float(self.penalty_multiplier_value),
             "parking_allowance_per_day":      self.parking_allowance_per_day,
+            "night_duty_allowance_per_session": self.night_duty_allowance_per_session,
             "live_prime_time_allowance":      self.live_prime_time_allowance,
             "live_prime_start_hour":          self.live_prime_start_hour,
             "live_prime_end_hour":            self.live_prime_end_hour,
