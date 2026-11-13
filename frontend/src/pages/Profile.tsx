@@ -44,6 +44,8 @@ import { CITIZEN_ID_ISSUE_PLACE_OPTIONS } from '../constants/onboarding';
 import ChangePasswordModal from '../components/Layout/ChangePasswordModal';
 import FeedbackDialog from '../components/FeedbackDialog';
 import PdfFrame from '../components/Common/PdfFrame';
+import { useSystemRules } from '../services/systemRules.service';
+import { choiceLabel } from '../utils/hrChoices';
 
 interface TeamMember {
   id: number;
@@ -69,19 +71,6 @@ interface MyContract {
   created_at: string;
 }
 
-const CONTRACT_TYPE_MAP: Record<string, string> = {
-  PROBATION: 'Hợp đồng thử việc',
-  INTERN: 'Hợp đồng thực tập',
-  COLLABORATOR: 'Hợp đồng cộng tác viên',
-  ONE_YEAR: 'Hợp đồng 1 năm',
-  TWO_YEAR: 'Hợp đồng 2 năm',
-  INDEFINITE: 'Hợp đồng không xác định thời hạn',
-  SERVICE: 'Hợp đồng dịch vụ',
-  CONFIDENTIALITY: 'Cam kết bảo mật',
-  COMPANY_RULES: 'Nội quy công ty',
-  NURSING_COMMITMENT: 'Cam kết nuôi dưỡng',
-};
-
 const getDaysUntilExpiry = (endDate: string | null | undefined): number | null => {
   if (!endDate) return null;
   const today = new Date();
@@ -91,13 +80,14 @@ const getDaysUntilExpiry = (endDate: string | null | undefined): number | null =
   return Math.floor((end.getTime() - today.getTime()) / 86400000);
 };
 
-const getContractDisplayStatus = (contract: MyContract): { label: string; className: string } => {
+// expiringDays: số ngày "sắp hết hạn" từ backend (CONTRACT_EXPIRING_SOON_DAYS); null = chưa tải, không gắn nhãn.
+const getContractDisplayStatus = (contract: MyContract, expiringDays: number | null): { label: string; className: string } => {
   if (contract.status === 'SIGNED') {
     const days = getDaysUntilExpiry(contract.end_date);
     if (days !== null && days < 0) {
       return { label: 'Đã hết hạn', className: 'bg-red-100 text-red-700' };
     }
-    if (days !== null && days <= 5) {
+    if (days !== null && expiringDays !== null && days <= expiringDays) {
       return { label: `Sắp hết hạn (${days} ngày)`, className: 'bg-amber-100 text-amber-600' };
     }
     return { label: 'Đang hiệu lực', className: 'bg-emerald-100 text-emerald-600' };
@@ -114,6 +104,13 @@ const getContractDisplayStatus = (contract: MyContract): { label: string; classN
 const Profile: React.FC = () => {
   const { user, updateUser } = useAuth();
   const navigate = useNavigate();
+  // Nhãn loại HĐ và số ngày "sắp hết hạn" theo backend (GET /api-hrm/system-rules/).
+  const systemRules = useSystemRules();
+  const expiringDays = systemRules?.hr?.contract_expiring_soon_days ?? null;
+  const isContractExpiringSoon = (endDate: string | null | undefined): boolean => {
+    const days = getDaysUntilExpiry(endDate);
+    return expiringDays !== null && days !== null && days >= 0 && days <= expiringDays;
+  };
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [department, setDepartment] = useState<Department | null>(null);
   const [manager, setManager] = useState<Employee | null>(null);
@@ -894,7 +891,7 @@ const Profile: React.FC = () => {
                 <DocumentTextIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
                 <span className="text-gray-900">
                   {employee.contract_type_display ||
-                    (employee.contract_type ? CONTRACT_TYPE_MAP[employee.contract_type] : undefined) ||
+                    (employee.contract_type ? choiceLabel(systemRules?.choices?.contract_type, employee.contract_type) : undefined) ||
                     employee.contract_type ||
                     'Chưa cập nhật'}
                 </span>
@@ -1134,7 +1131,7 @@ const Profile: React.FC = () => {
             );
             const history = sorted.filter((c) => c !== active);
             const { label, className } = active
-              ? getContractDisplayStatus(active)
+              ? getContractDisplayStatus(active, expiringDays)
               : { label: '', className: '' };
 
             return (
@@ -1142,7 +1139,7 @@ const Profile: React.FC = () => {
                 {/* Active contract */}
                 {active ? (
                   <div className={`rounded-2xl border p-5 ${
-                    getDaysUntilExpiry(active.end_date) !== null && getDaysUntilExpiry(active.end_date)! <= 5
+                    isContractExpiringSoon(active.end_date)
                       ? 'border-amber-300 bg-amber-50'
                       : 'border-emerald-300 bg-emerald-50'
                   }`}>
@@ -1176,7 +1173,7 @@ const Profile: React.FC = () => {
                         </div>
                       )}
                     </div>
-                    {getDaysUntilExpiry(active.end_date) !== null && getDaysUntilExpiry(active.end_date)! <= 5 && getDaysUntilExpiry(active.end_date)! >= 0 && (
+                    {isContractExpiringSoon(active.end_date) && (
                       <div className="mt-3 flex items-center gap-2 text-amber-700 bg-amber-100 rounded-xl px-3 py-2 text-sm">
                         <ExclamationTriangleIcon className="h-4 w-4 flex-shrink-0" />
                         Hợp đồng sắp hết hạn trong {getDaysUntilExpiry(active.end_date)} ngày. Vui lòng liên hệ phòng HCNS để gia hạn nhằm tiếp tục sử dụng dịch vụ.
@@ -1201,7 +1198,7 @@ const Profile: React.FC = () => {
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Lịch sử hợp đồng</p>
                     <div className="divide-y divide-gray-100 border border-gray-100 rounded-2xl overflow-hidden">
                       {history.map((c) => {
-                        const { label: hLabel, className: hClass } = getContractDisplayStatus(c);
+                        const { label: hLabel, className: hClass } = getContractDisplayStatus(c, expiringDays);
                         return (
                           <div key={c.id} className="flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 gap-3 flex-wrap">
                             <div className="min-w-0">
