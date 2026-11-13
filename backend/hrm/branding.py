@@ -25,6 +25,11 @@ def hr_department_label():
     return _get('HR_DEPARTMENT_LABEL', 'Phòng Hành chính - Nhân sự')
 
 
+def company_city():
+    """Địa danh ghi trên văn bản in ("Hà Nội, ngày ...")."""
+    return _get('COMPANY_CITY', 'Hà Nội')
+
+
 def portal_url():
     return _get('HRM_PORTAL_URL') or _get('FRONTEND_URL', 'http://localhost:3000')
 

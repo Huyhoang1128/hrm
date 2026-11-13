@@ -5632,6 +5632,7 @@ class CompanyAnnouncementViewSet(viewsets.ModelViewSet):
             extra['created_by'] = Employee.objects.get(user=self.request.user)
         except Employee.DoesNotExist:
             pass
+        self._validate_attachment_files()
         attachment = self.request.FILES.get('attachment')
         if attachment and getattr(settings, 'CLOUDFLY_ENABLED', False):
             extra['attachment'] = upload_file_to_cloudfly(attachment, 'company/announcements')
@@ -5642,6 +5643,7 @@ class CompanyAnnouncementViewSet(viewsets.ModelViewSet):
         from .utils import upload_file_to_cloudfly
         from django.conf import settings
         extra = {}
+        self._validate_attachment_files()
         attachment = self.request.FILES.get('attachment')
         if attachment and getattr(settings, 'CLOUDFLY_ENABLED', False):
             extra['attachment'] = upload_file_to_cloudfly(attachment, 'company/announcements')
@@ -5654,6 +5656,25 @@ class CompanyAnnouncementViewSet(viewsets.ModelViewSet):
                 announcement=announcement, id__in=remove_ids
             ).delete()
         self._save_attachments(announcement)
+
+    def _validate_attachment_files(self):
+        """Chặn file sai định dạng / quá dung lượng TRƯỚC khi lưu thông báo (hrm/upload_limits.py,
+        web đọc cùng hằng số qua system-rules "uploads")."""
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+        from .upload_limits import (
+            ANNOUNCEMENT_ATTACHMENT_EXTENSIONS, ANNOUNCEMENT_ATTACHMENT_MAX_BYTES, file_extension, format_mb,
+        )
+        files = list(self.request.FILES.getlist('attachments'))
+        single = self.request.FILES.get('attachment')
+        if single:
+            files.append(single)
+        for f in files:
+            if file_extension(f.name) not in ANNOUNCEMENT_ATTACHMENT_EXTENSIONS:
+                raise DRFValidationError({'attachments': f'File "{f.name}": định dạng không được hỗ trợ.'})
+            if f.size > ANNOUNCEMENT_ATTACHMENT_MAX_BYTES:
+                raise DRFValidationError({
+                    'attachments': f'File "{f.name}" vượt quá {format_mb(ANNOUNCEMENT_ATTACHMENT_MAX_BYTES)}.'
+                })
 
     def _save_attachments(self, announcement):
         from .utils import upload_file_to_cloudfly
@@ -9651,6 +9672,24 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 
+SEND_ALL_ACCOUNT_EMAILS_BATCH_PREFIX = 'EMAIL_ALL_'
+
+
+def _send_all_account_emails_retry_after():
+    """Số giây còn phải chờ trước khi được "gửi tất cả" lần nữa (0 = được gửi)."""
+    from django.conf import settings
+    from hrm.models import EmailBatch
+    cooldown = int(getattr(settings, 'SEND_ALL_ACCOUNT_EMAILS_COOLDOWN_SECONDS', 0) or 0)
+    if cooldown <= 0:
+        return 0
+    last = (EmailBatch.objects.filter(batch_id__startswith=SEND_ALL_ACCOUNT_EMAILS_BATCH_PREFIX)
+            .order_by('-created_at').values_list('created_at', flat=True).first())
+    if not last:
+        return 0
+    remaining = cooldown - (timezone.now() - last).total_seconds()
+    return max(int(-(-remaining // 1)), 0)
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def send_account_emails(request):
@@ -9667,6 +9706,18 @@ def send_account_emails(request):
     try:
         send_all = request.data.get('send_all', False)
         employee_ids = request.data.get('employee_ids', [])
+
+        # "Gửi tất cả" reset mật khẩu MỌI nhân viên đang làm -> chặn bấm lặp trong
+        # SEND_ALL_ACCOUNT_EMAILS_COOLDOWN_SECONDS (dựa trên lô "gửi tất cả" gần nhất trong DB nên
+        # đúng cho mọi worker / mọi trình duyệt; web đọc cùng số qua system-rules "account").
+        if send_all:
+            retry_after = _send_all_account_emails_retry_after()
+            if retry_after > 0:
+                return Response({
+                    'success': False,
+                    'message': f'Vừa gửi email tài khoản cho tất cả nhân viên. Vui lòng thử lại sau {retry_after} giây.',
+                    'retry_after': retry_after,
+                }, status=status.HTTP_429_TOO_MANY_REQUESTS)
 
         # Query employees
         if send_all:
@@ -9692,8 +9743,9 @@ def send_account_emails(request):
                 'message': 'Không tìm thấy nhân viên nào có email'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Tạo batch ID
-        batch_id = f"EMAIL_{timezone.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+        # Tạo batch ID (lô "gửi tất cả" có tiền tố riêng để tính thời gian chờ ở trên)
+        batch_prefix = SEND_ALL_ACCOUNT_EMAILS_BATCH_PREFIX if send_all else 'EMAIL_'
+        batch_id = f"{batch_prefix}{timezone.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
         
         # Tạo EmailBatch record
         email_batch = EmailBatch.objects.create(
@@ -9842,6 +9894,15 @@ class ContractTemplateViewSet(viewsets.ModelViewSet):
     serializer_class = ContractTemplateSerializer
     permission_classes = [IsAuthenticated]
  
+    def _validate_template_file(self, file):
+        """Mẫu hợp đồng chỉ nhận đuôi CONTRACT_TEMPLATE_EXTENSIONS (.docx — engine điền placeholder đọc
+        Word); web đọc cùng hằng số qua system-rules "uploads"."""
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+        from .upload_limits import CONTRACT_TEMPLATE_EXTENSIONS, file_extension
+        if file and file_extension(file.name) not in CONTRACT_TEMPLATE_EXTENSIONS:
+            allowed = ', '.join(f'.{ext}' for ext in CONTRACT_TEMPLATE_EXTENSIONS)
+            raise DRFValidationError({'file': f'Chỉ chấp nhận file {allowed}.'})
+
     def perform_create(self, serializer):
         """✅ FIX: Upload file lên S3 dùng presigned URLs"""
         from django.conf import settings
@@ -9850,6 +9911,7 @@ class ContractTemplateViewSet(viewsets.ModelViewSet):
         from io import BytesIO
 
         file = self.request.FILES.get('file')
+        self._validate_template_file(file)
         file_key = None
 
         if file:
@@ -9917,6 +9979,7 @@ class ContractTemplateViewSet(viewsets.ModelViewSet):
         from io import BytesIO
 
         file = self.request.FILES.get('file')
+        self._validate_template_file(file)
         
         if file:
             try:
@@ -11795,12 +11858,17 @@ class ChangeAvatarView(APIView):
         if not avatar_file:
             return Response({'error': 'Vui lòng tải lên file ảnh avatar'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Kiểm tra content type
-        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
+        # Định dạng + dung lượng theo hrm/upload_limits.py (web đọc cùng hằng số qua system-rules "uploads").
+        from .upload_limits import AVATAR_ALLOWED_TYPES, AVATAR_MAX_BYTES, format_mb
         content_type = getattr(avatar_file, 'content_type', '') or ''
-        if content_type not in allowed_types:
+        if content_type not in AVATAR_ALLOWED_TYPES:
             return Response(
                 {'error': 'Chỉ hỗ trợ định dạng ảnh: JPEG, PNG, WebP, GIF'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if avatar_file.size > AVATAR_MAX_BYTES:
+            return Response(
+                {'error': f'Kích thước ảnh không được vượt quá {format_mb(AVATAR_MAX_BYTES)}.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
