@@ -1270,12 +1270,10 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
         try:
             # ===== GENERATE PASSWORD =====
-            # Generate random password (12 chars) with uppercase, lowercase, numbers, special chars
-            import secrets
-            import string
-            
-            password_chars = string.ascii_uppercase + string.ascii_lowercase + string.digits + "!@#$%^&*"
-            new_password = ''.join(secrets.choice(password_chars) for _ in range(12))
+            # Mật khẩu ngẫu nhiên RESET_PASSWORD_LENGTH ký tự (chữ hoa, thường, số, ký tự đặc biệt) —
+            # trang "Cấp lại mật khẩu" đọc đúng độ dài này qua system-rules "password".
+            from hrm.utils import generate_reset_password
+            new_password = generate_reset_password()
             
             logger.info(f"Generated random password for employee {employee.employee_id} (user: {user.username})")
             
@@ -9601,7 +9599,8 @@ def forgot_password(request):
     POST /api-hrm/forgot-password/
     Body: { "employee_id": "NV80018" }
     """
-    import secrets, string, logging
+    import logging
+    from hrm.utils import generate_reset_password
     logger = logging.getLogger(__name__)
 
     employee_id = (request.data.get('employee_id') or '').strip().upper()
@@ -9623,8 +9622,8 @@ def forgot_password(request):
         return Response({'error': 'Nhân viên chưa có email. Vui lòng liên hệ phòng Nhân sự.'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        chars = string.ascii_uppercase + string.ascii_lowercase + string.digits + "!@#$%"
-        new_password = ''.join(secrets.choice(chars) for _ in range(12))
+        # Cùng bộ sinh với HR "Cấp lại" (RESET_PASSWORD_LENGTH) — web đọc độ dài qua system-rules.
+        new_password = generate_reset_password()
         user.set_password(new_password)
         user.save()
 

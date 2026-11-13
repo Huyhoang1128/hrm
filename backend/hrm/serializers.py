@@ -771,7 +771,22 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
             # Active status
             'is_active'
         ]
-    
+
+    def validate(self, attrs):
+        # Mật khẩu HR đặt cho tài khoản mới theo cùng chính sách AUTH_PASSWORD_VALIDATORS như đổi mật khẩu
+        # (web đọc chính sách qua system-rules "password") — không có chính sách riêng cho từng màn hình.
+        from django.contrib.auth.password_validation import validate_password as django_validate_password
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        password = attrs.get('password')
+        if password:
+            probe = User(username=attrs.get('username', ''), email=attrs.get('email', ''),
+                         first_name=attrs.get('first_name', ''), last_name=attrs.get('last_name', ''))
+            try:
+                django_validate_password(password, probe)
+            except DjangoValidationError as e:
+                raise serializers.ValidationError({'password': list(e.messages)})
+        return super().validate(attrs)
+
     def create(self, validated_data):
         """
         Create user and employee together

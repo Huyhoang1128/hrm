@@ -208,7 +208,13 @@ export const authAPI = {
   changePassword: async (data: {
     currentPassword: string;
     newPassword: string;
+    confirmPassword: string;
   }): Promise<void> => {
-    await managementApi.post('/api/users/change-password/', data);
+    // Backend (users/views.py ChangePasswordView) đọc snake_case và bắt buộc cả 3 trường.
+    await managementApi.post('/api/users/change-password/', {
+      current_password: data.currentPassword,
+      new_password: data.newPassword,
+      confirm_password: data.confirmPassword,
+    });
   },
 };

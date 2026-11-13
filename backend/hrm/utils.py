@@ -34,6 +34,18 @@ def generate_random_password(length=12):
     return ''.join(password)
 
 
+# Mật khẩu ngẫu nhiên khi cấp lại (HR bấm "Cấp lại" / nhân viên tự yêu cầu "Quên mật khẩu").
+# Web hiển thị độ dài này qua GET /api-hrm/system-rules/ (section "password") — không ghi cứng ở FE.
+RESET_PASSWORD_LENGTH = 12
+RESET_PASSWORD_CHARS = string.ascii_uppercase + string.ascii_lowercase + string.digits + '!@#$%^&*'
+
+
+def generate_reset_password(length=RESET_PASSWORD_LENGTH):
+    """Mật khẩu ngẫu nhiên (secrets) cho luồng cấp lại mật khẩu."""
+    import secrets
+    return ''.join(secrets.choice(RESET_PASSWORD_CHARS) for _ in range(length))
+
+
 def generate_simple_password(length=8):
     """
     Generate a simpler random password (chỉ chữ + số, dễ nhớ hơn)
