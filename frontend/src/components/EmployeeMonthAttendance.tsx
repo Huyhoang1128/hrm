@@ -26,6 +26,7 @@ import {
   ChevronRightIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../contexts/AuthContext';
+import { useSystemRules } from '../services/systemRules.service';
 import { attendanceService, AttendanceRecord } from '../services/attendance.service';
 import { approvalService } from '../services/approval.service';
 import shiftRegistrationService, { Ca2Request, caLabels } from '../services/shiftRegistration.service';
@@ -195,6 +196,8 @@ const EmployeeMonthAttendance: React.FC<EmployeeMonthAttendanceProps> = ({
   showKpiCards = true,
 }) => {
   const { user } = useAuth();
+  // Quy định hệ thống (sàn tăng ca...) — nguồn duy nhất là backend.
+  const systemRules = useSystemRules();
   // Sửa thẳng giờ check-in/check-out thô (khác "Sửa đơn" — đây là sửa bản
   // ghi chấm công gốc) — mirror đúng điều kiện canEditAttendance cũ của
   // AttendanceCalendar.tsx (internal dialog), giờ chuyển hẳn vào đây vì
@@ -1655,7 +1658,10 @@ const EmployeeMonthAttendance: React.FC<EmployeeMonthAttendanceProps> = ({
                 </div>
               </div>
               <p className="text-xs text-gray-500">
-                Tối thiểu 30 phút mới được tính tăng ca. Số giờ được tính lại tự động theo giờ vào/ra mới.
+                {/* Sàn tăng ca lấy từ backend (overtime.min_minutes) — đúng số backend chặn khi sửa giờ. */}
+                {systemRules?.overtime?.min_applies_to.includes('OVERTIME') &&
+                  `Tối thiểu ${systemRules.overtime.min_minutes} phút mới được tính tăng ca. `}
+                Số giờ được tính lại tự động theo giờ vào/ra mới.
                 {(hoursModal.item.data?.status || '').toUpperCase() === 'APPROVED' &&
                   ' Đơn đã duyệt sẽ quay lại "Chờ duyệt" để HCNS duyệt lại.'}
               </p>

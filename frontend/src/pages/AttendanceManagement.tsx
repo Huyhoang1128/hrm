@@ -40,6 +40,7 @@ import {
   TrashIcon,
 } from '@heroicons/react/24/outline';
 import { Employee, employeesAPI } from '@/utils/api';
+import { useSystemRules } from '../services/systemRules.service';
 
 /**
  * Trích xuất thông báo lỗi dễ đọc từ response lỗi của DRF (Django REST
@@ -86,6 +87,8 @@ const onlineFreeSlot = (date: Date | null, unlimited?: boolean) => {
 
 const AttendanceManagement: React.FC = () => {
   const { user } = useAuth();
+  // Quy định hệ thống (sàn tăng ca, giới hạn khoảng ngày...) — nguồn duy nhất là backend.
+  const systemRules = useSystemRules();
 
   // Tab "Bản thân" / "Nhân viên" — tab "Nhân viên" chỉ dành cho Admin/HR/
   // Trưởng phòng (is_manager) xem chấm công của người khác (quản lý trực
@@ -364,6 +367,15 @@ const AttendanceManagement: React.FC = () => {
   const nightShiftDuration = calculateNightShiftDuration();
   const liveDuration = calculateLiveDuration();
 
+  // Sàn thời lượng (giờ) của loại đơn đang chọn — backend chỉ áp sàn cho các loại trong
+  // overtime.min_applies_to (hiện chỉ Tăng ca), nên web cũng chỉ chặn đúng các loại đó. Chưa
+  // tải được quy định thì không chặn theo sàn (backend vẫn kiểm tra khi gửi).
+  const registrationMinHours = (reason: string | null | undefined): number => {
+    const rule = systemRules?.overtime;
+    if (!rule || !reason) return 0;
+    return rule.min_applies_to.includes(reason.toUpperCase()) ? rule.min_minutes / 60 : 0;
+  };
+
   // Validate registration time fields
   // - Must have start and end time
   // - Duration must be positive (end > start)
@@ -380,28 +392,28 @@ const AttendanceManagement: React.FC = () => {
 
     if (!selectedReason) return false;
 
-    const MIN_HOURS = 0.5; // Default minimum for most registrations (30 minutes)
+    const minHours = registrationMinHours(selectedReason);
 
     switch (selectedReason) {
       case 'overtime':
         return (
           !!(overtimeStartTime && overtimeEndTime) &&
-          overtimeDuration >= MIN_HOURS
+          overtimeDuration > 0 && overtimeDuration >= minHours
         );
       case 'extra_hours':
         return (
           !!(extraHoursStartTime && extraHoursEndTime) &&
-          extraHoursDuration >= MIN_HOURS
+          extraHoursDuration > 0 && extraHoursDuration >= minHours
         );
       case 'night_shift':
         // Cho phép Ca CheckPage không có giờ cố định
         if (!nightShiftStartTime && !nightShiftEndTime) return true;
         return (
           !!(nightShiftStartTime && nightShiftEndTime) &&
-          nightShiftDuration >= MIN_HOURS
+          nightShiftDuration > 0 && nightShiftDuration >= minHours
         );
       case 'live':
-        return !!(liveStartTime && liveEndTime) && liveDuration >= MIN_HOURS;
+        return !!(liveStartTime && liveEndTime) && liveDuration > 0 && liveDuration >= minHours;
       default:
         return true;
     }
@@ -411,7 +423,7 @@ const AttendanceManagement: React.FC = () => {
   const getRegistrationTimeError = (): string | null => {
     if (selectedContext !== 'registration') return null;
 
-    const MIN_HOURS = 0.5;
+    const minHours = registrationMinHours(selectedReason);
     let hasTime = false;
     let duration = 0;
 
@@ -438,7 +450,7 @@ const AttendanceManagement: React.FC = () => {
 
     if (!hasTime) return null; // Don't show error until user selects times
     if (duration <= 0) return 'Giờ kết thúc phải sau giờ bắt đầu';
-    if (duration < MIN_HOURS) return 'Tối thiểu 30 phút';
+    if (minHours > 0 && duration < minHours) return `Tối thiểu ${systemRules?.overtime?.min_minutes} phút`;
     return null;
   };
 

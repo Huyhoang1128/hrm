@@ -51,7 +51,7 @@ HOURS_BASED_TYPES = {"OVERTIME", "EXTRA_HOURS"}
 # Thời lượng tăng ca tối thiểu (phút) — định nghĩa gốc ở
 # overtime_reconciliation.py, import lại ở đây để lúc TẠO đơn và lúc ĐỐI SOÁT
 # dùng chung đúng 1 con số.
-from .overtime_reconciliation import OT_MIN_DURATION_MINUTES  # noqa: E402
+from .overtime_reconciliation import OT_MIN_DURATION_MINUTES, OT_MIN_DURATION_TYPES  # noqa: E402
 
 # Loại đơn tính theo buổi / ca (1 đơn = 1 đơn vị)
 SESSION_BASED_TYPES = {"LIVE", "NIGHT_SHIFT", "OFF_DUTY"}
@@ -521,7 +521,7 @@ class RegistrationRequestCreateSerializer(serializers.Serializer):
             # ONSITE và xét theo giờ CHẤM CÔNG THỰC TẾ — nên đơn Online dưới 30
             # phút luôn lọt, còn đơn Offline dưới 30 phút vẫn được tạo rồi mới
             # bị huỷ sau khi có dữ liệu máy chấm công (cuối tháng).
-            if reg_type == "OVERTIME" and data["hours"] * 60 < OT_MIN_DURATION_MINUTES:
+            if reg_type in OT_MIN_DURATION_TYPES and data["hours"] * 60 < OT_MIN_DURATION_MINUTES:
                 raise serializers.ValidationError(
                     {"hours": f"Tăng ca tối thiểu {OT_MIN_DURATION_MINUTES} phút "
                               f"({OT_MIN_DURATION_MINUTES / 60:.1f} giờ) mới được tính — "

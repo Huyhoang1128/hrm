@@ -710,8 +710,8 @@ class RegistrationRequestViewSet(BulkRejectMixin, FinalizationLockMixin, viewset
         # chặn ở lúc tạo thì vẫn lách được bằng cách tạo đơn 30 phút rồi sửa
         # xuống 20 phút. Áp dụng cho cả Online lẫn Offline (HCNS chốt
         # 2026-09-23, Thông báo HCNS "Dưới 30 phút không tính OT").
-        if (d.get("registration_type") or "").upper() == "OVERTIME":
-            from .overtime_reconciliation import OT_MIN_DURATION_MINUTES
+        from .overtime_reconciliation import OT_MIN_DURATION_MINUTES, OT_MIN_DURATION_TYPES
+        if (d.get("registration_type") or "").upper() in OT_MIN_DURATION_TYPES:
             new_hours = d.get("hours")
             if new_hours is not None and float(new_hours) * 60 < OT_MIN_DURATION_MINUTES:
                 return Response(

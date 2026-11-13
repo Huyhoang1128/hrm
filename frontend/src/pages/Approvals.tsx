@@ -20,6 +20,7 @@ import { EDIT_FIELD_LABELS, sortEditChanges, formatEditValue, countRealEditChang
 import deadlineExceptionService, { AppliedDeadlineException } from '../services/deadlineException.service';
 import { DeadlineExceptionBadge, DeadlineExceptionDetail } from '../components/approvals/DeadlineExceptionFlag';
 import { useNotePrompt } from '../components/NotePromptDialog';
+import { useSystemRules } from '../services/systemRules.service';
 
 // Giá trị đặc biệt cho lựa chọn "Tôi là QLTT" trong dropdown Phòng ban —
 // không phải tên phòng ban thật nên không bao giờ trùng.
@@ -75,6 +76,8 @@ const TYPE_CHIP_STYLES: Record<string, { active: string; idle: string; badge: st
 
 const Approvals: React.FC = () => {
   const { user } = useAuth();
+  // Quy định hệ thống (sàn tăng ca...) — nguồn duy nhất là backend.
+  const systemRules = useSystemRules();
   const { askNote, notePromptDialog } = useNotePrompt();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<
@@ -5110,8 +5113,10 @@ const Approvals: React.FC = () => {
             <div className="p-5 space-y-4">
               <div className="p-3 rounded-lg bg-indigo-50 border border-indigo-100 text-xs text-indigo-700">
                 Sửa lại cho đúng giờ tăng ca thực tế của nhân viên. Số giờ sẽ được tính lại tự động theo
-                giờ vào/ra mới. Tối thiểu 30 phút mới được tính tăng ca — nếu thực tế làm dưới 30 phút
-                thì huỷ đơn thay vì sửa giờ.
+                giờ vào/ra mới.
+                {/* Sàn tăng ca lấy từ backend (overtime.min_minutes) — đúng số backend chặn khi sửa giờ. */}
+                {systemRules?.overtime?.min_applies_to.includes('OVERTIME') &&
+                  ` Tối thiểu ${systemRules.overtime.min_minutes} phút mới được tính tăng ca — nếu thực tế làm dưới ${systemRules.overtime.min_minutes} phút thì huỷ đơn thay vì sửa giờ.`}
                 {!(isAdmin || isHR) && (() => {
                   const dl = getManagerFixDeadline(
                     otEditItem.attendance_date || otEditItem.registration_date || otEditItem.event_date || otEditItem.start_date,
