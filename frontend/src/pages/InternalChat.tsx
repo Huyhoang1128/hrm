@@ -28,6 +28,7 @@ import {
   InternalConversation,
   InternalReactionType,
 } from '@/utils/api';
+import { formatBytes, useSystemRules } from '@/services/systemRules.service';
 
 const textOf = (message?: InternalChatMessage | null) => {
   if (!message) return '';
@@ -59,6 +60,8 @@ function ReactionIcon({ code, assetUrl, className = 'h-5 w-5' }: { code: string;
 
 export default function InternalChat() {
   const { user: authUser } = useAuth();
+  // Giới hạn ảnh chat / icon reaction lấy từ backend (chat/views.py qua system-rules "chat").
+  const chatRules = useSystemRules()?.chat ?? null;
   const [meId, setMeId] = useState<number>();
   const [canDeleteMessages, setCanDeleteMessages] = useState(false);
   const [canManageChannels, setCanManageChannels] = useState(false);
@@ -308,8 +311,8 @@ export default function InternalChat() {
       setReactionTypes(await internalChatAPI.reactionTypes(true));
       setReactionLabel('');
       setReactionFile(null);
-    } catch {
-      setError('Không thể xử lý icon reaction. Ảnh gốc cần nhỏ hơn 15MB.');
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Không thể xử lý icon reaction.');
     } finally {
       setSavingReaction(false);
     }
@@ -382,8 +385,17 @@ export default function InternalChat() {
 
   const selectImage = (file?: File) => {
     if (!file) return;
+    // Kiểm tra theo đúng định dạng / dung lượng backend nhận (cả đường dán ảnh); chưa tải được quy định
+    // thì để backend kiểm tra.
     if (!file.type.startsWith('image/')) { setError('Vui lòng chọn một file ảnh.'); return; }
-    if (file.size > 500 * 1024) { setError('Kích thước ảnh tối đa là 500 KB.'); return; }
+    if (chatRules && !chatRules.image_types.includes(file.type)) {
+      setError(`Chỉ hỗ trợ ảnh ${chatRules.image_types.map((t) => t.split('/')[1]?.toUpperCase()).join(', ')}.`);
+      return;
+    }
+    if (chatRules && file.size > chatRules.image_max_bytes) {
+      setError(`Kích thước ảnh tối đa là ${formatBytes(chatRules.image_max_bytes)}.`);
+      return;
+    }
     setImageFile(file);
   };
   const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
@@ -518,7 +530,7 @@ export default function InternalChat() {
           </div>
           {isActiveMember ? <form onSubmit={onSubmit} className="border-t border-gray-200 bg-white p-3 sm:px-5">
             {imageFile && <div className={`mx-auto mb-2 flex items-center justify-between rounded-lg bg-primary-50 px-3 py-2 text-xs text-primary-700 transition-[max-width] duration-200 ${sidebarCollapsed ? 'max-w-none' : 'max-w-4xl 2xl:max-w-5xl'}`}><span className="truncate">{imageFile.name} ({Math.ceil(imageFile.size / 1024)} KB)</span><button type="button" onClick={() => setImageFile(null)} className="ml-2 font-semibold">Bỏ ảnh</button></div>}
-            <div className={`mx-auto flex items-end gap-2 transition-[max-width] duration-200 ${sidebarCollapsed ? 'max-w-none' : 'max-w-4xl 2xl:max-w-5xl'}`}><input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={(event) => { selectImage(event.target.files?.[0]); event.target.value = ''; }} /><button type="button" onClick={() => imageInputRef.current?.click()} disabled={sending} title="Gửi ảnh (tối đa 500 KB)" className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-40"><PhotoIcon className="h-5 w-5" /></button><textarea value={input} onChange={(event) => setInput(event.target.value)} onPaste={onPaste} onKeyDown={onKeyDown} rows={1} placeholder="Nhập tin nhắn hoặc dán ảnh..." className="max-h-28 min-h-[44px] flex-1 resize-none rounded-xl border-gray-300 bg-gray-50 px-4 py-2.5 text-sm focus:border-primary-500 focus:ring-primary-500" /><button type="submit" disabled={(!input.trim() && !imageFile) || sending} className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-40"><PaperAirplaneIcon className="h-5 w-5" /></button></div>
+            <div className={`mx-auto flex items-end gap-2 transition-[max-width] duration-200 ${sidebarCollapsed ? 'max-w-none' : 'max-w-4xl 2xl:max-w-5xl'}`}><input ref={imageInputRef} type="file" accept={chatRules ? chatRules.image_types.join(',') : 'image/*'} className="hidden" onChange={(event) => { selectImage(event.target.files?.[0]); event.target.value = ''; }} /><button type="button" onClick={() => imageInputRef.current?.click()} disabled={sending} title={chatRules ? `Gửi ảnh (tối đa ${formatBytes(chatRules.image_max_bytes)})` : 'Gửi ảnh'} className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-40"><PhotoIcon className="h-5 w-5" /></button><textarea value={input} onChange={(event) => setInput(event.target.value)} onPaste={onPaste} onKeyDown={onKeyDown} rows={1} placeholder="Nhập tin nhắn hoặc dán ảnh..." className="max-h-28 min-h-[44px] flex-1 resize-none rounded-xl border-gray-300 bg-gray-50 px-4 py-2.5 text-sm focus:border-primary-500 focus:ring-primary-500" /><button type="submit" disabled={(!input.trim() && !imageFile) || sending} className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-40"><PaperAirplaneIcon className="h-5 w-5" /></button></div>
           </form> : <div className="flex items-center justify-center gap-2 border-t border-amber-200 bg-amber-50 px-4 py-4 text-sm font-medium text-amber-700"><EyeIcon className="h-5 w-5" />Bạn chỉ có thể xem nội dung vì không phải thành viên của conversation này.</div>}
         </>}
       </section>
@@ -588,7 +600,7 @@ export default function InternalChat() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4" onMouseDown={closeReactionManager}>
           <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl" onMouseDown={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between border-b p-4"><div><h2 className="font-semibold text-gray-900">Quản lý reaction</h2><p className="text-xs text-gray-500">Dành cho HR và Admin</p></div><button onClick={closeReactionManager} className="rounded-lg p-1 hover:bg-gray-100"><XMarkIcon className="h-5 w-5 text-gray-500" /></button></div>
-            <div className="space-y-3 border-b bg-gray-50 p-4"><p className="text-sm font-medium text-gray-700">Thêm icon bằng ảnh</p><div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]"><input value={reactionLabel} onChange={(event) => setReactionLabel(event.target.value)} placeholder="Tên reaction" className="rounded-xl border-gray-300 text-sm focus:border-primary-500 focus:ring-primary-500" /><input type="file" accept="image/*" onChange={(event) => setReactionFile(event.target.files?.[0] || null)} className="min-w-0 rounded-xl border border-gray-300 bg-white p-2 text-xs" /><button onClick={uploadReaction} disabled={!reactionLabel.trim() || !reactionFile || savingReaction} className="rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">{savingReaction ? 'Đang xử lý' : 'Thêm'}</button></div><p className="text-xs text-gray-400">Ảnh tối đa 15MB; hệ thống tự resize, căn giữa và nén thành WebP 96×96.</p></div>
+            <div className="space-y-3 border-b bg-gray-50 p-4"><p className="text-sm font-medium text-gray-700">Thêm icon bằng ảnh</p><div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]"><input value={reactionLabel} onChange={(event) => setReactionLabel(event.target.value)} placeholder="Tên reaction" className="rounded-xl border-gray-300 text-sm focus:border-primary-500 focus:ring-primary-500" /><input type="file" accept="image/*" onChange={(event) => setReactionFile(event.target.files?.[0] || null)} className="min-w-0 rounded-xl border border-gray-300 bg-white p-2 text-xs" /><button onClick={uploadReaction} disabled={!reactionLabel.trim() || !reactionFile || savingReaction} className="rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">{savingReaction ? 'Đang xử lý' : 'Thêm'}</button></div><p className="text-xs text-gray-400">{chatRules ? `Ảnh tối đa ${formatBytes(chatRules.reaction_source_max_bytes)}; hệ thống tự resize, căn giữa và nén thành WebP ${chatRules.reaction_icon_px}×${chatRules.reaction_icon_px}.` : 'Hệ thống tự resize, căn giữa và nén ảnh thành WebP.'}</p></div>
             <div className="max-h-[55vh] overflow-y-auto p-3">{reactionTypes.map((option) => <div key={option.id} className={`flex items-center gap-3 rounded-xl p-3 ${option.is_active ? 'hover:bg-gray-50' : 'bg-gray-50 opacity-60'}`}><div className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-xl"><ReactionIcon code={option.code} assetUrl={option.asset_url} className="h-8 w-8" /></div><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-gray-900">{option.code}</p><p className="text-xs text-gray-500">{option.asset_url ? 'Icon ảnh' : 'Emoji'}</p></div><label className="flex items-center gap-1 text-xs text-gray-500">Thứ tự<input type="number" min="0" defaultValue={option.sort_order} onBlur={(event) => updateReactionOrder(option, Number(event.target.value) || 0)} className="w-16 rounded-lg border-gray-300 px-2 py-1 text-xs" /></label><button onClick={() => toggleReactionTypeActive(option)} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${option.is_active ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>{option.is_active ? 'Ẩn' : 'Hiện'}</button></div>)}</div>
           </div>
         </div>
