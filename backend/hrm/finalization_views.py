@@ -238,6 +238,22 @@ def _resolve_config_allowances(employee: Employee) -> Decimal:
     return sum(_to_decimal(allowances.get(k), Decimal("0")) for k in keys)
 
 
+def _profile_allowance_outside_config(employee: Employee, profile_allowance: Decimal) -> Decimal:
+    """Phần "phụ cấp cố định" trên hồ sơ / lịch sử lương KHÔNG nằm trong cấu hình lương.
+
+    Trang Cấu hình lương lưu Employee.allowance (và lịch sử lương) = đi lại + điện thoại + nhà ở +
+    độc hại (+ ăn trưa khi ăn trưa cố định) — đúng các khoản build_salary_row đã cộng riêng từ
+    payroll_config (_resolve_config_allowances, _calculate_lunch_allowance). Cộng cả allowance lẫn
+    các khoản đó là tính 2 lần; chỉ cộng phần vượt (phụ cấp nhập tay ngoài cấu hình, dữ liệu cũ).
+    Nhân viên chưa cấu hình lương: các khoản cấu hình = 0 nên cộng nguyên allowance như trước.
+    """
+    in_config = _resolve_config_allowances(employee)
+    lunch_policy = _resolve_lunch_policy(employee)
+    if lunch_policy["mode"] == "fixed":
+        in_config += min(max(lunch_policy["fixed_amount"], Decimal("0")), lunch_policy["monthly_cap"])
+    return max(profile_allowance - in_config, Decimal("0"))
+
+
 def _get_other_allowance(employee: Employee, year: int, month: int) -> Decimal:
     try:
         obj = OtherAllowance.objects.get(employee=employee, year=year, month=month)
@@ -1535,8 +1551,10 @@ def build_salary_row(employee: Employee, ctx: SalaryMonthContext) -> dict:
         livestream_allowance_config.amount_per_session if livestream_allowance_config else 0
     )
     livestream_allowance = livestream_amount_per_session * Decimal(str(livestream_sessions))
+    # Phụ cấp cố định trên hồ sơ / lịch sử lương: chỉ phần chưa có trong cấu hình lương (tránh cộng 2 lần).
+    profile_allowance = _profile_allowance_outside_config(employee, fixed_allowance)
     total_allowance = (
-        fixed_allowance
+        profile_allowance
         + lunch_allowance
         + parking_allowance
         + config_allowances
