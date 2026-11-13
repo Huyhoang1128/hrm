@@ -1943,6 +1943,7 @@ class CompanyConfigSerializer(serializers.ModelSerializer):
             'lock_employee_self_edit',
             'explanation_quota_mode', 'max_late_explanation_per_month', 'max_early_leave_explanation_per_month',
             'max_incomplete_attendance_explanation_per_month', 'manager_combined_explanation_quota',
+            'manager_incomplete_explanation_quota',
             'is_active', 'effective_from', 'effective_to',
             'created_at', 'updated_at', 'created_by', 'created_by_name', 'created_by_id',
             'is_current'

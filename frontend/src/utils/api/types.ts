@@ -640,6 +640,8 @@ export interface CompanyConfig {
   max_early_leave_explanation_per_month?: number;
   max_incomplete_attendance_explanation_per_month?: number;
   manager_combined_explanation_quota?: number;
+  /** Rổ gộp: Quên chấm công rổ riêng (lần/tháng); null = tính chung rổ gộp. */
+  manager_incomplete_explanation_quota?: number | null;
   is_active: boolean;
   effective_from: string;
   effective_to?: string;

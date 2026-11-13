@@ -83,7 +83,8 @@ const ManagerExplanationQuotaTab: React.FC = () => {
         <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
           Chỉ có tác dụng khi Cấu hình công ty tính hạn mức giải trình <strong>theo từng loại</strong>. Người được chọn dùng
           chung 1 rổ cho mọi loại (Đi muộn / Về sớm / Quên chấm công) với số lượt "Rổ gộp" trong Cấu hình công ty, thay cho
-          hạn mức của từng loại.
+          hạn mức của từng loại. Nếu Cấu hình công ty có điền "Quên chấm công riêng", Quên chấm công tách rổ riêng với số
+          lượt đó, rổ gộp chỉ còn Đi muộn + Về sớm.
         </p>
       </div>
 

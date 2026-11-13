@@ -2267,6 +2267,8 @@ def _explanation_quota_summary(employee, year, month) -> dict:
         "explanation_quota_shared": status["shared"],
         "is_manager_combined_quota": status["is_manager_combined_quota"],
         "explanation_quota_by_type": status["by_type"],
+        # Các rổ hạn mức (nhãn + loại đơn + used/max) — lịch hiển thị theo đây.
+        "explanation_quota_groups": status["groups"],
     }
     if status["mode"] == "PER_TYPE":
         # Số tổng trên lịch = tổng các giỏ (hoặc rổ gộp) thay cho hạn mức chung của chính sách

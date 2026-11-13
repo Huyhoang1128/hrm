@@ -264,15 +264,22 @@ def serialize_duyet_don_event(event: EmployeeEvent, violation_info: dict = None,
         result["quota_used"] = stats.get("quota_used", 0)
         result["quota_remaining"] = stats.get("quota_remaining", 0)
         result["max_explanation_quota"] = stats.get("max_explanation_quota", 3)
-        # Hạn mức theo từng loại: số của đúng giỏ loại đơn này (hrm/explanation_quota.py)
-        from .explanation_quota import BUCKET_OF
-        _bucket = BUCKET_OF.get(str(result.get("explanation_type") or "").upper())
-        _bucket_stats = (stats.get("explanation_quota_by_type") or {}).get(_bucket) if _bucket else None
-        result["quota_bucket"] = None if stats.get("explanation_quota_shared", True) else _bucket
-        if _bucket_stats and not stats.get("explanation_quota_shared", True):
-            result["quota_used"] = _bucket_stats["used"]
-            result["quota_remaining"] = _bucket_stats["remaining"]
-            result["max_explanation_quota"] = _bucket_stats["max"]
+        # Hạn mức theo từng loại: số của RỔ chứa loại đơn này (1 giỏ, hoặc Đi muộn + Về sớm /
+        # Quên chấm công của rổ gộp tách) — hrm/explanation_quota.py
+        from .explanation_quota import group_entry
+        _groups = stats.get("explanation_quota_groups") or []
+        _group = group_entry({"groups": _groups}, result.get("explanation_type"))
+        result["quota_bucket"] = None if stats.get("explanation_quota_shared", True) or not _group else _group["key"]
+        if _group and not stats.get("explanation_quota_shared", True):
+            result["quota_used"] = _group["used"]
+            result["quota_remaining"] = _group["remaining"]
+            result["max_explanation_quota"] = _group["max"]
+        # Rổ của đơn (có nhãn) + mọi rổ của nhân viên trong tháng — trang Phê duyệt hiển thị theo đây.
+        result["explanation_quota"] = (
+            {k: _group[k] for k in ("key", "label", "used", "max", "remaining")} if _group else None)
+        result["explanation_quota_groups"] = [
+            {k: g[k] for k in ("key", "label", "used", "max", "remaining")} for g in _groups]
+        result["max_online_quota"] = stats.get("max_online_quota")
         result["leave_used"] = stats.get("leave_used", 0)
         result["max_leave_quota"] = stats.get("max_leave_quota", 1)
 

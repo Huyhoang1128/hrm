@@ -1252,13 +1252,13 @@ class HRMAttendanceEngine:
         # Running counters
         running_violations = 0
         running_expl_quota = 0
-        # Hạn mức giải trình theo từng loại (hrm/explanation_quota.py)
+        # Hạn mức giải trình theo từng loại / theo rổ (hrm/explanation_quota.py)
         try:
-            from .explanation_quota import BUCKET_OF, quota_rules
+            from .explanation_quota import pool_key, quota_rules
             quota_rule = quota_rules(employee.pk)
         except Exception:
-            BUCKET_OF, quota_rule = {}, {'mode': 'COMBINED'}
-        running_by_bucket = {}
+            pool_key, quota_rule = None, {'mode': 'COMBINED'}
+        running_by_pool = {}
         running_ot         = 0.0
         running_live_ot    = 0.0
         prime_sessions     = 0
@@ -1292,12 +1292,13 @@ class HRMAttendanceEngine:
             )
 
             if quota_rule['mode'] == 'PER_TYPE':
-                bucket = BUCKET_OF.get(str(ctx.get("explanation_type") or "").upper())
-                if quota_rule['limits'] is None:
+                pool = pool_key(quota_rule, ctx.get("explanation_type"))
+                if quota_rule['combined_max'] is not None:   # mọi loại chung 1 rổ
                     ctx["explanation_quota_max"] = quota_rule['combined_max']
-                elif bucket:
-                    ctx["explanation_quota_used"] = running_by_bucket.get(bucket, 0)
-                    ctx["explanation_quota_max"] = quota_rule['limits'][bucket]
+                elif pool:
+                    # Rổ riêng (từng giỏ, hoặc Đi muộn + Về sớm / Quên chấm công của rổ gộp tách).
+                    ctx["explanation_quota_used"] = running_by_pool.get(pool, 0)
+                    ctx["explanation_quota_max"] = quota_rule['pools'][pool]
 
             result = self._apply_rules(ctx, policy, tiers)
 
@@ -1328,9 +1329,10 @@ class HRMAttendanceEngine:
             if (result.is_exempt and ctx.get("explanation_type") not in EXEMPT_EXPLANATION_TYPES
                     and ctx.get("explanation_type") != "MACHINE_ERROR"):
                 running_expl_quota += 1
-                counted_bucket = BUCKET_OF.get(str(ctx.get("explanation_type") or "").upper())
-                if counted_bucket:
-                    running_by_bucket[counted_bucket] = running_by_bucket.get(counted_bucket, 0) + 1
+                counted_pool = (pool_key(quota_rule, ctx.get("explanation_type"))
+                                if quota_rule['mode'] == 'PER_TYPE' else None)
+                if counted_pool:
+                    running_by_pool[counted_pool] = running_by_pool.get(counted_pool, 0) + 1
             running_ot      += result.overtime_hours
             running_live_ot += result.overtime_hours  # approx; ideally filter LIVE OT only
 

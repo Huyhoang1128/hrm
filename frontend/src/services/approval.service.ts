@@ -789,6 +789,23 @@ class ApprovalService {
     }
   }
 
+  /**
+   * XEM TRƯỚC duyệt nhanh (dry_run) — backend chạy đúng thuật toán hạn mức của
+   * smart_bulk_approve rồi trả về đơn nào sẽ duyệt / bị từ chối / Quên chấm công vượt
+   * hạn mức (vẫn duyệt, engine trừ công), KHÔNG lưu gì. Web không tự tính lại hạn mức.
+   */
+  async previewSmartBulkApproveAttendanceExplanations(ids: number[]): Promise<{
+    approved: number[];
+    rejected: Array<{ id: number; note: string }>;
+    over_quota: number[];
+  }> {
+    const response = await managementApi.post('/api-hrm/attendance-explanations/smart_bulk_approve/', {
+      ids,
+      dry_run: true,
+    });
+    return response.data;
+  }
+
   // Duyệt hàng loạt đơn nghỉ phép tháng
   async bulkApproveMonthlyLeaveRequests(ids: number[], note?: string): Promise<any> {
     try {

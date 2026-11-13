@@ -2068,15 +2068,20 @@ class EmployeeState:
                         over_quota_deduction = float(policy.get("incomplete_over_quota_deduction", 0.5))
                     except Exception: pass
 
-                # Hạn mức theo từng loại: so với giỏ của loại đơn (hoặc rổ gộp) thay vì hạn mức chung
+                # Hạn mức theo từng loại: so với RỔ chứa loại đơn (1 giỏ, rổ gộp, hoặc rổ Quên chấm
+                # công tách riêng của rổ gộp) thay vì hạn mức chung — hrm/explanation_quota.py.
                 rules = self._explanation_quota_rules()
                 quota_used_now = self.explanation_quota_used
                 if rules['mode'] == 'PER_TYPE':
-                    if rules['limits'] is None:
+                    if rules['combined_max'] is not None:
                         quota_max = rules['combined_max']
                     elif explanation_type in _QUOTA_BUCKET_FIELD:
-                        quota_used_now = getattr(self, _QUOTA_BUCKET_FIELD[explanation_type])
-                        quota_max = rules['limits'][_QUOTA_BUCKET_NAME[explanation_type]]
+                        pool = rules['pool_of'][_QUOTA_BUCKET_NAME[explanation_type]]
+                        quota_used_now = sum(
+                            getattr(self, _QUOTA_BUCKET_FIELD[bucket])
+                            for bucket, key in rules['pool_of'].items() if key == pool
+                        )
+                        quota_max = rules['pools'][pool]
                 is_over_quota = not is_exempt_type and quota_used_now >= quota_max
                 logger.info(
                     "[Explanation Approval Rule] Quota: đơn thứ %d/%d | is_over_quota=%s | type=%s",

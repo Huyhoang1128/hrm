@@ -1216,7 +1216,8 @@ const Approvals: React.FC = () => {
 
     // Thống kê từ backend (đã bọc trong item khi list)
     const qUsed = item.quota_used ?? 0;
-    const mExp = item.max_explanation_quota ?? 3;
+    // Hạn mức của rổ chứa loại đơn này — backend tính (duyet-don max_explanation_quota).
+    const mExp = Number(item.max_explanation_quota ?? 0);
     const owUsed = item.online_work_used ?? 0;
     const mOnl = item.max_online_quota ?? 3;
     const lUsed = item.leave_used ?? 0;
@@ -2332,39 +2333,28 @@ const Approvals: React.FC = () => {
       return groups;
     };
 
-    // 1. Đơn Giải trình — check quota (LATE, EARLY_LEAVE, LATE_EARLY, INCOMPLETE_ATTENDANCE)
+    // 1. Đơn Giải trình tính hạn mức (LATE, EARLY_LEAVE, LATE_EARLY, INCOMPLETE_ATTENDANCE):
+    // hỏi backend XEM TRƯỚC (smart_bulk_approve dry_run) — đúng thuật toán + hạn mức backend
+    // dùng khi duyệt thật (rổ chung / từng giỏ / rổ gộp tách Quên chấm công; Quên chấm công
+    // luôn được duyệt, vượt hạn mức thì engine trừ công).
     if (quotaItems.length > 0) {
-      Object.entries(groupByEmpMonth(quotaItems)).forEach(([_key, group]) => {
-        const defaultMax = Number(group[0]?.max_explanation_quota) || 3;
-        const minRemaining = group.reduce((min, item) => {
-          const rem = item.quota_remaining !== undefined ? Number(item.quota_remaining) : (Number(item.max_explanation_quota || 3) - Number(item.quota_used || 0));
-          return Math.min(min, isNaN(rem) ? defaultMax : rem);
-        }, defaultMax);
-
-        const sortedGroup = [...group].sort((a, b) => {
-          const isAForget = (a.explanation_type || '').toUpperCase() === 'INCOMPLETE_ATTENDANCE';
-          const isBForget = (b.explanation_type || '').toUpperCase() === 'INCOMPLETE_ATTENDANCE';
-          if (isAForget !== isBForget) return isAForget ? -1 : 1;
-          const penaltyA = Number(a.penalty_amount) || 0;
-          const penaltyB = Number(b.penalty_amount) || 0;
-          if (penaltyA !== penaltyB) return penaltyB - penaltyA;
-          // FCFS: đơn tạo sớm nhất được ưu tiên duyệt trước
-          const tsA = a.created_at ? new Date(a.created_at).getTime() : 0;
-          const tsB = b.created_at ? new Date(b.created_at).getTime() : 0;
-          return tsA - tsB;
-        });
-
-        let currentRemaining = Math.max(0, minRemaining);
-        sortedGroup.forEach(item => {
-          const isForget = (item.explanation_type || '').toUpperCase() === 'INCOMPLETE_ATTENDANCE';
-          if (isForget) {
-            if (currentRemaining > 0) { approvalItems.push(item); currentRemaining--; }
-            else { approvalItems.push({ ...item, is_penalty: true }); }
-          } else {
-            if (currentRemaining > 0) { approvalItems.push(item); currentRemaining--; }
-            else { rejectionItems.push(item); }
-          }
-        });
+      let preview: Awaited<ReturnType<typeof approvalService.previewSmartBulkApproveAttendanceExplanations>>;
+      try {
+        preview = await approvalService.previewSmartBulkApproveAttendanceExplanations(quotaItems.map(i => i.id));
+      } catch (error: any) {
+        setErrorMessage('Không tính được hạn mức giải trình để duyệt nhanh: ' + (error.response?.data?.error || error.message));
+        setErrorModalOpen(true);
+        return;
+      }
+      const approvedIds = new Set(preview.approved);
+      const overQuotaIds = new Set(preview.over_quota);
+      const rejectNotes = new Map(preview.rejected.map(r => [r.id, r.note]));
+      quotaItems.forEach(item => {
+        if (approvedIds.has(item.id)) {
+          approvalItems.push(overQuotaIds.has(item.id) ? { ...item, is_penalty: true } : item);
+        } else if (rejectNotes.has(item.id)) {
+          rejectionItems.push({ ...item, reject_note: rejectNotes.get(item.id) });
+        }
       });
     }
 
@@ -4584,10 +4574,24 @@ const Approvals: React.FC = () => {
                                               return allOfThisType.filter(i => (i.status === 'APPROVED' || i.hr_approved === true)).length;
                                             };
 
+                                            // Mức tối đa lấy từ backend (không ghi số ở web): giải trình theo đúng
+                                            // các rổ backend trả (explanation_quota_groups — rổ chung / từng giỏ /
+                                            // rổ gộp tách Quên chấm công); nghỉ phép / online theo max_*_quota.
+                                            const empItems = [
+                                              ...attendanceExplanations, ...approvedExplanations, ...rejectedExplanations,
+                                              ...pendingLeaveRequests, ...approvedLeaveRequests,
+                                              ...pendingOnlineWorkRequests, ...approvedOnlineWorkRequests, ...rejectedOnlineWorkRequests,
+                                            ].filter((i: any) => (i.employee_id || (typeof i.employee === 'object' ? i.employee?.id : i.employee)) === empId);
+                                            const quotaGroups: Array<{ key: string; label: string; used: number; max: number }> =
+                                              empItems.find((i: any) => Array.isArray(i.explanation_quota_groups))?.explanation_quota_groups || [];
+                                            const maxOf = (field: string): number | null => {
+                                              const v = empItems.find((i: any) => i[field] !== undefined && i[field] !== null)?.[field];
+                                              return v === undefined ? null : Number(v);
+                                            };
                                             const quotas = [
-                                              { id: 'exp', label: 'Giải trình', value: getMonthlyQuota('EXPLANATION'), max: 3, color: 'amber', bg: 'bg-amber-50/70', text: 'text-amber-700', border: 'border-amber-200' },
-                                              { id: 'leave', label: 'Nghỉ phép tháng', value: getMonthlyQuota('LEAVE'), max: 1, color: 'primary', bg: 'bg-primary-50/70', text: 'text-primary-700', border: 'border-primary-200' },
-                                              { id: 'online', label: 'Làm việc online', value: getMonthlyQuota('ONLINE_WORK'), max: 3, color: 'emerald', bg: 'bg-emerald-50/70', text: 'text-emerald-700', border: 'border-emerald-200' },
+                                              ...quotaGroups.map(g => ({ id: `exp-${g.key}`, label: g.label, value: g.used, max: g.max, color: 'amber', bg: 'bg-amber-50/70', text: 'text-amber-700', border: 'border-amber-200' })),
+                                              { id: 'leave', label: 'Nghỉ phép tháng', value: getMonthlyQuota('LEAVE'), max: maxOf('max_leave_quota'), color: 'primary', bg: 'bg-primary-50/70', text: 'text-primary-700', border: 'border-primary-200' },
+                                              { id: 'online', label: 'Làm việc online', value: getMonthlyQuota('ONLINE_WORK'), max: maxOf('max_online_quota'), color: 'emerald', bg: 'bg-emerald-50/70', text: 'text-emerald-700', border: 'border-emerald-200' },
                                               { id: 'reg', label: 'Đăng ký', value: getMonthlyQuota('REGISTRATION'), max: null, color: 'primary', bg: 'bg-primary-50/70', text: 'text-primary-700', border: 'border-primary-200' },
                                             ];
 

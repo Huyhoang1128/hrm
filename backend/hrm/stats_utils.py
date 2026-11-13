@@ -172,6 +172,8 @@ def get_employee_monthly_stats(employee, date, company_config=None):
         'explanation_quota_shared': quota_status['shared'],
         'is_manager_combined_quota': quota_status['is_manager_combined_quota'],
         'explanation_quota_by_type': quota_status['by_type'],
+        # Các rổ hạn mức (nhãn + loại đơn + used/max) — giao diện hiển thị theo đây.
+        'explanation_quota_groups': quota_status['groups'],
         'online_work_used': _get_online_work_used(employee, date),
         'max_online_quota': max_online_quota,
         'leave_used': _get_leave_used(employee, date),
