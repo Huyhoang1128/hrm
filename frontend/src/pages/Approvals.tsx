@@ -5945,15 +5945,21 @@ const Approvals: React.FC = () => {
                                           const [h1, m1] = ci.split(':').map(Number);
                                           const [h2, m2] = co.split(':').map(Number);
                                           const hours = ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60;
+                                          // Ngưỡng 1 ngày công lấy từ backend (shift_config_utils.FULL_DAY_HOURS_THRESHOLD
+                                          // — đúng hằng số engine dùng khi duyệt Quên chấm công). Chưa tải thì chỉ hiện số giờ.
+                                          const threshold = systemRules?.attendance?.full_day_hours_threshold;
+                                          const fullDay = threshold != null && hours >= threshold;
                                           return (
-                                            <div className={`p-3 rounded-lg border shadow-sm ${hours >= 5.5 ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+                                            <div className={`p-3 rounded-lg border shadow-sm ${fullDay ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
                                               <span className="text-xs text-gray-400 font-semibold uppercase tracking-widest block mb-1">Tổng giờ</span>
-                                              <span className={`text-lg font-semibold ${hours >= 5.5 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                              <span className={`text-lg font-semibold ${fullDay ? 'text-emerald-600' : 'text-amber-600'}`}>
                                                 {hours.toFixed(1)}h
                                               </span>
-                                              <span className={`block text-xs font-bold uppercase mt-0.5 ${hours >= 5.5 ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                                {hours >= 5.5 ? '→ 1.0 công' : '→ 0.5 công'}
-                                              </span>
+                                              {threshold != null && (
+                                                <span className={`block text-xs font-bold uppercase mt-0.5 ${fullDay ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                                  {fullDay ? '→ 1.0 công' : '→ 0.5 công'}
+                                                </span>
+                                              )}
                                             </div>
                                           );
                                         }

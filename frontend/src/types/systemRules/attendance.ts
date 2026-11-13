@@ -30,6 +30,8 @@ export interface AttendanceRules {
     };
     /** Phạt nghỉ không báo / không được duyệt (VNĐ); null = chưa áp dụng. */
     unreported_absence_penalty: number | null;
+    /** Giờ vào–ra của đơn Quên chấm công >= ngưỡng này -> 1.0 công, còn lại 0.5 (shift_config_utils). */
+    full_day_hours_threshold: number;
   };
   /** Đơn tăng ca (hrm/overtime_reconciliation.py). */
   overtime?: {

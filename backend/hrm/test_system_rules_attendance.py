@@ -107,3 +107,14 @@ class PenaltyPolicyRulesTests(TestCase):
         ])
         self.assertEqual(policy['multiplier_threshold'], 5)
         self.assertEqual(policy['incomplete_no_expl_deduction'], 0.5)
+
+
+class FullDayHoursThresholdTests(TestCase):
+    def test_section_uses_engine_constant(self):
+        from hrm.shift_config_utils import FULL_DAY_HOURS_THRESHOLD, shift_workday
+
+        section = build_rules(_admin_request(), {'attendance'})['attendance']
+        self.assertEqual(section['full_day_hours_threshold'], FULL_DAY_HOURS_THRESHOLD)
+        # shift_workday dùng cùng hằng số (ca > ngưỡng -> 1.0 công)
+        self.assertEqual(shift_workday(SimpleNamespace(fixed_workday=None, working_hours=FULL_DAY_HOURS_THRESHOLD + 0.5)), 1.0)
+        self.assertEqual(shift_workday(SimpleNamespace(fixed_workday=None, working_hours=FULL_DAY_HOURS_THRESHOLD)), 0.5)

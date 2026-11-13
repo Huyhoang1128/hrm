@@ -44,6 +44,7 @@ def attendance_rules(request):
     from django.utils import timezone
 
     from hrm.penalty_config import PENALTY_AMOUNT_PER_VIOLATION, is_penalty_configured
+    from hrm.shift_config_utils import FULL_DAY_HOURS_THRESHOLD
 
     return {
         # Bảng "Quy định kỷ luật" ở trang Chấm công — chính sách áp dụng hôm nay.
@@ -51,6 +52,9 @@ def attendance_rules(request):
         # Phạt nghỉ không báo / không được duyệt (penalty_config.decide_penalty). None khi chưa
         # cấu hình ngày hiệu lực (không dòng nào ra tiền).
         'unreported_absence_penalty': PENALTY_AMOUNT_PER_VIOLATION if is_penalty_configured() else None,
+        # Ngưỡng giờ của 1 ngày công: duyệt Quên chấm công / Lỗi máy chấm công, giờ vào–ra ghép lại
+        # >= ngưỡng -> 1.0 công, còn lại 0.5 (main_api). Web dùng cho phần xem trước ở trang Phê duyệt.
+        'full_day_hours_threshold': FULL_DAY_HOURS_THRESHOLD,
     }
 
 

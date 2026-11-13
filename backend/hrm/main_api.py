@@ -2199,7 +2199,8 @@ class EmployeeState:
                     if start_time and end_time:
                         worked_minutes = (end_time.hour * 60 + end_time.minute) - (start_time.hour * 60 + start_time.minute)
                         worked_hours = worked_minutes / 60
-                        if worked_hours >= 5.5:
+                        from .shift_config_utils import FULL_DAY_HOURS_THRESHOLD
+                        if worked_hours >= FULL_DAY_HOURS_THRESHOLD:
                             target_credit = 1.0
                         elif worked_hours > 0:
                             target_credit = 0.5
