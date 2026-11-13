@@ -14,6 +14,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { SelectBox } from '../../components/LandingLayout/SelectBox';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { positionsAPI, departmentsAPI } from '../../utils/api';
+import { useSystemRules } from '../../services/systemRules.service';
 import {
   recruitmentService,
   RecruitmentNeedListItem,
@@ -30,8 +31,11 @@ const EMPLOYMENT_TYPE_OPTIONS: { value: EmploymentType; label: string }[] = [
   { value: 'COLLABORATOR', label: 'Cộng tác viên' },
 ];
 
+// Màu badge theo mã trạng thái (RECRUITMENT_STATUS backend); mã khác -> màu trung tính.
 const STATUS_COLORS: Record<string, string> = {
-  OPEN: 'bg-emerald-100 text-emerald-800',
+  DRAFT: 'bg-gray-100 text-gray-700',
+  PENDING_APPROVAL: 'bg-yellow-100 text-yellow-800',
+  APPROVED: 'bg-emerald-100 text-emerald-800',
   IN_PROGRESS: 'bg-primary-100 text-primary-800',
   FILLED: 'bg-gray-100 text-gray-800',
   EXPIRED: 'bg-orange-100 text-orange-800',
@@ -79,6 +83,8 @@ interface PositionOption {
   name: string;
   code: string;
 }const RecruitmentNeeds: React.FC = () => {
+  // Danh sách trạng thái + nhãn cho bộ lọc lấy từ backend (system-rules "recruitment").
+  const needStatuses = useSystemRules()?.recruitment?.need_statuses ?? [];
   const navigate = useNavigate();
   const { user } = useAuth();
   const isHR = user?.hrm_user?.is_hr || user?.is_staff;
@@ -339,13 +345,7 @@ interface PositionOption {
 
         {/* Status filter buttons */}
         <div className="flex gap-2 flex-wrap">
-          {[
-            { value: 'all', label: 'Tất cả' },
-            { value: 'IN_PROGRESS', label: 'Đang tuyển' },
-            { value: 'FILLED', label: 'Đã tuyển đủ' },
-            { value: 'EXPIRED', label: 'Đã hết hạn' },
-            { value: 'CANCELLED', label: 'Đã hủy' },
-          ].map(opt => (
+          {[{ value: 'all', label: 'Tất cả' }, ...needStatuses].map(opt => (
             <button
               key={opt.value}
               onClick={() => setStatusFilter(opt.value)}

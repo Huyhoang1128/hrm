@@ -6,6 +6,7 @@ import type { CompanyUnit } from '../utils/api/types';
 import { SelectBox } from '../components/LandingLayout/SelectBox';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useHrChoices } from '../utils/hrChoices';
+import { useSystemRules } from '../services/systemRules.service';
 import {
   DocumentTextIcon,
   PlusIcon,
@@ -43,6 +44,11 @@ type ContractTemplate = {
 export default function ContractTemplates() {
   // Loại mẫu hợp đồng theo backend (CONTRACT_DOCUMENT_TYPE, system-rules "choices") — không chép cứng.
   const contractTypeOptions = useHrChoices()?.contract_document_type ?? [];
+  // Đuôi file mẫu hợp đồng backend nhận (CONTRACT_TEMPLATE_EXTENSIONS, backend chặn khi lưu).
+  const templateExtensions = useSystemRules()?.uploads?.contract_template.extensions ?? null;
+  const templateExtLabel = templateExtensions?.map((x) => `.${x}`).join(', ') ?? '';
+  const isAllowedTemplateFile = (file: File) =>
+    !templateExtensions || templateExtensions.includes(file.name.split('.').pop()?.toLowerCase() ?? '');
   const [templates, setTemplates] = useState<ContractTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -102,7 +108,8 @@ export default function ContractTemplates() {
 
   const handleSubmit = async () => {
     if (!form.name.trim()) return alert('Vui lòng nhập tên template');
-    if (!form.file) return alert('Vui lòng chọn file .docx');
+    if (!form.file) return alert(`Vui lòng chọn file mẫu ${templateExtLabel}`.trim());
+    if (!isAllowedTemplateFile(form.file)) return alert(`Chỉ chấp nhận file ${templateExtLabel}`);
 
     setUploading(true);
     try {
@@ -125,7 +132,7 @@ export default function ContractTemplates() {
       setForm({ name: '', contract_type: 'PROBATION', description: '', status: 'ACTIVE', file: null, company_unit: null });
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (e: any) {
-      alert('Lỗi upload: ' + (e.response?.data?.detail || e.message));
+      alert('Lỗi upload: ' + (e.response?.data?.file || e.response?.data?.detail || e.message));
     } finally {
       setUploading(false);
     }
@@ -181,6 +188,7 @@ export default function ContractTemplates() {
 
   const handleUpdate = async () => {
     if (!editTemplate || !editForm.name.trim()) return;
+    if (editForm.file && !isAllowedTemplateFile(editForm.file)) return alert(`Chỉ chấp nhận file ${templateExtLabel}`);
     setUpdating(true);
     try {
       const fd = new FormData();
@@ -197,7 +205,7 @@ export default function ContractTemplates() {
       setEditTemplate(null);
       if (editFileInputRef.current) editFileInputRef.current.value = '';
     } catch (e: any) {
-      alert('Lỗi: ' + (e.response?.data?.detail || e.message));
+      alert('Lỗi: ' + (e.response?.data?.file || e.response?.data?.detail || e.message));
     } finally {
       setUpdating(false);
     }
@@ -497,11 +505,11 @@ export default function ContractTemplates() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">File Word (.docx)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">File Word{templateExtLabel && ` (${templateExtLabel})`}</label>
                 <input
                   ref={editFileInputRef}
                   type="file"
-                  accept=".docx"
+                  accept={templateExtensions?.map((x) => `.${x}`).join(',')}
                   onChange={e => setEditForm({ ...editForm, file: e.target.files?.[0] || null })}
                   className="input-field w-full file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700"
                 />
@@ -596,15 +604,15 @@ export default function ContractTemplates() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">File Word (.docx) <span className="text-red-500">*</span></label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">File Word{templateExtLabel && ` (${templateExtLabel})`} <span className="text-red-500">*</span></label>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".docx"
+                  accept={templateExtensions?.map((x) => `.${x}`).join(',')}
                   onChange={e => setForm({ ...form, file: e.target.files?.[0] || null })}
                   className="input-field w-full file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700"
                 />
-                <p className="text-xs text-gray-400 mt-1">Chỉ chấp nhận file .docx. Sử dụng các placeholder như {'{{ho_ten}}'} trong file Word.</p>
+                <p className="text-xs text-gray-400 mt-1">{templateExtLabel && `Chỉ chấp nhận file ${templateExtLabel}. `}Sử dụng các placeholder như {'{{ho_ten}}'} trong file Word.</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>

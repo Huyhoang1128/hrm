@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Fragment, useCallback } from 'react';
-import { assetTypeOptionsFrom, isMultiHolderType } from './assetTypes';
+import { assetTypeOptionsFrom, isAssignableCondition, isMultiHolderType, useAssetRules } from './assetTypes';
 import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import { XMarkIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { Asset, assetsAPI, employeesAPI } from '../../utils/api';
@@ -15,6 +15,8 @@ interface AssetBulkAssignModalProps {
 type ResultItem = { asset: Asset; status: 'success' | 'error'; message?: string };
 
 export default function AssetBulkAssignModal({ isOpen, onClose, onSuccess, assets }: AssetBulkAssignModalProps) {
+  // Quy định Phân loại / bàn giao tài sản lấy từ backend (system-rules "assets").
+  const assetRules = useAssetRules();
   const [loading, setLoading] = useState(false);
   const [employees, setEmployees] = useState<SelectOption<string>[]>([]);
   const [results, setResults] = useState<ResultItem[] | null>(null);
@@ -55,9 +57,9 @@ export default function AssetBulkAssignModal({ isOpen, onClose, onSuccess, asset
   }, [isOpen, fetchEmployees]);
 
   const assignableAssets = assets.filter((a) => {
-    if (a.condition === 'BROKEN' || a.condition === 'POOR') return false;
+    if (!isAssignableCondition(a.condition, assetRules)) return false;
     if (a.pending_assignment) return false;
-    const isMulti = isMultiHolderType(a.asset_type) && (a.total_quantity ?? 1) > 1;
+    const isMulti = isMultiHolderType(a.asset_type, assetRules) && (a.total_quantity ?? 1) > 1;
     if (isMulti) return (a.remaining_quantity ?? 0) > 0;
     return !a.assigned_to_name;
   });
@@ -67,7 +69,7 @@ export default function AssetBulkAssignModal({ isOpen, onClose, onSuccess, asset
   const visibleBlocked = filterType === 'all' ? blockedAssets : blockedAssets.filter((a) => a.asset_type === filterType);
 
   const getBlockReason = (a: Asset) => {
-    const isMulti = isMultiHolderType(a.asset_type) && (a.total_quantity ?? 1) > 1;
+    const isMulti = isMultiHolderType(a.asset_type, assetRules) && (a.total_quantity ?? 1) > 1;
     if (isMulti && (a.remaining_quantity ?? 0) === 0) return 'Hết số lượng khả dụng';
     if (a.assigned_to_name && !isMulti) return 'Đang sử dụng — cần thu hồi trước';
     if (a.pending_assignment) return 'Đang chờ xác nhận';
@@ -83,7 +85,7 @@ export default function AssetBulkAssignModal({ isOpen, onClose, onSuccess, asset
           employee_id: parseInt(formData.employee_id),
           assigned_date: formData.assigned_date,
           notes: formData.notes,
-          ...(isMultiHolderType(asset.asset_type) && (asset.total_quantity ?? 1) > 1
+          ...(isMultiHolderType(asset.asset_type, assetRules) && (asset.total_quantity ?? 1) > 1
             ? { quantity: quantities[asset.id] ?? 1 }
             : {}),
         })
@@ -161,7 +163,7 @@ export default function AssetBulkAssignModal({ isOpen, onClose, onSuccess, asset
                         </div>
                         <div className="max-h-44 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
                           {visibleAssignable.map((a) => {
-                            const isMulti = isMultiHolderType(a.asset_type) && (a.total_quantity ?? 1) > 1;
+                            const isMulti = isMultiHolderType(a.asset_type, assetRules) && (a.total_quantity ?? 1) > 1;
                             return (
                               <div key={a.id} className="px-3 py-2 flex items-center gap-2 bg-white">
                                 <CheckCircleIcon className="h-4 w-4 text-emerald-500 flex-shrink-0" />

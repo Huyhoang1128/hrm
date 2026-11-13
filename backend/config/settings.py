@@ -304,6 +304,16 @@ EMAIL_BANNER_URL = os.environ.get('EMAIL_BANNER_URL', '')
 DEFAULT_PASSWORD_PREFIX = os.environ.get('DEFAULT_PASSWORD_PREFIX', 'hrm')
 # Tiền tố mã nhân viên khi đơn vị chưa cấu hình tiền tố riêng
 EMPLOYEE_ID_FALLBACK_PREFIX = os.environ.get('EMPLOYEE_ID_FALLBACK_PREFIX', 'NV')
+# Địa danh ghi trên văn bản in ("<địa danh>, ngày ... tháng ... năm ...")
+COMPANY_CITY = os.environ.get('COMPANY_CITY', 'Hà Nội')
+
+# ===== Quy định khác — web đọc qua GET /api-hrm/system-rules/ (hrm/system_rules/misc.py) =====
+# Biên bản xử lý vi phạm (bản in): giờ hạn hoàn thành biên bản trong ngày
+PENALTY_REPORT_SUBMIT_DEADLINE = os.environ.get('PENALTY_REPORT_SUBMIT_DEADLINE', '17h30')
+# Tài liệu quy định: số giây tối thiểu mở tài liệu trước khi được bấm "Đã đọc"
+REGULATION_MIN_READ_SECONDS = int(os.environ.get('REGULATION_MIN_READ_SECONDS', 10))
+# "Gửi email tài khoản cho tất cả" (reset mật khẩu mọi nhân viên đang làm): thời gian chờ giữa 2 lần
+SEND_ALL_ACCOUNT_EMAILS_COOLDOWN_SECONDS = int(os.environ.get('SEND_ALL_ACCOUNT_EMAILS_COOLDOWN_SECONDS', 120))
 
 # Cảnh báo quan trọng (hrm/important_alerts.py)
 IMPORTANT_ALERT_CONTRACT_DAYS = int(os.environ.get('IMPORTANT_ALERT_CONTRACT_DAYS', 15))

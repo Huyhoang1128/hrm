@@ -12,15 +12,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import MyFeedbackList from '@/components/feedback/MyFeedbackList';
 import feedbackService, {
   FEEDBACK_FEATURE_NAME,
-  FEEDBACK_IT_TOPICS,
-  FEEDBACK_MAX_IMAGES,
-  FEEDBACK_MAX_IMAGE_MB,
-  FEEDBACK_QUESTIONS,
-  FEEDBACK_TOPIC_OPTIONS,
   FeedbackAnswerField,
   FeedbackTopic,
 } from '@/services/feedback.service';
 import { BRAND } from '@/config/brand';
+import { formatBytes, useSystemRules } from '@/services/systemRules.service';
 
 export type FeedbackBoxTab = 'send' | 'mine';
 
@@ -29,21 +25,17 @@ interface FeedbackBoxModalProps {
   initialTab?: FeedbackBoxTab;
 }
 
-const MAX_LENGTH = 5000;
-const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-
 type PickedImage = { file: File; preview: string };
 
-const emptyAnswers = (): Record<FeedbackAnswerField, string> => ({
-  difficulties: '',
-  support_needed: '',
-  career_sharing: '',
-  work_proposal: '',
-  other_sharing: '',
-});
+// Câu trả lời theo mã câu hỏi backend trả (system-rules "feedback".questions); câu chưa trả lời = ''.
+const emptyAnswers = (): Record<FeedbackAnswerField, string> => ({});
 
 export default function FeedbackBoxModal({ onClose, initialTab = 'send' }: FeedbackBoxModalProps) {
   const { user } = useAuth();
+  // Vấn đề, câu hỏi, giới hạn ảnh / độ dài lấy từ backend (cùng chỗ backend kiểm tra khi gửi).
+  const feedbackRules = useSystemRules()?.feedback ?? null;
+  const feedbackRulesRef = useRef(feedbackRules);
+  feedbackRulesRef.current = feedbackRules;
   const [tab, setTab] = useState<FeedbackBoxTab>(initialTab);
   const [topic, setTopic] = useState<FeedbackTopic | ''>('');
   const [isAnonymous, setIsAnonymous] = useState(false);
@@ -61,21 +53,23 @@ export default function FeedbackBoxModal({ onClose, initialTab = 'send' }: Feedb
 
   const addImages = (files: File[]) => {
     if (!files.length) return;
+    // Chưa tải được quy định thì không chặn ở web — backend vẫn kiểm tra khi gửi.
+    const rules = feedbackRulesRef.current;
     const valid: PickedImage[] = [];
     let problem = '';
     for (const file of files) {
-      if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-        problem = `"${file.name}" không phải ảnh JPG, PNG, WEBP hoặc GIF.`;
-      } else if (file.size > FEEDBACK_MAX_IMAGE_MB * 1024 * 1024) {
-        problem = `"${file.name}" vượt quá ${FEEDBACK_MAX_IMAGE_MB}MB.`;
+      if (rules && !rules.image_types.includes(file.type)) {
+        problem = `"${file.name}" không phải ảnh ${rules.image_formats.join(', ')}.`;
+      } else if (rules && file.size > rules.max_image_bytes) {
+        problem = `"${file.name}" vượt quá ${formatBytes(rules.max_image_bytes)}.`;
       } else {
         valid.push({ file, preview: URL.createObjectURL(file) });
       }
     }
-    const room = FEEDBACK_MAX_IMAGES - imagesRef.current.length;
-    if (valid.length > room) {
+    const room = rules ? rules.max_images - imagesRef.current.length : valid.length;
+    if (rules && valid.length > room) {
       valid.slice(room).forEach((img) => URL.revokeObjectURL(img.preview));
-      problem = `Chỉ được đính kèm tối đa ${FEEDBACK_MAX_IMAGES} ảnh.`;
+      problem = `Chỉ được đính kèm tối đa ${rules.max_images} ảnh.`;
     }
     setImages((prev) => [...prev, ...valid.slice(0, Math.max(room, 0))]);
     setError(problem);
@@ -181,7 +175,7 @@ export default function FeedbackBoxModal({ onClose, initialTab = 'send' }: Feedb
             </div>
             <h3 className="text-base font-bold text-gray-900">Cảm ơn bạn đã chia sẻ!</h3>
             <p className="text-sm text-gray-500 mt-1 max-w-md">
-              Ý kiến của bạn đã được gửi tới {topic && FEEDBACK_IT_TOPICS.includes(topic) ? 'bộ phận IT' : 'HCNS'} và sẽ được bảo mật,
+              Ý kiến của bạn đã được gửi tới {topic && feedbackRules?.it_topics.includes(topic) ? 'bộ phận IT' : 'HCNS'} và sẽ được bảo mật,
               xem xét giải quyết thấu đáo. Bạn có thể theo dõi tiến độ xử lý ở tab “Ý kiến của tôi”.
             </p>
             <div className="flex flex-wrap justify-center gap-3 mt-6">
@@ -235,7 +229,7 @@ export default function FeedbackBoxModal({ onClose, initialTab = 'send' }: Feedb
                   Vấn đề bạn muốn phản ánh <span className="text-red-500">*</span>
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {FEEDBACK_TOPIC_OPTIONS.map((o) => (
+                  {(feedbackRules?.topics ?? []).map((o) => (
                     <button
                       key={o.value}
                       type="button"
@@ -252,13 +246,13 @@ export default function FeedbackBoxModal({ onClose, initialTab = 'send' }: Feedb
                 </div>
               </div>
 
-              {FEEDBACK_QUESTIONS.map((q) => (
+              {(feedbackRules?.questions ?? []).map((q) => (
                 <div key={q.field}>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{q.question}</label>
                   <textarea
-                    value={answers[q.field]}
+                    value={answers[q.field] ?? ''}
                     onChange={(e) => { setAnswers((prev) => ({ ...prev, [q.field]: e.target.value })); setError(''); }}
-                    maxLength={MAX_LENGTH}
+                    maxLength={feedbackRules?.max_answer_length}
                     rows={3}
                     placeholder="Câu trả lời của bạn"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-y"
@@ -272,7 +266,8 @@ export default function FeedbackBoxModal({ onClose, initialTab = 'send' }: Feedb
                   Ảnh đính kèm <span className="font-normal text-gray-400">(không bắt buộc)</span>
                 </label>
                 <p className="text-xs text-gray-500 mt-0.5 mb-2">
-                  VD: ảnh chụp màn hình khi app bị lỗi để bộ phận IT nắm rõ và xử lý nhanh hơn. Tối đa {FEEDBACK_MAX_IMAGES} ảnh, mỗi ảnh ≤ {FEEDBACK_MAX_IMAGE_MB}MB.
+                  VD: ảnh chụp màn hình khi app bị lỗi để bộ phận IT nắm rõ và xử lý nhanh hơn.
+                  {feedbackRules && ` Tối đa ${feedbackRules.max_images} ảnh, mỗi ảnh ≤ ${formatBytes(feedbackRules.max_image_bytes)}.`}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {images.map((img, i) => (
@@ -288,7 +283,7 @@ export default function FeedbackBoxModal({ onClose, initialTab = 'send' }: Feedb
                       </button>
                     </div>
                   ))}
-                  {images.length < FEEDBACK_MAX_IMAGES && (
+                  {(!feedbackRules || images.length < feedbackRules.max_images) && (
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
@@ -307,7 +302,7 @@ export default function FeedbackBoxModal({ onClose, initialTab = 'send' }: Feedb
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept={ACCEPTED_IMAGE_TYPES.join(',')}
+                  accept={feedbackRules ? feedbackRules.image_types.join(',') : 'image/*'}
                   multiple
                   className="hidden"
                   onChange={(e) => { addImages(Array.from(e.target.files || [])); e.target.value = ''; }}

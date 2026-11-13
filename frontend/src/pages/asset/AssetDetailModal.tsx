@@ -1,5 +1,5 @@
 import React, { Fragment, useState, useEffect } from 'react';
-import { isMultiHolderType } from './assetTypes';
+import { isMultiHolderType, useAssetRules } from './assetTypes';
 import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import { XMarkIcon, ComputerDesktopIcon, CalendarIcon, UserIcon, BuildingOfficeIcon, ShieldCheckIcon, ShoppingBagIcon, CpuChipIcon, ServerStackIcon, Square3Stack3DIcon, CircleStackIcon, DeviceTabletIcon, BoltIcon, ArrowUturnLeftIcon, IdentificationIcon, TagIcon, BuildingStorefrontIcon, SparklesIcon, ClockIcon, UserPlusIcon, XCircleIcon, CheckCircleIcon, PhotoIcon, WrenchScrewdriverIcon, ClipboardDocumentCheckIcon, PlusIcon, BanknotesIcon, QrCodeIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { Asset, AssetAssignmentHistory, AssetMaintenance, AssetInventoryCheck, positionsAPI, assetsAPI } from '../../utils/api';
@@ -32,7 +32,9 @@ export default function AssetDetailModal({ isOpen, onClose, asset, onAfterReturn
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
-  const isMultiHolder = isMultiHolderType(asset.asset_type) && (asset.total_quantity ?? 1) > 1;
+  // Quy định Phân loại / bàn giao tài sản lấy từ backend (system-rules "assets").
+  const assetRules = useAssetRules();
+  const isMultiHolder = isMultiHolderType(asset.asset_type, assetRules) && (asset.total_quantity ?? 1) > 1;
   const holders = asset.holders || [];
   const isManager = viewMode === 'manager';
   const isEmployee = viewMode === 'employee';
@@ -673,7 +675,7 @@ export default function AssetDetailModal({ isOpen, onClose, asset, onAfterReturn
                     )}
 
                     {/* Multi-holder quantity Information */}
-                    {isMultiHolderType(asset.asset_type) && asset.specifications && isManager && (
+                    {isMultiHolderType(asset.asset_type, assetRules) && asset.specifications && isManager && (
                       <div className="md:col-span-2 space-y-4">
                         <h4 className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest border-b pb-2">Thông tin số lượng</h4>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1165,7 +1167,7 @@ export default function AssetDetailModal({ isOpen, onClose, asset, onAfterReturn
                                         <span className="font-semibold text-gray-800">{h.assigned_by_name}</span>
                                       </div>
                                     )}
-                                    {isMultiHolderType(asset.asset_type) && h.assigned_quantity != null && (
+                                    {isMultiHolderType(asset.asset_type, assetRules) && h.assigned_quantity != null && (
                                       <div className="flex items-center gap-1.5">
                                         <Square3Stack3DIcon className="h-3 w-3 text-gray-400" />
                                         <span className="text-gray-500">Số lượng:</span>

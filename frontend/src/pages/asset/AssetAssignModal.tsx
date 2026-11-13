@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Fragment, useCallback, useMemo } from 'react';
-import { isMultiHolderType } from './assetTypes';
+import { isAssignableCondition, isMultiHolderType, useAssetRules } from './assetTypes';
 import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import { XMarkIcon, UserIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { Asset, assetsAPI, employeesAPI } from '../../utils/api';
@@ -26,6 +26,8 @@ const QUICK_STATUS_TAGS = [
 ];
 
 export default function AssetAssignModal({ isOpen, onClose, onSuccess, asset, onRequestReturn }: AssetAssignModalProps) {
+  // Quy định Phân loại / bàn giao tài sản lấy từ backend (system-rules "assets").
+  const assetRules = useAssetRules();
   const [loading, setLoading] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showManagerConfirm, setShowManagerConfirm] = useState(false);
@@ -38,7 +40,7 @@ export default function AssetAssignModal({ isOpen, onClose, onSuccess, asset, on
   } | null>(null);
   const [employees, setEmployees] = useState<SelectOption<string>[]>([]);
   const [quantityError, setQuantityError] = useState<string | null>(null);
-  const hasQuantity = isMultiHolderType(asset.asset_type);
+  const hasQuantity = isMultiHolderType(asset.asset_type, assetRules);
   const isMultiHolder = hasQuantity && (asset.total_quantity ?? 1) > 1;
   const totalQty = asset.total_quantity ?? 1;
   const remainingQty = asset.remaining_quantity ?? totalQty;
@@ -232,7 +234,7 @@ export default function AssetAssignModal({ isOpen, onClose, onSuccess, asset, on
     }
   };
 
-  const isUnusable = asset.condition === 'BROKEN' || asset.condition === 'POOR';
+  const isUnusable = !isAssignableCondition(asset.condition, assetRules);
   const isFormValid = formData.employee_id.trim() !== '' && !isUnusable && !quantityError;
 
   return (

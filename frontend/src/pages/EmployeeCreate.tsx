@@ -217,8 +217,11 @@ const EmployeeCreate: React.FC = () => {
       }, 3000);
     } catch (err: any) {
       console.error('Failed to create employee:', err);
+      // Mật khẩu không đạt chính sách chung (backend validate_password) -> hiện đúng lý do backend trả.
+      const passwordErrors = err.response?.data?.password;
       setError(
-        err.response?.data?.message || err.message || 'Lỗi khi tạo nhân viên'
+        (Array.isArray(passwordErrors) ? `Mật khẩu: ${passwordErrors.join(' ')}` : null) ||
+          err.response?.data?.message || err.message || 'Lỗi khi tạo nhân viên'
       );
     } finally {
       setLoading(false);

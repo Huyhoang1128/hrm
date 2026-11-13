@@ -44,7 +44,7 @@ import { CITIZEN_ID_ISSUE_PLACE_OPTIONS } from '../constants/onboarding';
 import ChangePasswordModal from '../components/Layout/ChangePasswordModal';
 import FeedbackDialog from '../components/FeedbackDialog';
 import PdfFrame from '../components/Common/PdfFrame';
-import { useSystemRules } from '../services/systemRules.service';
+import { formatBytes, useSystemRules } from '../services/systemRules.service';
 import { choiceLabel } from '../utils/hrChoices';
 
 interface TeamMember {
@@ -150,6 +150,11 @@ const Profile: React.FC = () => {
   const [viewingDoc, setViewingDoc] = useState<OnboardingDocument | null>(null);
   const [docReadable, setDocReadable] = useState(false);
   const [markingReadId, setMarkingReadId] = useState<number | null>(null);
+  // Giới hạn ảnh đại diện + thời gian đọc tối thiểu tài liệu quy định: lấy từ backend (system-rules),
+  // backend kiểm tra cùng con số — không ghi cứng ở web.
+  const systemRules = useSystemRules();
+  const avatarRules = systemRules?.uploads?.avatar ?? null;
+  const minReadSeconds = systemRules?.regulation?.min_read_seconds ?? null;
 
   // My contracts state
   const [myContracts, setMyContracts] = useState<MyContract[]>([]);
@@ -372,14 +377,22 @@ const Profile: React.FC = () => {
     setEditForm(prev => ({ ...prev, [field]: value }));
   };
 
+  const avatarTypesLabel = avatarRules
+    ? Array.from(new Set(avatarRules.types.map((t) => t.split('/')[1]?.toUpperCase()).filter(Boolean))).join(', ')
+    : '';
+
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Client-side file size validation (5 MB limit)
-    const MAX_SIZE_MB = 5;
-    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-      alert(`Kích thước ảnh không được vượt quá ${MAX_SIZE_MB}MB.`);
+    // Chặn sớm theo giới hạn backend (chưa tải được quy định thì để backend kiểm tra).
+    if (avatarRules && !avatarRules.types.includes(file.type)) {
+      alert(`Chỉ hỗ trợ ảnh định dạng ${avatarTypesLabel}.`);
+      if (avatarInputRef.current) avatarInputRef.current.value = '';
+      return;
+    }
+    if (avatarRules && file.size > avatarRules.max_bytes) {
+      alert(`Kích thước ảnh không được vượt quá ${formatBytes(avatarRules.max_bytes)}.`);
       if (avatarInputRef.current) avatarInputRef.current.value = '';
       return;
     }
@@ -392,9 +405,10 @@ const Profile: React.FC = () => {
       if (user?.hrm_user) {
         updateUser({ hrm_user: { ...user.hrm_user, avatar_url: result.avatar_url } });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Avatar upload failed:', err);
-      alert('Tải ảnh đại diện thất bại. Vui lòng thử lại.');
+      // Backend báo đúng lý do (sai định dạng / quá dung lượng) thì hiện lý do đó.
+      alert(err?.response?.data?.error || 'Tải ảnh đại diện thất bại. Vui lòng thử lại.');
     } finally {
       setAvatarUploading(false);
       // Reset file input so the same file can be selected again
@@ -550,7 +564,7 @@ const Profile: React.FC = () => {
             <input
               ref={avatarInputRef}
               type="file"
-              accept="image/*"
+              accept={avatarRules ? avatarRules.types.join(',') : 'image/*'}
               className="hidden"
               onChange={handleAvatarChange}
               id="avatar-upload"
@@ -562,7 +576,11 @@ const Profile: React.FC = () => {
               <PhotoIcon className="h-4 w-4 mr-2 text-gray-400" />
               {avatarUploading ? 'Đang tải...' : 'Thay đổi ảnh'}
             </label>
-            <p className="mt-1 text-xs text-gray-400">PNG, JPG, GIF tối đa 5MB</p>
+            {avatarRules && (
+              <p className="mt-1 text-xs text-gray-400">
+                {avatarTypesLabel} tối đa {formatBytes(avatarRules.max_bytes)}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -1610,8 +1628,10 @@ const Profile: React.FC = () => {
                   className="w-full h-full border-0"
                   title={viewingDoc.document_name}
                   onLoad={() => {
-                    // Fallback: timer 10s đảm bảo user có đủ thời gian xem
-                    setTimeout(() => setDocReadable(true), 10000);
+                    // Đếm thời gian đọc tối thiểu theo quy định backend (system-rules "regulation");
+                    // chưa tải được quy định thì không chặn bằng số đoán.
+                    if (minReadSeconds == null) setDocReadable(true);
+                    else setTimeout(() => setDocReadable(true), minReadSeconds * 1000);
                   }}
                 />
               ) : (
@@ -1627,7 +1647,9 @@ const Profile: React.FC = () => {
                   ? 'Bạn đã đọc tài liệu này'
                   : docReadable
                   ? 'Có thể xác nhận đã đọc'
-                  : 'Vui lòng đọc hết tài liệu (tối thiểu 10 giây)...'}
+                  : minReadSeconds
+                  ? `Vui lòng đọc hết tài liệu (tối thiểu ${minReadSeconds} giây)...`
+                  : 'Vui lòng đọc hết tài liệu...'}
               </p>
               {!viewingDoc.is_read && (
                 <button

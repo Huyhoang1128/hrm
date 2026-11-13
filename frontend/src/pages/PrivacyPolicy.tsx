@@ -1,4 +1,4 @@
-import { BRAND } from '@/config/brand';
+import { useBrand } from '@/config/brand';
 
 const sections: { title: string; items: string[] }[] = [
   {
@@ -41,6 +41,8 @@ const sections: { title: string; items: string[] }[] = [
 ];
 
 export default function PrivacyPolicy() {
+  // Tên công ty / phòng HCNS theo cấu hình backend.
+  const BRAND = useBrand();
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="prose prose-lg max-w-none">

@@ -11,7 +11,6 @@ interface ImportMetaEnv {
   readonly VITE_HR_DEPARTMENT_LABEL?: string;
   readonly VITE_SUPPORT_EMAIL?: string;
   readonly VITE_LOGO_URL?: string;
-  readonly VITE_DEFAULT_PASSWORD_PREFIX?: string;
 }
 
 interface ImportMeta {

@@ -30,6 +30,7 @@ from .payment_document_models import (
 )
 from .permissions import IsAdminOrHR
 
+# Giới hạn file đính kèm chứng từ — web đọc cùng hằng số qua GET /api-hrm/system-rules/ (section "uploads").
 MAX_ATTACHMENT_SIZE = 20 * 1024 * 1024
 ALLOWED_EXTENSIONS = {
     'pdf', 'jpg', 'jpeg', 'png', 'webp', 'heic', 'heif',
@@ -219,7 +220,7 @@ def _save_attachments(document, request):
         if ext not in ALLOWED_EXTENSIONS:
             raise ValidationError({'attachments': f'File "{f.name}": định dạng không được hỗ trợ.'})
         if f.size > MAX_ATTACHMENT_SIZE:
-            raise ValidationError({'attachments': f'File "{f.name}" vượt quá 20MB.'})
+            raise ValidationError({'attachments': f'File "{f.name}" vượt quá {MAX_ATTACHMENT_SIZE // (1024 * 1024)}MB.'})
     for f in files:
         if getattr(settings, 'CLOUDFLY_ENABLED', False):
             from .utils import upload_file_to_cloudfly

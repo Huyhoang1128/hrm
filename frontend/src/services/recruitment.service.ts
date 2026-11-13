@@ -2,7 +2,18 @@ import { managementApi } from '../utils/api/client';
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
-export type RecruitmentNeedStatus = 'OPEN' | 'IN_PROGRESS' | 'FILLED' | 'CANCELLED';
+/**
+ * Trạng thái nhu cầu tuyển dụng = recruitment.models.RECRUITMENT_STATUS. Danh sách + nhãn dùng cho
+ * bộ lọc lấy từ backend (system-rules "recruitment".need_statuses); kiểu này chỉ để gõ đúng mã.
+ */
+export type RecruitmentNeedStatus =
+  | 'DRAFT'
+  | 'PENDING_APPROVAL'
+  | 'APPROVED'
+  | 'IN_PROGRESS'
+  | 'FILLED'
+  | 'EXPIRED'
+  | 'CANCELLED';
 export type EmploymentType = 'FULL_TIME' | 'PART_TIME' | 'CONTRACT' | 'INTERN' | 'COLLABORATOR';
 export type JobStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED';
 export type ChannelType =

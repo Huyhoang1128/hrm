@@ -46,8 +46,10 @@ Tên công ty, logo, chữ ký email và mật khẩu mặc định đều lấy
 
 - **Backend**: `COMPANY_NAME`, `COMPANY_LEGAL_NAME`, `HR_DEPARTMENT_LABEL`, `HR_CONTACT_ADDRESS`,
   `HR_CONTACT_PHONE`, `EMAIL_LOGO_URL`, `EMAIL_BANNER_URL`, `DEFAULT_PASSWORD_PREFIX`,
-  `EMPLOYEE_ID_FALLBACK_PREFIX`. Xem [backend/.env.example](backend/.env.example) và
-  [backend/hrm/branding.py](backend/hrm/branding.py).
+  `EMPLOYEE_ID_FALLBACK_PREFIX`, `COMPANY_CITY`. Xem [backend/.env.example](backend/.env.example) và
+  [backend/hrm/branding.py](backend/hrm/branding.py). Web đọc tên công ty / phòng HCNS / địa danh
+  của backend qua `GET /api-hrm/system-rules/` (section `branding`) cho các câu chữ phải khớp email
+  và bản in.
 - **Frontend**: `VITE_APP_NAME`, `VITE_COMPANY_NAME`, `VITE_LOGO_URL`… Xem
   [frontend/.env.example](frontend/.env.example) và
   [frontend/src/config/brand.ts](frontend/src/config/brand.ts).
