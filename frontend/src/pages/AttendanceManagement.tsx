@@ -4588,8 +4588,10 @@ const AttendanceManagement: React.FC = () => {
                             </h4>
                             <div className="grid grid-cols-1 gap-2">
                               {(() => {
-                                const _TELESALE_CODES = ['NV_TELESALE', 'TP_TELESALE', 'LEADER_TELESALE'];
-                                const isTelesale = _TELESALE_CODES.includes(currentEmployee?.position?.code ?? '');
+                                // Mã vị trí Telesale lấy từ backend (shift.telesale_position_codes = đúng tập
+                                // main_api dùng khi tính công đơn Trực tối) — chưa tải thì ẩn preset riêng Telesale.
+                                const isTelesale = (systemRules?.shift?.telesale_position_codes ?? [])
+                                  .includes(currentEmployee?.position?.code ?? '');
                                 return [
                                   {
                                     label: 'Ca chiều tối',
@@ -5003,11 +5005,14 @@ const AttendanceManagement: React.FC = () => {
                       const startDateStr = selectedDate
                         ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
                         : '';
-                      // Giới hạn tối đa 30 ngày kể từ ngày bắt đầu (khớp giới hạn 31 ngày/đơn bên backend)
-                      const maxEndDate = selectedDate
+                      // Số ngày tối đa của 1 đơn lấy từ backend (attendance.unauthorized_absence_max_days =
+                      // RegistrationRequestCreateSerializer.MAX_UNAUTHORIZED_ABSENCE_RANGE_DAYS, tính cả ngày
+                      // bắt đầu) — chưa tải được thì không giới hạn ở web, backend vẫn chặn khi gửi.
+                      const maxDays = systemRules?.attendance?.unauthorized_absence_max_days;
+                      const maxEndDate = selectedDate && maxDays != null
                         ? (() => {
                             const d = new Date(selectedDate);
-                            d.setDate(d.getDate() + 30);
+                            d.setDate(d.getDate() + maxDays - 1);
                             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                           })()
                         : undefined;

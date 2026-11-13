@@ -84,6 +84,12 @@ LATE_EXPLANATION_GRACE_EFFECTIVE_DATE = "2026-09-10"
 NIGHT_DUTY_SHIFT_EFFECTIVE_FROM = _dt.date(2026, 9, 1)
 
 
+# Mã vị trí Telesale: đơn Trực tối được cộng 0.5 công dù không có chấm công ca chiều (xem
+# _evaluate_overtime_rule, nhánh NIGHT_SHIFT). Web đọc qua GET /api-hrm/system-rules/ (shift.telesale_position_codes) để
+# hiện preset "Ca gãy" đúng cho nhóm này — không giữ danh sách riêng.
+TELESALE_POSITION_CODES = frozenset({"NV_TELESALE", "TP_TELESALE", "LEADER_TELESALE"})
+
+
 class EmployeeState:
     """Main class for employee attendance calculation"""
 
@@ -1672,9 +1678,8 @@ class EmployeeState:
                     # (tổng = số buổi trên đơn, không cộng trùng).
                     effects["truc_toi"] = sessions - 1
 
-            # Telesale positions: NV_TELESALE, TP_TELESALE
-            _TELESALE_POSITION_CODES = {"NV_TELESALE", "TP_TELESALE","LEADER_TELESALE"}
-            is_telesale = self.position_code in _TELESALE_POSITION_CODES
+            # Telesale positions: TELESALE_POSITION_CODES (đầu file)
+            is_telesale = self.position_code in TELESALE_POSITION_CODES
 
             if event_date and self._has_afternoon_shift_attendance(event_date):
                 # Có dữ liệu chấm công ca chiều → cộng 0.5 công thêm cho ca tối

@@ -118,3 +118,16 @@ class FullDayHoursThresholdTests(TestCase):
         # shift_workday dùng cùng hằng số (ca > ngưỡng -> 1.0 công)
         self.assertEqual(shift_workday(SimpleNamespace(fixed_workday=None, working_hours=FULL_DAY_HOURS_THRESHOLD + 0.5)), 1.0)
         self.assertEqual(shift_workday(SimpleNamespace(fixed_workday=None, working_hours=FULL_DAY_HOURS_THRESHOLD)), 0.5)
+
+
+class RegistrationRulesTests(TestCase):
+    def test_unauthorized_absence_max_days_matches_serializer(self):
+        section = build_rules(_admin_request(), {'attendance'})['attendance']
+        self.assertEqual(section['unauthorized_absence_max_days'],
+                         RegistrationRequestCreateSerializer.MAX_UNAUTHORIZED_ABSENCE_RANGE_DAYS)
+
+    def test_telesale_codes_match_engine(self):
+        from hrm.main_api import TELESALE_POSITION_CODES
+
+        section = build_rules(_admin_request(), {'shift'})['shift']
+        self.assertEqual(set(section['telesale_position_codes']), set(TELESALE_POSITION_CODES))

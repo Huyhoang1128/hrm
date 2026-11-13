@@ -32,6 +32,13 @@ export interface AttendanceRules {
     unreported_absence_penalty: number | null;
     /** Giờ vào–ra của đơn Quên chấm công >= ngưỡng này -> 1.0 công, còn lại 0.5 (shift_config_utils). */
     full_day_hours_threshold: number;
+    /** Số ngày tối đa (tính cả ngày bắt đầu) của 1 đơn Nghỉ không phép nhiều ngày. */
+    unauthorized_absence_max_days: number;
+  };
+  /** Ca làm / trực tối. */
+  shift?: {
+    /** Mã vị trí Telesale (main_api.TELESALE_POSITION_CODES). */
+    telesale_position_codes: string[];
   };
   /** Đơn tăng ca (hrm/overtime_reconciliation.py). */
   overtime?: {
