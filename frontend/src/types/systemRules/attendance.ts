@@ -34,6 +34,10 @@ export interface AttendanceRules {
     full_day_hours_threshold: number;
     /** Số ngày tối đa (tính cả ngày bắt đầu) của 1 đơn Nghỉ không phép nhiều ngày. */
     unauthorized_absence_max_days: number;
+    /** Hạn mức online ghi đè: khoảng theo validator model, bước nửa ngày. */
+    online_quota_override: { min: number; max: number; step: number };
+    /** Chế độ con nhỏ: số phút mỗi chiều (validator + mặc định của model). */
+    child_care_allowance_minutes: { min: number; max: number; default: number };
   };
   /** Ca làm / trực tối. */
   shift?: {

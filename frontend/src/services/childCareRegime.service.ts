@@ -26,7 +26,8 @@ export async function createChildCareRegime(data: {
   employee: number;
   start_date: string;
   end_date: string | null;
-  allowance_minutes: number;
+  /** Bỏ trống -> backend dùng mặc định của ChildCareRegime.allowance_minutes. */
+  allowance_minutes?: number;
   note?: string;
 }): Promise<ChildCareRegime> {
   const response = await managementApi.post(BASE, data);

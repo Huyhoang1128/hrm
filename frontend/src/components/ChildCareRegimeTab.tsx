@@ -3,6 +3,7 @@ import { TrashIcon, PlusIcon, ExclamationCircleIcon } from '@heroicons/react/24/
 import { employeesAPI } from '../utils/api';
 import { Employee } from '../utils/api/types';
 import { SelectBox } from './LandingLayout/SelectBox';
+import { useSystemRules } from '../services/systemRules.service';
 import {
   ChildCareRegime,
   listChildCareRegimes,
@@ -11,11 +12,22 @@ import {
   deleteChildCareRegime,
 } from '../services/childCareRegime.service';
 
-/** 15 → 120 phút, bước 15 (mặc định 60). */
-const MINUTE_OPTIONS: { value: number; label: string }[] = Array.from({ length: 8 }, (_, i) => (i + 1) * 15).map(n => ({
-  value: n,
-  label: `${n} phút`,
-}));
+/** Bước của danh sách chọn (chỉ để chọn nhanh — backend nhận mọi số phút trong [min, max]). */
+const MINUTE_PICK_STEP = 15;
+
+/** Lựa chọn số phút trong [min, max] của backend (attendance.child_care_allowance_minutes = validator
+ *  của ChildCareRegime.allowance_minutes); giá trị đang lưu nằm ngoài lưới vẫn được giữ trong danh sách. */
+const buildMinuteOptions = (rule?: { min: number; max: number; default: number }, current?: number | null) => {
+  const values = new Set<number>();
+  if (rule) {
+    for (let n = Math.ceil(rule.min / MINUTE_PICK_STEP) * MINUTE_PICK_STEP; n <= rule.max; n += MINUTE_PICK_STEP) {
+      if (n >= rule.min) values.add(n);
+    }
+    values.add(rule.default);
+  }
+  if (current != null) values.add(current);
+  return Array.from(values).sort((a, b) => a - b).map(n => ({ value: n, label: `${n} phút` }));
+};
 
 const firstDayOfMonth = () => {
   const now = new Date();
@@ -40,6 +52,7 @@ const apiError = (err: any, fallback: string) => {
  * mà không tính lỗi / phạt. Phần vượt N phút tính như bình thường.
  */
 const ChildCareRegimeTab: React.FC = () => {
+  const minuteRule = useSystemRules()?.attendance?.child_care_allowance_minutes;
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [regimes, setRegimes] = useState<ChildCareRegime[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +61,11 @@ const ChildCareRegimeTab: React.FC = () => {
   const [newEmployeeId, setNewEmployeeId] = useState<number | ''>('');
   const [newStart, setNewStart] = useState(firstDayOfMonth());
   const [newEnd, setNewEnd] = useState('');
-  const [newMinutes, setNewMinutes] = useState(60);
+  // Mặc định lấy theo backend (ChildCareRegime.allowance_minutes default) khi đã tải quy định.
+  const [newMinutes, setNewMinutes] = useState<number | null>(null);
+  useEffect(() => {
+    if (minuteRule && newMinutes == null) setNewMinutes(minuteRule.default);
+  }, [minuteRule, newMinutes]);
   const [newNote, setNewNote] = useState('');
   const [creating, setCreating] = useState(false);
   const [savingRowId, setSavingRowId] = useState<number | null>(null);
@@ -84,7 +101,7 @@ const ChildCareRegimeTab: React.FC = () => {
         employee: newEmployeeId,
         start_date: newStart,
         end_date: newEnd || null,
-        allowance_minutes: newMinutes,
+        allowance_minutes: newMinutes ?? undefined,
         note: newNote.trim(),
       });
       setRegimes(prev => [row, ...prev]);
@@ -187,7 +204,7 @@ const ChildCareRegimeTab: React.FC = () => {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
           <div>
-            <SelectBox<number> label="Số phút mỗi chiều" value={newMinutes} options={MINUTE_OPTIONS} onChange={setNewMinutes} />
+            <SelectBox<number | null> label="Số phút mỗi chiều" value={newMinutes} options={buildMinuteOptions(minuteRule, newMinutes)} onChange={setNewMinutes} />
           </div>
           <input
             type="text"
@@ -258,11 +275,7 @@ const ChildCareRegimeTab: React.FC = () => {
                     <SelectBox<number>
                       label=""
                       value={r.allowance_minutes}
-                      options={
-                        MINUTE_OPTIONS.some(o => o.value === r.allowance_minutes)
-                          ? MINUTE_OPTIONS
-                          : [{ value: r.allowance_minutes, label: `${r.allowance_minutes} phút` }, ...MINUTE_OPTIONS]
-                      }
+                      options={buildMinuteOptions(minuteRule, r.allowance_minutes)}
                       onChange={v => handleUpdate(r, { allowance_minutes: v })}
                     />
                   </td>

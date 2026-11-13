@@ -5,6 +5,25 @@ Xem hrm/system_rules/__init__.py. Mỗi hàm @rule_section trả dict, giá tr�
 from . import rule_section
 
 
+def _validator_bounds(model, field_name):
+    """(min, max) mà validator của field cho phép — chặt nhất trong các MinValueValidator /
+    MaxValueValidator gắn trên field (kể cả validator khoảng số nguyên Django tự thêm)."""
+    from django.core.validators import MaxValueValidator, MinValueValidator
+
+    field = model._meta.get_field(field_name)
+    mins = [v.limit_value for v in field.validators if isinstance(v, MinValueValidator)]
+    maxs = [v.limit_value for v in field.validators if isinstance(v, MaxValueValidator)]
+    return _num(max(mins) if mins else None), _num(min(maxs) if maxs else None)
+
+
+def _num(value):
+    """Số JSON gọn: 31 thay vì Decimal('31') / 31.0."""
+    if value is None:
+        return None
+    value = float(value)
+    return int(value) if value.is_integer() else value
+
+
 def _penalty_policy(day):
     """Bảng phạt chấm công đang áp dụng ở ngày `day` — đúng nguồn engine dùng (PolicyLoader:
     AttendancePolicyVersion + PenaltyTierConfig + AttendancePolicyConfig, mặc định của engine
@@ -59,7 +78,27 @@ def attendance_rules(request):
         # Số ngày tối đa (tính cả ngày bắt đầu) của 1 đơn Nghỉ không phép nhiều ngày — đúng hằng số
         # serializer dùng để chặn ((end - start).days >= N bị từ chối).
         'unauthorized_absence_max_days': RegistrationRequestCreateSerializer.MAX_UNAUTHORIZED_ABSENCE_RANGE_DAYS,
+        # Hạn mức ngày làm online ghi đè (OnlineWorkQuotaOverride.max_online_days): khoảng theo
+        # validator của model, bước = nửa ngày (đơn vị 1 đơn online nửa ngày tính vào hạn mức).
+        'online_quota_override': _online_quota_override_rule(),
+        # Chế độ con nhỏ (ChildCareRegime.allowance_minutes): khoảng theo validator + mặc định.
+        'child_care_allowance_minutes': _child_care_minutes_rule(),
     }
+
+
+def _online_quota_override_rule():
+    from hrm.models import OnlineWorkQuotaOverride
+    from hrm.stats_utils import ONLINE_HALF_DAY_AMOUNT
+
+    lo, hi = _validator_bounds(OnlineWorkQuotaOverride, 'max_online_days')
+    return {'min': lo, 'max': hi, 'step': ONLINE_HALF_DAY_AMOUNT}
+
+
+def _child_care_minutes_rule():
+    from hrm.models import ChildCareRegime
+
+    lo, hi = _validator_bounds(ChildCareRegime, 'allowance_minutes')
+    return {'min': lo, 'max': hi, 'default': ChildCareRegime._meta.get_field('allowance_minutes').get_default()}
 
 
 @rule_section('shift')

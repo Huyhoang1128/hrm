@@ -131,3 +131,21 @@ class RegistrationRulesTests(TestCase):
 
         section = build_rules(_admin_request(), {'shift'})['shift']
         self.assertEqual(set(section['telesale_position_codes']), set(TELESALE_POSITION_CODES))
+
+
+class ConfigOptionRulesTests(TestCase):
+    """Lựa chọn ở tab cấu hình (hạn mức online ghi đè, chế độ con nhỏ) theo validator của model."""
+
+    def test_online_quota_override_bounds(self):
+        from hrm.stats_utils import ONLINE_HALF_DAY_AMOUNT
+
+        rule = build_rules(_admin_request(), {'attendance'})['attendance']['online_quota_override']
+        self.assertEqual(rule, {'min': 0, 'max': 31, 'step': ONLINE_HALF_DAY_AMOUNT})
+
+    def test_child_care_minutes_bounds(self):
+        from hrm.models import ChildCareRegime
+
+        rule = build_rules(_admin_request(), {'attendance'})['attendance']['child_care_allowance_minutes']
+        self.assertEqual(rule['min'], 1)
+        self.assertEqual(rule['max'], 240)
+        self.assertEqual(rule['default'], ChildCareRegime._meta.get_field('allowance_minutes').get_default())

@@ -37,6 +37,11 @@ def _get_quota_remaining(employee, date):
     max_quota = company_config.max_explanation_count_per_month if company_config else 3
     return max(0, max_quota - used)
 
+# Số ngày 1 đơn làm online NỬA NGÀY tính vào hạn mức — cũng là bước nhỏ nhất có nghĩa của hạn mức
+# online (web dựng lựa chọn hạn mức ghi đè theo bước này: system-rules attendance.online_quota_override).
+ONLINE_HALF_DAY_AMOUNT = 0.5
+
+
 def online_quota_amount(employee, event_date, data) -> float:
     """Số ngày mà 1 đơn làm việc online TÍNH VÀO hạn mức online/tháng.
 
@@ -52,7 +57,7 @@ def online_quota_amount(employee, event_date, data) -> float:
     "còn lại" — để các nơi không bao giờ lệch nhau.
     """
     data = data or {}
-    base = 0.5 if data.get('expected_status') == 'HALF_DAY' else 1.0
+    base = ONLINE_HALF_DAY_AMOUNT if data.get('expected_status') == 'HALF_DAY' else 1.0
     if not (event_date and employee is not None):
         return base
     weekday = event_date.weekday()
@@ -77,7 +82,7 @@ def online_quota_amount(employee, event_date, data) -> float:
         half = _resolve_online_work_half(data)
         if half == 'AFTERNOON':
             return 0.0
-        return 0.5
+        return ONLINE_HALF_DAY_AMOUNT
     return base
 
 
