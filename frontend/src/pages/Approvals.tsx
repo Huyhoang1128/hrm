@@ -21,6 +21,7 @@ import deadlineExceptionService, { AppliedDeadlineException } from '../services/
 import { DeadlineExceptionBadge, DeadlineExceptionDetail } from '../components/approvals/DeadlineExceptionFlag';
 import { useNotePrompt } from '../components/NotePromptDialog';
 import { useSystemRules } from '../services/systemRules.service';
+import { choiceLabel } from '../utils/hrChoices';
 
 // Giá trị đặc biệt cho lựa chọn "Tôi là QLTT" trong dropdown Phòng ban —
 // không phải tên phòng ban thật nên không bao giờ trùng.
@@ -2736,16 +2737,8 @@ const Approvals: React.FC = () => {
     const text = String(value).trim();
     if (!text) return '-';
 
-    const normalized = text
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[_-]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .toUpperCase();
-
-    if (normalized === 'SUPERVISOR') return 'Quản lý';
-    return text;
+    // Nhãn theo danh sách cấp bậc của backend (RANK_CHOICES) — không chép bảng nhãn ở web.
+    return choiceLabel(systemRules?.choices?.rank, text);
   };
 
   const toggleWorkNote = (noteKey: string) => {
@@ -2856,8 +2849,12 @@ const Approvals: React.FC = () => {
         workForm: getWfValue(emp, ['hinh_thuc_lam_viec', 'work_form', 'work_type'], detail.work_form),
       })
     ) {
-      const computed = Number((insuranceBaseNumber * 0.105).toFixed(2));
-      return formatWfAllowance(computed);
+      // Tỷ lệ BH phần người lao động theo backend (system-rules payroll.insurance_rates) — không ghi cứng 10,5%.
+      const insuranceRate = systemRules?.payroll?.insurance_rates?.total;
+      if (insuranceRate !== undefined) {
+        const computed = Number((insuranceBaseNumber * insuranceRate).toFixed(2));
+        return formatWfAllowance(computed);
+      }
     }
 
     return getWfValue(emp, ['khau_tru_bhxh', 'si_deduction', 'bhxh', 'bhxh_deduction'], fallback);

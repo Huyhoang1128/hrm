@@ -28,6 +28,7 @@ import {
 } from '../services/workFinalization.service';
 import { approvalService } from '../services/approval.service';
 import { employeesAPI } from '../utils/api';
+import { choiceLabel, useHrChoices } from '../utils/hrChoices';
 import { WORK_FORM_OPTIONS } from '../constants/onboarding';
 
 const STATUS_LABELS: Record<ApprovalStatus, string> = {
@@ -54,23 +55,13 @@ const WORK_FORM_LABELS: Record<string, string> = {
   CTTV: 'Cộng tác viên',
 };
 
-const formatRankDisplay = (value: any) => {
-  const text = String(value ?? '').trim();
-  if (!text) return value;
-
-  const normalized = text
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[_-]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toUpperCase();
-
-  if (normalized === 'SUPERVISOR') return 'Quản lý';
-  return value;
-};
-
 const AttendanceFinalizationApprovals: React.FC = () => {
+  // Nhãn cấp bậc theo danh sách backend (RANK_CHOICES, system-rules "choices") — không chép bảng nhãn.
+  const rankChoices = useHrChoices()?.rank;
+  const formatRankDisplay = (value: any) => {
+    if (value === undefined || value === null || value === '') return value;
+    return choiceLabel(rankChoices, String(value).trim());
+  };
   const { user } = useAuth();
   const [currentEmployee, setCurrentEmployee] = useState<any>(null);
 

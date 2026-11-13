@@ -26,7 +26,7 @@ import { getSystemRules, useSystemRules, type SystemRules } from '../services/sy
 import { SelectBox } from '../components/LandingLayout/SelectBox';
 import PayrollFinalizeBar from '../components/PayrollFinalizeBar';
 import { useLockBodyScroll } from '../hooks/useLockBodyScroll';
-import { BRAND } from '@/config/brand';
+import { BRAND, useBrand } from '@/config/brand';
 import type { Row, Workbook, Worksheet } from 'exceljs';
 import {
   groupByLegalEntityAndMonth,
@@ -253,6 +253,8 @@ interface PayslipDetailModalProps {
 
 const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose, employee, onEmailQueued }) => {
   useLockBodyScroll(true);
+  // Tên phòng HCNS trong bản xem trước email: đúng giá trị backend in vào email (HR_DEPARTMENT_LABEL).
+  const brand = useBrand();
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [emailAddr, setEmailAddr] = useState(employee?.personal_email ?? '');
   const [emailSubject, setEmailSubject] = useState('');
@@ -440,7 +442,7 @@ const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({ record, onClose
                   </td>
                   <td style="vertical-align: middle; color: #666; font-size: 13px; line-height: 1.5;">
                   Trân trọng!
-                  ${BRAND.hrDepartmentLabel}
+                  ${brand.hrDepartmentLabel}
                   </td>
                 </tr>
               </table>

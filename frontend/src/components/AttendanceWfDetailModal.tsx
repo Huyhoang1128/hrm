@@ -6,6 +6,7 @@
  */
 
 import React from 'react';
+import { choiceLabel, useHrChoices } from '../utils/hrChoices';
 
 // ---------------------------------------------------------------------------
 // Inline helpers (pure functions, no external deps)
@@ -39,11 +40,6 @@ const formatDateTime = (dateString: string): string => {
   } catch {
     return dateString;
   }
-};
-
-const formatRankDisplay = (value: any): string => {
-  if (!value || value === '-') return '-';
-  return String(value);
 };
 
 const formatWorkNumber = (value: any, decimals = 1): string => {
@@ -93,6 +89,12 @@ const AttendanceWfDetailModal: React.FC<AttendanceWfDetailModalProps> = ({
   onReject,
   onViewCalendar,
 }) => {
+  // Nhãn cấp bậc theo danh sách backend (RANK_CHOICES, system-rules "choices") — không chép bảng nhãn.
+  const rankChoices = useHrChoices()?.rank;
+  const formatRankDisplay = (value: any): string => {
+    if (!value || value === '-') return '-';
+    return choiceLabel(rankChoices, String(value).trim());
+  };
   const canDecide =
     approval?.status !== 'REJECTED' &&
     !!(approval?.can_decide_employees ?? approval?.can_approve);
