@@ -11296,10 +11296,12 @@ class GenericRequestViewSet(viewsets.ModelViewSet):
 
         from .models import SalaryAdvanceApprovalLock
 
+        S = GenericRequestSerializer
         lock = SalaryAdvanceApprovalLock.get_solo()
-        if lock.is_locked and timezone.now().day not in (1, 2, 3):
+        if lock.is_locked and not S.is_salary_advance_approval_window_open():
             return Response(
-                {'error': 'Đơn tạm ứng lương chỉ được duyệt trong 3 ngày đầu tháng. Liên hệ Admin để mở khoá nếu cần duyệt ngoài thời gian này.'},
+                {'error': f'Đơn tạm ứng lương chỉ được duyệt {S.salary_advance_approval_window_text()}. '
+                          'Liên hệ Admin để mở khoá nếu cần duyệt ngoài thời gian này.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         return None

@@ -6037,6 +6037,9 @@ class GenericRequestSerializer(serializers.ModelSerializer):
     # ------------------------------------------------------------------
     # SALARY_ADVANCE specific validation
     # ------------------------------------------------------------------
+    # NGUỒN DUY NHẤT của quy định tạm ứng lương: kiểm tra đơn (dưới), khung duyệt
+    # (GenericRequestViewSet._check_salary_advance_window) và API cấu hình
+    # GET /api-hrm/salary-advance/config/ (web + app đọc từ đó, không tự ghi số / câu chữ).
     SALARY_ADVANCE_OFFICIAL_CONTRACTS = OFFICIAL_LABOR_CONTRACT_TYPES
     SALARY_ADVANCE_MAX_AMOUNT = 5_000_000
     SALARY_ADVANCE_MAX_RATIO = 0.8
@@ -6045,6 +6048,42 @@ class GenericRequestSerializer(serializers.ModelSerializer):
     # qua SalaryAdvanceCreationLock.
     SALARY_ADVANCE_CREATE_LAST_DAY = 3
     SALARY_ADVANCE_CREATE_CUTOFF = (15, 30)
+    # Khung DUYỆT: ngày 1 đến hết ngày này (giờ VN) — Admin mở khoá qua SalaryAdvanceApprovalLock.
+    SALARY_ADVANCE_APPROVAL_LAST_DAY = 3
+
+    @classmethod
+    def salary_advance_ratio_percent(cls) -> int:
+        return int(round(cls.SALARY_ADVANCE_MAX_RATIO * 100))
+
+    @classmethod
+    def salary_advance_contracts(cls) -> list:
+        """[(mã, nhãn)] loại hợp đồng được tạm ứng, theo thứ tự CONTRACT_TYPE."""
+        from employee.models import CONTRACT_TYPE
+        return [(code, label) for code, label in CONTRACT_TYPE if code in cls.SALARY_ADVANCE_OFFICIAL_CONTRACTS]
+
+    @classmethod
+    def salary_advance_contracts_text(cls) -> str:
+        """'hợp đồng lao động 6 tháng, …, hoặc hợp đồng vô thời hạn' — sinh từ nhãn, luôn khớp danh sách."""
+        labels = [label[:1].lower() + label[1:] for _, label in cls.salary_advance_contracts()]
+        return labels[0] if len(labels) == 1 else f"{', '.join(labels[:-1])} hoặc {labels[-1]}"
+
+    @classmethod
+    def salary_advance_create_window_text(cls) -> str:
+        """'từ ngày 1 đến 15h30 ngày 3'."""
+        h, m = cls.SALARY_ADVANCE_CREATE_CUTOFF
+        return f'từ ngày 1 đến {h}h{m:02d} ngày {cls.SALARY_ADVANCE_CREATE_LAST_DAY}'
+
+    @classmethod
+    def salary_advance_approval_window_text(cls) -> str:
+        """'trong 3 ngày đầu tháng'."""
+        return f'trong {cls.SALARY_ADVANCE_APPROVAL_LAST_DAY} ngày đầu tháng'
+
+    @classmethod
+    def is_salary_advance_approval_window_open(cls, now=None) -> bool:
+        from django.utils import timezone as _tz
+        # Giờ VN — trước đây so timezone.now().day (UTC): 00:00-07:00 ngày 1 bị chặn nhầm,
+        # 00:00-07:00 ngày sau hạn lại lọt.
+        return _tz.localtime(now or _tz.now()).day <= cls.SALARY_ADVANCE_APPROVAL_LAST_DAY
 
     @classmethod
     def is_salary_advance_creation_window_open(cls, now=None) -> bool:
@@ -6117,7 +6156,7 @@ class GenericRequestSerializer(serializers.ModelSerializer):
                 if amount > cap_80:
                     raise serializers.ValidationError({
                         'extra_data': [
-                            f'Số tiền không vượt quá 80% lương cơ bản '
+                            f'Số tiền không vượt quá {self.salary_advance_ratio_percent()}% lương cơ bản '
                             f'({cap_80:,}đ).'
                         ]
                     })
@@ -6129,7 +6168,7 @@ class GenericRequestSerializer(serializers.ModelSerializer):
                 if SalaryAdvanceCreationLock.get_solo().is_effectively_locked():
                     raise serializers.ValidationError({
                         'non_field_errors': [
-                            'Chỉ nhận đơn tạm ứng lương từ ngày 1 đến 15h30 ngày 3 hàng tháng. '
+                            f'Chỉ nhận đơn tạm ứng lương {self.salary_advance_create_window_text()} hàng tháng. '
                             'Liên hệ Admin để mở khoá nếu cần tạo đơn ngoài thời gian này.'
                         ]
                     })
@@ -6145,7 +6184,7 @@ class GenericRequestSerializer(serializers.ModelSerializer):
                 if contract not in self.SALARY_ADVANCE_OFFICIAL_CONTRACTS:
                     raise serializers.ValidationError({
                         'non_field_errors': [
-                            'Chỉ nhân viên chính thức (hợp đồng 12 tháng, 24 tháng hoặc vô thời hạn) mới được tạm ứng lương.'
+                            f'Chỉ nhân viên chính thức ({self.salary_advance_contracts_text()}) mới được tạm ứng lương.'
                         ]
                     })
                 # Đang có đơn xin nghỉ việc (PENDING_*/APPROVED) → chặn

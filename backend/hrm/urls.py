@@ -13,6 +13,7 @@ from salary.payroll_finalization_views import (
     FinalizeSalaryMonthView, SalaryFinalizeStateView, UnfinalizeSalaryMonthView,
 )
 from .attendance_views import AttendanceCalendarView
+from .salary_advance_config_views import SalaryAdvanceConfigAPIView
 from .finalization_views import (
     FinalizeAttendanceView,
     FinalizeAllAttendanceView,
@@ -147,6 +148,7 @@ urlpatterns = [
     path('meeting-room-settings/', MeetingRoomSettingView.as_view(), name='meeting-room-settings'),
 
     # Attendance Upload API endpoints - must come before attendance router
+    path('salary-advance/config/', SalaryAdvanceConfigAPIView.as_view(), name='salary-advance-config'),
     path('attendance/upload/', AttendanceUploadView.as_view(), name='attendance-upload'),
     path('attendance/upload/template/', AttendanceUploadTemplateView.as_view(), name='attendance-upload-template'),
     path('attendance/upload/validate/', AttendanceUploadValidationView.as_view(), name='attendance-upload-validate'),

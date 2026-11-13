@@ -82,8 +82,54 @@ export interface SalaryAdvanceApprovalLockState {
  * (is_effectively_locked() phía BE): mở khoá tự hết hiệu lực khi sang
  * tháng mới, không cần Admin nhớ khoá tay lại. */
 export type SalaryAdvanceCreationLockState = SalaryAdvanceApprovalLockState & {
-  /** Đang trong khung tạo đơn mặc định (00:00 ngày 1 - 15:30 ngày 3, giờ server). */
+  /** Đang trong khung tạo đơn mặc định (giờ server). */
   window_open?: boolean;
+};
+
+/** Khung ngày (tạo đơn / duyệt đơn) — giờ server (VN). */
+export type SalaryAdvanceWindow = {
+  /** false = không giới hạn ngày */
+  enabled: boolean;
+  first_day: number;
+  last_day: number;
+  /** 'HH:MM' của ngày last_day; null = hết ngày */
+  cutoff?: string | null;
+  /** Câu mô tả sẵn, vd 'từ ngày 1 đến 15h30 ngày 3' / 'trong 3 ngày đầu tháng' */
+  text: string;
+  /** Đang trong khung lúc gọi API */
+  open: boolean;
+};
+
+/** GET /api-hrm/salary-advance/config/ — NGUỒN DUY NHẤT của quy định tạm ứng lương (cùng chỗ backend dùng
+ * để kiểm tra khi tạo / duyệt đơn). Web không tự ghi số / khung ngày / câu chữ. */
+export type SalaryAdvanceConfig = {
+  /** Trần tuyệt đối (đ); null = không có trần */
+  max_amount: number | null;
+  /** Tỷ lệ trên lương cơ bản (0.8 = 80%); không áp khi chưa có lương cơ bản. */
+  max_ratio: number;
+  max_ratio_percent: number;
+  /** Loại hợp đồng được ứng; [] = không xét loại hợp đồng */
+  official_contracts: Array<{ id: string; label: string }>;
+  requires_probation_end: boolean;
+  /** Khung TẠO đơn */
+  window: SalaryAdvanceWindow;
+  creation_lock_supported: boolean;
+  creation_unlocked: boolean;
+  /** Tạo được ngay lúc này (trong khung hoặc Admin đã mở khoá) — chưa xét điều kiện cá nhân */
+  can_create: boolean;
+  /** Khung DUYỆT */
+  approval_window: SalaryAdvanceWindow;
+  approval_unlocked: boolean;
+  /** Điều kiện để hiển thị */
+  conditions: string[];
+  /** Của người đang đăng nhập — reasons cùng câu báo lỗi backend khi tạo đơn */
+  me: {
+    basic_salary_set: boolean;
+    cap_by_ratio: number | null;
+    cap: number | null;
+    eligible: boolean;
+    reasons: string[];
+  } | null;
 };
 
 class GenericRequestService {
@@ -170,7 +216,13 @@ class GenericRequestService {
     return res.data;
   }
 
-  /** Trạng thái khoá/mở khoá rule "chỉ TẠO đơn tạm ứng lương trong 3 ngày đầu tháng" */
+  /** Quy định tạm ứng lương (mức tối đa, khung ngày, điều kiện) theo backend. */
+  async getSalaryAdvanceConfig(): Promise<SalaryAdvanceConfig> {
+    const res = await managementApi.get('/api-hrm/salary-advance/config/');
+    return res.data;
+  }
+
+  /** Trạng thái khoá/mở khoá rule TẠO đơn tạm ứng lương ngoài khung ngày */
   async getCreationLock(): Promise<SalaryAdvanceCreationLockState> {
     const res = await managementApi.get(`${this.base}creation-lock/`);
     return res.data;
