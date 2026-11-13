@@ -1384,20 +1384,21 @@ class AttendanceExplanationViewSet(BulkRejectMixin, FinalizationLockMixin, views
         _QUOTA_SUBJECT_TYPES = ('LATE', 'EARLY_LEAVE', 'LATE_EARLY')
         _explanation_type = str((event.data or {}).get('explanation_type', '')).upper()
         if _explanation_type in _QUOTA_SUBJECT_TYPES:
-            # Hạn mức chung hoặc của đúng giỏ loại đơn này (hrm/explanation_quota.py)
-            from .explanation_quota import BUCKET_LABELS, BUCKET_OF, bucket_entry, explanation_quota_status
+            # Hạn mức của RỔ chứa loại đơn này — 1 rổ chung, 1 giỏ, hoặc Đi muộn + Về sớm của rổ
+            # gộp tách Quên chấm công (hrm/explanation_quota.py)
+            from .explanation_quota import explanation_quota_status, group_entry
             _quota = explanation_quota_status(event.employee, event.event_date)
-            _bucket = bucket_entry(_quota, _explanation_type)
-            _quota_used, _max_quota = _bucket['used'], _bucket['max']
+            _group = group_entry(_quota, _explanation_type)
+            _quota_used, _max_quota = _group['used'], _group['max']
             if _quota_used >= _max_quota:
-                _which = '' if _quota['shared'] else f' {BUCKET_LABELS[BUCKET_OF[_explanation_type]].lower()}'
+                _which = '' if _quota['shared'] else f' {_group["label"].lower()}'
                 return Response({
                     'error': f'Nhân viên đã dùng {_quota_used}/{_max_quota} lượt giải trình{_which} tháng này. '
                              f'Đã hết hạn mức, không thể duyệt thêm — cần từ chối hoặc liên hệ HCNS.',
                     'quota_exceeded': True,
                     'quota_used': _quota_used,
                     'max_quota': _max_quota,
-                    'quota_type': None if _quota['shared'] else BUCKET_OF[_explanation_type],
+                    'quota_type': None if _quota['shared'] else _group['key'],
                 }, status=status.HTTP_400_BAD_REQUEST)
 
         d = dict(event.data or {})
@@ -1706,6 +1707,10 @@ class AttendanceExplanationViewSet(BulkRejectMixin, FinalizationLockMixin, views
         ids = request.data.get('ids', [])
         approval_note = request.data.get('approval_note', 'Đã duyệt nhanh')
         quota_exceeded_note = "Từ chối tự động: Vượt quá hạn mức giải trình tối đa của tháng này."
+        # dry_run=true: chỉ XEM TRƯỚC — chạy đúng thuật toán hạn mức bên dưới rồi trả về đơn nào
+        # sẽ duyệt / bị từ chối / Quên chấm công vượt hạn mức (vẫn duyệt, engine trừ công), KHÔNG
+        # lưu gì. Trang Phê duyệt dùng để hiện hộp xác nhận thay vì tự tính lại hạn mức.
+        dry_run = str(request.data.get('dry_run', '')).lower() in ('1', 'true', 'yes')
 
         if not ids:
             return Response({'error': 'Danh sách ID không được để trống'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1750,22 +1755,21 @@ class AttendanceExplanationViewSet(BulkRejectMixin, FinalizationLockMixin, views
         from .stats_utils import _get_leave_used
         
         to_approve_batch_all = [] # Accumulate all for bulk update
+        preview = {'approved': [], 'rejected': [], 'over_quota': []}
 
         for (emp_id, year, month), items in groups.items():
             if not items: continue
             first_item = items[0]['event']
             emp_obj = first_item.employee
             
-            # Hạn mức còn lại thực tế — 1 giỏ chung (COMBINED / rổ gộp) hoặc từng giỏ
-            from .explanation_quota import BUCKET_OF, explanation_quota_status
+            # Hạn mức còn lại thực tế của từng RỔ (1 rổ chung, từng giỏ, hoặc Đi muộn + Về sớm /
+            # Quên chấm công của rổ gộp tách) — trừ dần theo rổ, các loại cùng rổ dùng chung bộ đếm.
+            from .explanation_quota import explanation_quota_status, group_entry
             _quota = explanation_quota_status(emp_obj, first_item.event_date)
-            if _quota['shared']:
-                temp_remaining = {'*': _quota['combined']['remaining']}
-            else:
-                temp_remaining = {bucket: v['remaining'] for bucket, v in _quota['by_type'].items()}
+            temp_remaining = {g['key']: g['remaining'] for g in _quota['groups']}
 
             def _quota_key(item):
-                return '*' if _quota['shared'] else BUCKET_OF[(item['event'].data or {}).get('explanation_type')]
+                return group_entry(_quota, (item['event'].data or {}).get('explanation_type'))['key']
             
             # Tách các nhóm đơn theo loại quota
             quota_subject_types = [
@@ -1817,6 +1821,8 @@ class AttendanceExplanationViewSet(BulkRejectMixin, FinalizationLockMixin, views
                         to_approve_batch.append(item)
                         if temp_remaining[key] > 0:
                             temp_remaining[key] -= 1
+                        else:
+                            item['over_quota'] = True
                     else:
                         # Các loại khác (Đi muộn, Về sớm) -> Chỉ phê duyệt nếu còn hạn mức quota
                         if temp_remaining[key] > 0:
@@ -1825,6 +1831,15 @@ class AttendanceExplanationViewSet(BulkRejectMixin, FinalizationLockMixin, views
                         else:
                             to_reject_batch.append(item)
             
+            if dry_run:
+                preview['approved'].extend(item['event'].id for item in to_approve_batch)
+                preview['over_quota'].extend(item['event'].id for item in to_approve_batch if item.get('over_quota'))
+                preview['rejected'].extend(
+                    {'id': item['event'].id, 'note': item.get('reject_note', quota_exceeded_note)}
+                    for item in to_reject_batch
+                )
+                continue
+
             # Duyệt đơn trong batch của employee này
             for item in to_approve_batch:
                 ev = item['event']
@@ -1878,6 +1893,9 @@ class AttendanceExplanationViewSet(BulkRejectMixin, FinalizationLockMixin, views
                 ev.save()
                 _create_approval_event(ev, approver, 'HR', 'REJECT', reject_note, now_str)
                 results['rejected'].append(ev.id)
+
+        if dry_run:
+            return Response({'dry_run': True, **preview, 'errors': results['errors']})
 
         # Batch update all approved events
         if to_approve_batch_all:

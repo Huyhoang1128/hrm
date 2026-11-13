@@ -1896,29 +1896,27 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
         </div>
       )}
 
-      {/* Hạn mức theo từng loại: số đã dùng / tối đa của từng giỏ */}
-      {engineSummary?.explanation_quota_mode === 'PER_TYPE' && engineSummary.explanation_quota_by_type && (
+      {/* Hạn mức theo từng loại: hiển thị đúng các rổ backend trả (explanation_quota_groups —
+          hrm/explanation_quota.py): mỗi giỏ 1 rổ, rổ gộp chung, hoặc rổ gộp tách Quên chấm công.
+          Web không tự biết loại nào gộp với loại nào hay hạn mức bao nhiêu. */}
+      {engineSummary?.explanation_quota_mode === 'PER_TYPE' && Array.isArray(engineSummary.explanation_quota_groups) && (
         <div className="px-2.5 pb-2.5 md:px-6 md:pb-3 border-b border-gray-100 bg-amber-50/30 flex flex-wrap items-center gap-2">
-          {engineSummary.explanation_quota_shared ? (
+          {engineSummary.explanation_quota_shared && (
             <span className="text-[10px] md:text-xs font-semibold text-amber-700">
-              {engineSummary.is_manager_combined_quota ? 'Rổ gộp: ' : ''}dùng chung cho Đi muộn / Về sớm / Quên chấm công
+              {engineSummary.is_manager_combined_quota ? 'Rổ gộp: ' : ''}dùng chung cho mọi loại giải trình
             </span>
-          ) : (
-            ([['LATE', 'Đi muộn'], ['EARLY_LEAVE', 'Về sớm'], ['INCOMPLETE_ATTENDANCE', 'Quên chấm công']] as const).map(([key, label]) => {
-              const q = engineSummary.explanation_quota_by_type[key];
-              if (!q) return null;
-              return (
-                <span
-                  key={key}
-                  className={`rounded-full border px-2 py-0.5 text-[10px] md:text-xs font-semibold ${
-                    q.remaining > 0 ? 'border-amber-200 bg-white text-amber-800' : 'border-red-200 bg-red-50 text-red-600'
-                  }`}
-                >
-                  {label}: {q.used}/{q.max} lần
-                </span>
-              );
-            })
           )}
+          {!engineSummary.explanation_quota_shared &&
+            (engineSummary.explanation_quota_groups as Array<{ key: string; label: string; used: number; max: number; remaining: number }>).map((g) => (
+              <span
+                key={g.key}
+                className={`rounded-full border px-2 py-0.5 text-[10px] md:text-xs font-semibold ${
+                  g.remaining > 0 ? 'border-amber-200 bg-white text-amber-800' : 'border-red-200 bg-red-50 text-red-600'
+                }`}
+              >
+                {g.label}: {g.used}/{g.max} lần
+              </span>
+            ))}
         </div>
       )}
 

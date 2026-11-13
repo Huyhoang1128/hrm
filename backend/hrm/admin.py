@@ -714,7 +714,7 @@ class CompanyConfigAdmin(admin.ModelAdmin):
         ('Hạn mức giải trình theo từng loại', {
             'fields': ('explanation_quota_mode', 'max_late_explanation_per_month',
                        'max_early_leave_explanation_per_month', 'max_incomplete_attendance_explanation_per_month',
-                       'manager_combined_explanation_quota')
+                       'manager_combined_explanation_quota', 'manager_incomplete_explanation_quota')
         }),
         ('Thông tin hiệu lực', {
             'fields': ('effective_from', 'effective_to')

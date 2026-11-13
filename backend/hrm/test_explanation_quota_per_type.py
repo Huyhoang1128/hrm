@@ -99,8 +99,10 @@ class PerTypeExplanationQuotaTests(APITestCase):
 
         def state(combined_used, incomplete_used):
             s = EmployeeState("NV00432")
+            limits = {'LATE': 1, 'EARLY_LEAVE': 1, 'INCOMPLETE_ATTENDANCE': 2}
             s._quota_rules_cache = {'mode': 'PER_TYPE', 'is_manager_combined_quota': False, 'combined_max': None,
-                                    'limits': {'LATE': 1, 'EARLY_LEAVE': 1, 'INCOMPLETE_ATTENDANCE': 2}}
+                                    'limits': limits, 'pools': dict(limits),
+                                    'pool_of': {bucket: bucket for bucket in limits}}
             s.explanation_quota_used = combined_used
             s.explanation_quota_used_incomplete = incomplete_used
             s.calendar_result = [{"date": "2026-08-10", "event_type": "attendance", "check_in": "08:00",

@@ -2371,7 +2371,13 @@ class CompanyConfig(models.Model):
     max_incomplete_attendance_explanation_per_month = models.PositiveSmallIntegerField(
         default=1, verbose_name="Hạn mức giải trình Quên chấm công / tháng (theo từng loại)")
     manager_combined_explanation_quota = models.PositiveSmallIntegerField(
-        default=5, verbose_name="Rổ gộp giải trình / tháng (nhân viên trong danh sách rổ gộp)")
+        default=5, verbose_name="Rổ gộp giải trình / tháng (nhân viên trong danh sách rổ gộp)",
+        help_text="Khi có hạn mức Quên chấm công riêng bên dưới, rổ gộp chỉ gồm Đi muộn + Về sớm.")
+    manager_incomplete_explanation_quota = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        verbose_name="Quên chấm công / tháng — rổ riêng (nhân viên trong danh sách rổ gộp)",
+        help_text="Để trống: Quên chấm công tính chung rổ gộp. Điền số: Quên chấm công tách rổ riêng "
+                  "với hạn mức này, rổ gộp chỉ còn Đi muộn + Về sớm.")
     
     # Trạng thái
     is_active = models.BooleanField(default=True, verbose_name="Đang hoạt động")

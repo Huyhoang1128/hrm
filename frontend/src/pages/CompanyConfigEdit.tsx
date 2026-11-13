@@ -41,6 +41,7 @@ const CompanyConfigEdit: React.FC = () => {
     max_early_leave_explanation_per_month: 1,
     max_incomplete_attendance_explanation_per_month: 1,
     manager_combined_explanation_quota: 5,
+    manager_incomplete_explanation_quota: null,
     is_active: true,
     effective_from: new Date().toISOString().split('T')[0],
     effective_to: '',
@@ -81,6 +82,7 @@ const CompanyConfigEdit: React.FC = () => {
         max_early_leave_explanation_per_month: config.max_early_leave_explanation_per_month ?? 1,
         max_incomplete_attendance_explanation_per_month: config.max_incomplete_attendance_explanation_per_month ?? 1,
         manager_combined_explanation_quota: config.manager_combined_explanation_quota ?? 5,
+        manager_incomplete_explanation_quota: config.manager_incomplete_explanation_quota ?? null,
         is_active: config.is_active,
         effective_from: config.effective_from.split('T')[0],
         effective_to: config.effective_to ? config.effective_to.split('T')[0] : '',
@@ -151,6 +153,13 @@ const CompanyConfigEdit: React.FC = () => {
         max_early_leave_explanation_per_month: Number(formData.max_early_leave_explanation_per_month) || 0,
         max_incomplete_attendance_explanation_per_month: Number(formData.max_incomplete_attendance_explanation_per_month) || 0,
         manager_combined_explanation_quota: Number(formData.manager_combined_explanation_quota) || 0,
+        // Để trống = Quên chấm công tính chung rổ gộp (null).
+        manager_incomplete_explanation_quota:
+          formData.manager_incomplete_explanation_quota === null
+          || formData.manager_incomplete_explanation_quota === undefined
+          || String(formData.manager_incomplete_explanation_quota) === ''
+            ? null
+            : Number(formData.manager_incomplete_explanation_quota),
         is_active: formData.is_active !== false,
         effective_from: formData.effective_from,
         effective_to: formData.effective_to || undefined,
@@ -542,7 +551,8 @@ const CompanyConfigEdit: React.FC = () => {
               </select>
               <p className="mt-1 text-xs text-gray-500">
                 Theo từng loại: mỗi loại một hạn mức riêng; nhân viên trong danh sách "Rổ gộp giải trình" (Quản lý phân
-                quyền) dùng chung 1 rổ cho mọi loại.
+                quyền) dùng chung 1 rổ cho mọi loại — điền "Quên chấm công riêng" thì Quên chấm công tách rổ riêng, rổ
+                gộp chỉ còn Đi muộn + Về sớm.
               </p>
             </div>
             <div>
@@ -593,6 +603,20 @@ const CompanyConfigEdit: React.FC = () => {
                 onChange={handleInputChange}
                 min="0"
                 max="100"
+                disabled={formData.explanation_quota_mode !== 'PER_TYPE'}
+                className="input-field w-full disabled:bg-gray-50 disabled:text-gray-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Rổ gộp — Quên chấm công riêng / tháng</label>
+              <input
+                type="number"
+                name="manager_incomplete_explanation_quota"
+                value={formData.manager_incomplete_explanation_quota ?? ''}
+                onChange={handleInputChange}
+                min="0"
+                max="100"
+                placeholder="Để trống: tính chung rổ gộp"
                 disabled={formData.explanation_quota_mode !== 'PER_TYPE'}
                 className="input-field w-full disabled:bg-gray-50 disabled:text-gray-400"
               />

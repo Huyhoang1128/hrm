@@ -2311,15 +2311,12 @@ const AttendanceManagement: React.FC = () => {
                 </span>
                 <span className="text-[10px] text-primary-500 font-medium">/{attendanceStats?.max_explanations_per_month || 0} lần</span>
               </div>
-              {/* Hạn mức theo từng loại: còn lại / tối đa của từng giỏ */}
+              {/* Hạn mức theo từng loại: còn lại / tối đa của từng RỔ backend trả (groups —
+                  hrm/explanation_quota.py), kể cả rổ gộp tách Quên chấm công. */}
               {attendanceStats?.explanation_quota && !attendanceStats.explanation_quota.shared && (
                 <p className="mt-1 text-[10px] text-gray-500">
-                  {([['LATE', 'Đi muộn'], ['EARLY_LEAVE', 'Về sớm'], ['INCOMPLETE_ATTENDANCE', 'Quên chấm công']] as const)
-                    .map(([key, label]) => {
-                      const q = attendanceStats.explanation_quota.by_type?.[key];
-                      return q ? `${label} ${q.remaining}/${q.max}` : null;
-                    })
-                    .filter(Boolean)
+                  {((attendanceStats.explanation_quota.groups || []) as Array<{ key: string; label: string; remaining: number; max: number }>)
+                    .map((g) => `${g.label} ${g.remaining}/${g.max}`)
                     .join(' · ')}
                 </p>
               )}
@@ -5537,7 +5534,8 @@ const AttendanceManagement: React.FC = () => {
                     {/* Quota Warning for Explanation */}
                     {selectedContext === 'explanation' &&
                       (() => {
-                        // Hạn mức theo từng loại: chỉ cảnh báo khi giỏ của lý do đang chọn đã hết
+                        // Hạn mức theo từng loại: chỉ cảnh báo khi RỔ của lý do đang chọn đã hết
+                        // (by_type[giỏ] = số của rổ chứa giỏ đó — backend tính).
                         const quota = attendanceStats?.explanation_quota;
                         if (!quota || quota.shared) return attendanceStats?.remaining_explanations <= 0;
                         const bucket = ({ late_minutes: 'LATE', early_leave_minutes: 'EARLY_LEAVE', incomplete_attendance: 'INCOMPLETE_ATTENDANCE' } as Record<string, string>)[selectedReason as string];
@@ -5562,7 +5560,9 @@ const AttendanceManagement: React.FC = () => {
                             lượt giải trình miễn phí trong tháng này
                             {attendanceStats?.explanation_quota && !attendanceStats.explanation_quota.shared
                               ? ' cho loại này'
-                              : ` (tối đa ${attendanceStats?.max_explanations_per_month ?? 3} lần)`}
+                              : attendanceStats?.max_explanations_per_month != null
+                                ? ` (tối đa ${attendanceStats.max_explanations_per_month} lần)`
+                                : ''}
                             . Đơn này vẫn có thể gửi đi nhưng có thể sẽ bị
                             tính phí bổ sung tùy theo quy định của công ty.
                           </p>
