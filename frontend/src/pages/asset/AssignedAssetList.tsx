@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { assetTypeOptionsFrom, isMultiHolderType } from './assetTypes';
+import { assetTypeOptionsFrom, isMultiHolderType, useAssetRules } from './assetTypes';
 import { assetsAPI, Asset, AssetAssignmentHistory } from '../../utils/api';
 import {
   ComputerDesktopIcon,
@@ -110,6 +110,8 @@ const CONDITION_OPTIONS = [
 ];
 
 export default function AssignedAssetList() {
+  // Quy định Phân loại / bàn giao tài sản lấy từ backend (system-rules "assets").
+  const assetRules = useAssetRules();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -528,7 +530,7 @@ export default function AssignedAssetList() {
                                 {h.asset_specifications.power_supply && <div><span className="text-slate-500">Nguồn:</span> <span className="font-semibold">{h.asset_specifications.power_supply}</span></div>}
                               </>
                             )}
-                            {isMultiHolderType(h.asset_type) && h.assigned_quantity != null && (
+                            {isMultiHolderType(h.asset_type, assetRules) && h.assigned_quantity != null && (
                               <div><span className="text-slate-500">Số lượng bàn giao:</span> <span className="font-semibold">{h.assigned_quantity}</span></div>
                             )}
                             {h.asset_type === 'SIM' && (

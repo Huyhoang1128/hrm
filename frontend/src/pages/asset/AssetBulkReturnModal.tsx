@@ -1,5 +1,6 @@
 import { useState, useEffect, Fragment } from 'react';
-import { assetTypeOptionsFrom, isMultiHolderType } from './assetTypes';
+import { assetTypeOptionsFrom, isMultiHolderType, useAssetRules } from './assetTypes';
+import type { AssetRules } from '../../types/systemRules/misc';
 import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import { XMarkIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { Asset, assetsAPI } from '../../utils/api';
@@ -22,14 +23,14 @@ const ASSET_CONDITIONS = [
   { value: 'BROKEN', label: 'Hỏng (Không hoạt động)' },
 ];
 
-const isMultiType = (a: Asset) =>
-  isMultiHolderType(a.asset_type) && (a.total_quantity ?? 1) > 1;
+const isMultiType = (a: Asset, rules: AssetRules | null) =>
+  isMultiHolderType(a.asset_type, rules) && (a.total_quantity ?? 1) > 1;
 
 const uniqueHolderCount = (a: Asset): number =>
   new Set((a.holders ?? []).map((h) => h.employee_id)).size;
 
-function canBulkReturn(asset: Asset): boolean {
-  if (isMultiType(asset) && uniqueHolderCount(asset) > 1) return false;
+function canBulkReturn(asset: Asset, rules: AssetRules | null): boolean {
+  if (isMultiType(asset, rules) && uniqueHolderCount(asset) > 1) return false;
   return !!asset.assigned_to_name;
 }
 
@@ -37,8 +38,8 @@ function getHolderDisplay(asset: Asset): string {
   return asset.assigned_to_name || '';
 }
 
-function getBlockReason(asset: Asset): string {
-  if (isMultiType(asset) && uniqueHolderCount(asset) > 1)
+function getBlockReason(asset: Asset, rules: AssetRules | null): string {
+  if (isMultiType(asset, rules) && uniqueHolderCount(asset) > 1)
     return 'Nhiều người giữ — thu hồi từng người trong Chi tiết';
   if (!asset.assigned_to_name)
     return asset.pending_assignment ? 'Chờ xác nhận — chưa nhận máy' : 'Chưa bàn giao';
@@ -46,6 +47,8 @@ function getBlockReason(asset: Asset): string {
 }
 
 export default function AssetBulkReturnModal({ isOpen, onClose, onSuccess, assets }: AssetBulkReturnModalProps) {
+  // Quy định Phân loại / bàn giao tài sản lấy từ backend (system-rules "assets").
+  const assetRules = useAssetRules();
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<ResultItem[] | null>(null);
   const [filterType, setFilterType] = useState('all');
@@ -69,8 +72,8 @@ export default function AssetBulkReturnModal({ isOpen, onClose, onSuccess, asset
     }
   }, [isOpen]);
 
-  const returnableAssets = assets.filter(canBulkReturn);
-  const blockedAssets = assets.filter((a) => !canBulkReturn(a));
+  const returnableAssets = assets.filter((a) => canBulkReturn(a, assetRules));
+  const blockedAssets = assets.filter((a) => !canBulkReturn(a, assetRules));
 
   const visibleReturnable = filterType === 'all' ? returnableAssets : returnableAssets.filter((a) => a.asset_type === filterType);
   const visibleBlocked = filterType === 'all' ? blockedAssets : blockedAssets.filter((a) => a.asset_type === filterType);
@@ -80,7 +83,7 @@ export default function AssetBulkReturnModal({ isOpen, onClose, onSuccess, asset
     setLoading(true);
     const settled = await Promise.allSettled(
       visibleReturnable.map((asset) => {
-        const singleHolder = isMultiType(asset) && (asset.holders?.length ?? 0) === 1 ? asset.holders![0] : null;
+        const singleHolder = isMultiType(asset, assetRules) && (asset.holders?.length ?? 0) === 1 ? asset.holders![0] : null;
         const holderQty = singleHolder?.assigned_quantity ?? 1;
         const returnQty = returnQuantities[asset.id] ?? holderQty;
         return assetsAPI.returnAsset(asset.id, {
@@ -162,7 +165,7 @@ export default function AssetBulkReturnModal({ isOpen, onClose, onSuccess, asset
                         </div>
                         <div className="max-h-44 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
                           {visibleReturnable.map((a) => {
-                            const singleHolder = isMultiType(a) && (a.holders?.length ?? 0) === 1 ? a.holders![0] : null;
+                            const singleHolder = isMultiType(a, assetRules) && (a.holders?.length ?? 0) === 1 ? a.holders![0] : null;
                             const holderQty = singleHolder?.assigned_quantity ?? 1;
                             const showQty = !!singleHolder && holderQty >= 1;
                             return (
@@ -197,7 +200,7 @@ export default function AssetBulkReturnModal({ isOpen, onClose, onSuccess, asset
                               <XCircleIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
                               <span className="text-xs font-mono text-gray-400">[{a.asset_code}]</span>
                               <span className="text-xs text-gray-400 truncate">{a.name}</span>
-                              <span className="ml-auto text-[10px] text-amber-600 flex-shrink-0">{getBlockReason(a)}</span>
+                              <span className="ml-auto text-[10px] text-amber-600 flex-shrink-0">{getBlockReason(a, assetRules)}</span>
                             </div>
                           ))}
                           {visibleReturnable.length === 0 && visibleBlocked.length === 0 && (
