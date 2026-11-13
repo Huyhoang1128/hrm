@@ -26,6 +26,7 @@ import {
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { buildContractWarnings } from '../utils/contractWarnings';
+import { useHrChoices, pickChoices } from '../utils/hrChoices';
 
 // ============================================
 // CONSTANTS
@@ -37,51 +38,11 @@ const GENDER_OPTIONS = [
   { label: 'Khác', value: 'O' },
 ];
 
-const EMPLOYMENT_STATUS_OPTIONS = [
-  { label: 'Đang làm việc', value: 'ACTIVE' },
-  { label: 'Tạm dừng', value: 'SUSPENDED' },
-  { label: 'Nghỉ thai sản', value: 'MATERNITY_LEAVE' },
-  { label: 'Đã nghỉ', value: 'INACTIVE' },
-];
-
 const MARITAL_STATUS_OPTIONS = [
   { label: 'Độc thân', value: 'SINGLE' },
   { label: 'Đã kết hôn', value: 'MARRIED' },
   { label: 'Ly hôn', value: 'DIVORCED' },
   { label: 'Góa', value: 'WIDOWED' },
-];
-
-const WORK_FORM_OPTIONS = [
-  { label: 'Toàn thời gian', value: 'FULL_TIME' },
-  { label: 'Bán thời gian', value: 'PART_TIME' },
-  { label: 'Hợp đồng', value: 'CONTRACT' },
-  { label: 'Thực tập', value: 'INTERN' },
-  { label: 'Cộng tác viên', value: 'COLLABORATOR' },
-];
-
-const REGION_OPTIONS = [
-  { label: 'Miền Bắc', value: 'Miền Bắc' },
-  { label: 'Miền Nam', value: 'Miền Nam' },
-];
-
-const BLOCK_OPTIONS = [
-  { label: 'Khối Back office', value: 'Khối Back office' },
-  { label: 'Khối Marketing', value: 'Khối Marketing' },
-  { label: 'Khối Kinh doanh', value: 'Khối Kinh doanh' },
-];
-
-const CONTRACT_TYPE_OPTIONS = [
-  { label: 'Hợp đồng thử việc', value: 'PROBATION' },
-  { label: 'Thử việc 1 tháng', value: 'PROBATION_1M' },
-  { label: 'Thử việc 2 tháng', value: 'PROBATION_2M' },
-  { label: 'Hợp đồng thực tập sinh', value: 'INTERN' },
-  { label: 'Hợp đồng cộng tác viên', value: 'COLLABORATOR' },
-  { label: 'Hợp đồng lao động 6 tháng', value: 'SIX_MONTH' },
-  { label: 'Hợp đồng lao động 12 tháng', value: 'ONE_YEAR' },
-  { label: 'Hợp đồng lao động 24 tháng', value: 'TWO_YEAR' },
-  { label: 'Hợp đồng lao động 36 tháng', value: 'THREE_YEAR' },
-  { label: 'Hợp đồng vô thời hạn', value: 'INDEFINITE' },
-  { label: 'Hợp đồng dịch vụ', value: 'SERVICE' },
 ];
 
 const PROBATION_RATE_OPTIONS = [
@@ -101,28 +62,6 @@ const FILE_STATUS_OPTIONS = [
   { label: 'Cần bổ sung hồ sơ', value: 'NEED_SUPPLEMENT' },
   { label: 'Chưa nộp', value: 'NOT_SUBMITTED' },
   { label: 'Chờ rà soát', value: 'PENDING_REVIEW' },
-];
-
-const RANK_OPTIONS = [
-  { label: 'Chủ tịch', value: 'CHAIRMAN' },
-  { label: 'Giám đốc', value: 'DIRECTOR' },
-  { label: 'Phó Giám đốc', value: 'DEPUTY_DIRECTOR' },
-  { label: 'Leader', value: 'LEADER' },
-  { label: 'Quản lý', value: 'SUPERVISOR' },
-  { label: 'Trưởng phòng', value: 'MANAGER' },
-  { label: 'Trưởng phòng tập sự', value: 'MANAGER_TRAINEE' },
-  { label: 'Phó phòng', value: 'DEPUTY_MANAGER' },
-  { label: 'Nhân viên', value: 'STAFF' },
-  { label: 'Thực tập sinh', value: 'INTERN' },
-];
-
-const EDUCATION_LEVEL_OPTIONS = [
-  { label: 'Trung học phổ thông', value: 'HIGH_SCHOOL' },
-  { label: 'Cao đẳng', value: 'ASSOCIATE' },
-  { label: 'Đại học', value: 'BACHELOR' },
-  { label: 'Thạc sĩ', value: 'MASTER' },
-  { label: 'Tiến sĩ', value: 'DOCTORATE' },
-  { label: 'Khác', value: 'OTHER' },
 ];
 
 const SOCIAL_INSURANCE_STATUS_OPTIONS = [
@@ -180,6 +119,11 @@ const EmployeeEdit: React.FC = () => {
   const isAdmin = isSuperUser || user?.role?.toUpperCase() === 'ADMIN';
   const isHR = user?.is_staff === true || user?.role?.toUpperCase() === 'HR';
   const canManageEmployee = isAdmin || isHR;
+  // Danh sách lựa chọn (cấp bậc, trạng thái, loại HĐ...) lấy từ backend — không chép cứng ở trang này.
+  const choices = useHrChoices();
+  const RANK_OPTIONS = choices?.rank ?? [];
+  // Loại HĐ của nhân viên: chỉ HĐ lao động (cam kết / thoả thuận không phải loại HĐ của hồ sơ).
+  const CONTRACT_TYPE_OPTIONS = pickChoices(choices?.contract_type, choices?.contract_type_groups.labor);
   const [loading, setLoading] = useState(false);
   const [loadingEmployee, setLoadingEmployee] = useState(true);
   const [originalExtraInfo, setOriginalExtraInfo] = useState<Record<string, any>>({});
@@ -696,7 +640,7 @@ const EmployeeEdit: React.FC = () => {
               label="Trình độ học vấn"
               value={formData.education_level}
               placeholder="Chọn trình độ"
-              options={EDUCATION_LEVEL_OPTIONS}
+              options={choices?.education_level ?? []}
               onChange={(v) => handleSelect('education_level', v)}
             />
           </div>
@@ -710,7 +654,7 @@ const EmployeeEdit: React.FC = () => {
               label="Trạng thái làm việc"
               value={formData.employment_status}
               placeholder="Chọn trạng thái"
-              options={EMPLOYMENT_STATUS_OPTIONS}
+              options={choices?.employment_status ?? []}
               onChange={(v) => handleSelect('employment_status', v)}
             />
 
@@ -812,7 +756,7 @@ const EmployeeEdit: React.FC = () => {
               label="Hình thức làm việc"
               value={formData.work_form}
               placeholder="Chọn hình thức"
-              options={WORK_FORM_OPTIONS}
+              options={choices?.work_form ?? []}
               onChange={(v) => handleSelect('work_form', v)}
             />
 
@@ -829,7 +773,7 @@ const EmployeeEdit: React.FC = () => {
               label="Vùng/Miền"
               value={formData.region}
               placeholder="Chọn vùng/miền"
-              options={REGION_OPTIONS}
+              options={choices?.region ?? []}
               onChange={(v) => handleSelect('region', v)}
             />
 
@@ -837,7 +781,7 @@ const EmployeeEdit: React.FC = () => {
               label="Khối"
               value={formData.block}
               placeholder="Chọn khối"
-              options={BLOCK_OPTIONS}
+              options={choices?.block ?? []}
               onChange={(v) => handleSelect('block', v)}
             />
 

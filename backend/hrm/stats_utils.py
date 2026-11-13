@@ -37,6 +37,11 @@ def _get_quota_remaining(employee, date):
     max_quota = company_config.max_explanation_count_per_month if company_config else 3
     return max(0, max_quota - used)
 
+# Số ngày 1 đơn làm online NỬA NGÀY tính vào hạn mức — cũng là bước nhỏ nhất có nghĩa của hạn mức
+# online (web dựng lựa chọn hạn mức ghi đè theo bước này: system-rules attendance.online_quota_override).
+ONLINE_HALF_DAY_AMOUNT = 0.5
+
+
 def online_quota_amount(employee, event_date, data) -> float:
     """Số ngày mà 1 đơn làm việc online TÍNH VÀO hạn mức online/tháng.
 
@@ -52,7 +57,7 @@ def online_quota_amount(employee, event_date, data) -> float:
     "còn lại" — để các nơi không bao giờ lệch nhau.
     """
     data = data or {}
-    base = 0.5 if data.get('expected_status') == 'HALF_DAY' else 1.0
+    base = ONLINE_HALF_DAY_AMOUNT if data.get('expected_status') == 'HALF_DAY' else 1.0
     if not (event_date and employee is not None):
         return base
     weekday = event_date.weekday()
@@ -77,8 +82,35 @@ def online_quota_amount(employee, event_date, data) -> float:
         half = _resolve_online_work_half(data)
         if half == 'AFTERNOON':
             return 0.0
-        return 0.5
+        return ONLINE_HALF_DAY_AMOUNT
     return base
+
+
+# Dữ liệu đơn online đại diện cho từng lựa chọn buổi trên web (id: morning/afternoon/full_day) —
+# đưa qua online_quota_amount() để biết mỗi buổi tính bao nhiêu vào hạn mức.
+ONLINE_SESSION_DATA = {
+    'morning': {'expected_status': 'HALF_DAY', 'half_day_period': 'MORNING'},
+    'afternoon': {'expected_status': 'HALF_DAY', 'half_day_period': 'AFTERNOON'},
+    'full_day': {},
+}
+
+
+def online_quota_cost_for_month(employee, year: int, month: int) -> dict:
+    """{'YYYY-MM-DD': {'morning': x, 'afternoon': y, 'full_day': z}} cho mọi ngày trong tháng —
+    số ngày mỗi buổi làm online TÍNH VÀO hạn mức (online_quota_amount, đúng hàm dùng khi đếm/duyệt).
+
+    Web dùng để khoá/mở thẻ "Làm việc online" và lọc buổi được chọn thay vì tự suy luật
+    "Chủ nhật / chiều T7 tuần 2-4" (backend còn xét lịch phòng ban THEO NGÀY và nhân viên làm
+    chiều T7 mọi tuần — web không biết)."""
+    import calendar
+    days = calendar.monthrange(year, month)[1]
+    out = {}
+    for day in range(1, days + 1):
+        d = datetime.date(year, month, day)
+        out[d.isoformat()] = {
+            key: online_quota_amount(employee, d, data) for key, data in ONLINE_SESSION_DATA.items()
+        }
+    return out
 
 
 def _get_online_work_used(employee, date):

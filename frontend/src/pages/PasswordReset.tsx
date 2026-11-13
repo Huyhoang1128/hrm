@@ -6,7 +6,7 @@ import Pagination from '../components/Pagination';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { SelectBox } from '../components/LandingLayout/SelectBox';
 import { KeyIcon } from '@heroicons/react/24/outline';
-import { BRAND } from '@/config/brand';
+import { useSystemRules } from '../services/systemRules.service';
 
 interface Employee {
   id: number;
@@ -27,6 +27,9 @@ interface FilterParams {
 }
 
 export default function PasswordReset() {
+  // Câu "Thông tin cần biết" phải đúng hành vi backend (employees/{id}/reset-password/): độ dài mật khẩu
+  // ngẫu nhiên đọc từ system-rules "password", không ghi cứng.
+  const passwordRules = useSystemRules()?.password ?? null;
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [filters, setFilters] = useState<FilterParams>({
@@ -410,9 +413,12 @@ export default function PasswordReset() {
       <div className="bg-primary-50 border border-primary-200 rounded-2xl p-5">
         <h3 className="text-sm font-bold text-primary-900 mb-2">Thông tin cần biết</h3>
         <ul className="text-sm text-primary-700 space-y-1">
-          <li>✓ Mật khẩu mới sẽ được tạo ngẫu nhiên: <code className="bg-primary-100 px-2 py-0.5 rounded-md text-xs font-mono">{BRAND.defaultPasswordPrefix}@XXXXX</code></li>
+          <li>
+            ✓ Mật khẩu mới được tạo ngẫu nhiên
+            {passwordRules ? ` (${passwordRules.reset_generated_length} ký tự)` : ''}
+          </li>
           <li>✓ Email thông tin tài khoản sẽ được gửi tự động đến nhân viên</li>
-          <li>✓ Nhân viên BẮT BUỘC đổi mật khẩu sau lần đăng nhập đầu tiên</li>
+          <li>✓ Nhân viên nên tự đổi mật khẩu sau khi đăng nhập (hệ thống không bắt buộc)</li>
           <li>✓ Hệ thống sẽ ghi nhận lịch sử cấp lại mật khẩu</li>
         </ul>
       </div>

@@ -13,6 +13,7 @@ from salary.payroll_finalization_views import (
     FinalizeSalaryMonthView, SalaryFinalizeStateView, UnfinalizeSalaryMonthView,
 )
 from .attendance_views import AttendanceCalendarView
+from .system_rules.views import SystemRulesView
 from .finalization_views import (
     FinalizeAttendanceView,
     FinalizeAllAttendanceView,
@@ -144,6 +145,8 @@ router.register(r'meeting-rooms', MeetingRoomViewSet, basename='meeting-room')
 router.register(r'meeting-room-bookings', MeetingRoomBookingViewSet, basename='meeting-room-booking')
 
 urlpatterns = [
+    # Quy định hệ thống dùng chung cho web — nguồn duy nhất (hrm/system_rules)
+    path('system-rules/', SystemRulesView.as_view(), name='system-rules'),
     path('meeting-room-settings/', MeetingRoomSettingView.as_view(), name='meeting-room-settings'),
 
     # Attendance Upload API endpoints - must come before attendance router

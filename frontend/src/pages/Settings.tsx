@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../utils/api';
+import { useSystemRules } from '../services/systemRules.service';
 import {
   UserCircleIcon,
   EnvelopeIcon,
@@ -20,6 +21,9 @@ interface ChangePasswordForm {
 
 export default function Settings() {
   const { user } = useAuth();
+  // Chính sách mật khẩu lấy từ backend (AUTH_PASSWORD_VALIDATORS) — không tự đặt độ dài ở web.
+  const passwordRules = useSystemRules()?.password ?? null;
+  const minLength = passwordRules?.min_length ?? null;
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -54,8 +58,8 @@ export default function Settings() {
     if (!formData.newPassword) {
       return 'Mật khẩu mới là bắt buộc';
     }
-    if (formData.newPassword.length < 8) {
-      return 'Mật khẩu mới phải có ít nhất 8 ký tự';
+    if (minLength != null && formData.newPassword.length < minLength) {
+      return `Mật khẩu mới phải có ít nhất ${minLength} ký tự`;
     }
     if (formData.newPassword !== formData.confirmPassword) {
       return 'Mật khẩu xác nhận không khớp';
@@ -82,6 +86,7 @@ export default function Settings() {
       await authAPI.changePassword({
         currentPassword: formData.currentPassword,
         newPassword: formData.newPassword,
+        confirmPassword: formData.confirmPassword,
       });
 
       setMessage({ type: 'success', text: 'Đổi mật khẩu thành công!' });
@@ -93,7 +98,7 @@ export default function Settings() {
     } catch (error: any) {
       setMessage({
         type: 'error',
-        text: error.response?.data?.message || 'Có lỗi xảy ra khi đổi mật khẩu',
+        text: error.response?.data?.error || error.response?.data?.message || 'Có lỗi xảy ra khi đổi mật khẩu',
       });
     } finally {
       setIsLoading(false);
@@ -254,7 +259,7 @@ export default function Settings() {
                     value={formData.newPassword}
                     onChange={handleInputChange}
                     className="block w-full pr-10 pl-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
-                    placeholder="Nhập mật khẩu mới (tối thiểu 8 ký tự)"
+                    placeholder={minLength != null ? `Nhập mật khẩu mới (tối thiểu ${minLength} ký tự)` : 'Nhập mật khẩu mới'}
                     required
                   />
                   <button
@@ -376,13 +381,13 @@ export default function Settings() {
             Lưu ý bảo mật
           </h3>
           <ul className="space-y-2 text-sm text-blue-800">
-            <li className="flex items-start space-x-2">
-              <span className="text-blue-600 mt-0.5">•</span>
-              <span>
-                Sử dụng mật khẩu mạnh với ít nhất 8 ký tự, bao gồm chữ hoa, chữ
-                thường, số và ký tự đặc biệt
-              </span>
-            </li>
+            {/* Quy tắc mật khẩu đúng như backend kiểm tra (help text của AUTH_PASSWORD_VALIDATORS). */}
+            {(passwordRules?.help_texts ?? []).map((text) => (
+              <li key={text} className="flex items-start space-x-2">
+                <span className="text-blue-600 mt-0.5">•</span>
+                <span>{text}</span>
+              </li>
+            ))}
             <li className="flex items-start space-x-2">
               <span className="text-blue-600 mt-0.5">•</span>
               <span>Không chia sẻ mật khẩu với người khác</span>

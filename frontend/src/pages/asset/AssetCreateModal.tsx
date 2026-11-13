@@ -5,7 +5,7 @@ import { assetsAPI, departmentsAPI, employeesAPI, positionsAPI, companyUnitsAPI 
 import { SelectBox, SelectOption } from '../../components/LandingLayout/SelectBox';
 import FeedbackDialog from '../../components/FeedbackDialog';
 import AssetTypeInput from './AssetTypeInput';
-import { isMultiHolderType, normalizeAssetType } from './assetTypes';
+import { isMultiHolderType, normalizeAssetType, useAssetRules } from './assetTypes';
 
 interface AssetCreateModalProps {
   isOpen: boolean;
@@ -44,6 +44,8 @@ const REGIONS: SelectOption<string>[] = [
 ];
 
 export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCreateModalProps) {
+  // Quy định Phân loại / bàn giao tài sản lấy từ backend (system-rules "assets").
+  const assetRules = useAssetRules();
   const [loading, setLoading] = useState(false);
   const [departments, setDepartments] = useState<SelectOption<string>[]>([]);
   const [employees, setEmployees] = useState<SelectOption<string>[]>([]);
@@ -91,7 +93,7 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
   });
 
   // Mã loại chuẩn (SIM, DESKTOP...) suy ra từ ô Phân loại gõ tự do
-  const typeCode = normalizeAssetType(formData.asset_type);
+  const typeCode = normalizeAssetType(formData.asset_type, assetRules);
   // Ảnh chỉ upload SAU KHI tạo tài sản thành công (cần id)
   const [currentImageFile, setCurrentImageFile] = useState<File | null>(null);
   const [purchaseImageFile, setPurchaseImageFile] = useState<File | null>(null);
@@ -264,7 +266,7 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
         specifications = { phone_number, network_provider, doctor, region, position_id, position_title: positionTitle, sim_type, sim_company, sim_company_name: simCompanyName, cancellation_report_date };
       } else if (typeCode === 'OTHER') {
         specifications = { type_name: other_type_name, quantity: parseInt(monitor_quantity) || 0 };
-      } else if (isMultiHolderType(typeCode)) {
+      } else if (isMultiHolderType(typeCode, assetRules)) {
         // Phân loại gõ tự do: giống "Khác" — có Số lượng
         specifications = { quantity: parseInt(monitor_quantity) || 0 };
       }
@@ -440,7 +442,7 @@ export default function AssetCreateModal({ isOpen, onClose, onSuccess }: AssetCr
                         />
 
                         {/* Màn hình / Khác: Số lượng */}
-                        {isMultiHolderType(typeCode) && (
+                        {isMultiHolderType(typeCode, assetRules) && (
                           <div className="sm:col-span-2 bg-violet-50/60 p-4 rounded-xl border border-violet-100">
                             <h4 className="text-[11px] font-semibold text-violet-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                               <div className="w-1.5 h-1.5 bg-violet-500 rounded-full"></div>

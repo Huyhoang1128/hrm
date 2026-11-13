@@ -62,6 +62,10 @@ OT_REPORT_THRESHOLD_MINUTES = 15
 # dưới mức này thì huỷ hẳn đơn (HCNS 2026-09-23: "duration mà <30p là hủy hẳn
 # đơn tăng ca"), không giữ đơn với vài phút OT lẻ.
 OT_MIN_DURATION_MINUTES = 30
+# Loại đơn (registration_type) áp sàn OT_MIN_DURATION_MINUTES khi tạo / sửa giờ — CHỈ đơn
+# Tăng ca. Đơn Làm thêm giờ / Trực tối / Live không có sàn này. Web đọc cả 2 giá trị qua
+# GET /api-hrm/system-rules/ (section "overtime") nên không tự áp sàn cho loại khác.
+OT_MIN_DURATION_TYPES = ("OVERTIME",)
 
 
 # Tab hiển thị ở FE (Đơn từ & Phê duyệt > Phê duyệt > Đối chiếu tăng ca) —

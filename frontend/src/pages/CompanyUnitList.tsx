@@ -3,8 +3,13 @@ import { companyUnitsAPI, CompanyUnit } from '../utils/api';
 import { SelectBox } from '../components/LandingLayout/SelectBox';
 import FeedbackDialog, { FeedbackVariant } from '../components/FeedbackDialog';
 import ConfirmDialog, { ConfirmVariant } from '../components/ConfirmDialog';
+import { useSystemRules } from '../services/systemRules.service';
 
 const CompanyUnitList: React.FC = () => {
+  // "Mã nhận diện" (CompanyUnit.prefix_code): độ dài tối đa và bắt buộc hay không theo field backend
+  // (system-rules "hr"). Backend cho để trống — khi đó mã nhân viên dùng mã đơn vị / tiền tố mặc định.
+  const prefixRule = useSystemRules()?.hr?.company_unit_prefix ?? null;
+  const prefixRequired = prefixRule?.required ?? false;
   const [units, setUnits] = useState<CompanyUnit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -133,8 +138,10 @@ const CompanyUnitList: React.FC = () => {
   // Handle Submit Add / Edit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.code.trim() || !formData.prefix_code.trim()) {
-      setModalError('Vui lòng nhập đầy đủ Tên, Mã định danh và Mã nhận diện.');
+    if (!formData.name.trim() || !formData.code.trim() || (prefixRequired && !formData.prefix_code.trim())) {
+      setModalError(prefixRequired
+        ? 'Vui lòng nhập đầy đủ Tên, Mã định danh và Mã nhận diện.'
+        : 'Vui lòng nhập đầy đủ Tên và Mã định danh.');
       return;
     }
 
@@ -501,12 +508,12 @@ const CompanyUnitList: React.FC = () => {
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Mã nhận diện <span className="text-red-500">*</span>
+                          Mã nhận diện {prefixRequired && <span className="text-red-500">*</span>}
                         </label>
                         <input
                           type="text"
-                          required
-                          maxLength={5}
+                          required={prefixRequired}
+                          maxLength={prefixRule?.max_length}
                           value={formData.prefix_code}
                           onChange={(e) => setFormData({ ...formData, prefix_code: e.target.value })}
                           className="input-field w-full uppercase"

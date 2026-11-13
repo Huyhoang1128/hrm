@@ -243,13 +243,17 @@ def _build_payslip_email_html(subject: str, body: str) -> str:
 
 
 def _build_default_payslip_body(record: dict, year: int, month: int) -> str:
-    import calendar as _cal
+    """Nội dung email phiếu lương mặc định — đúng các dòng phiếu lương trên web.
 
-    _, days_in_month = _cal.monthrange(year, month)
-    sundays = sum(1 for d in range(1, days_in_month + 1) if _cal.weekday(year, month, d) == 6)
+    Mọi số đọc từ record['phieu_luong'] do salary/payslip.py apply_payslip_totals tính (get_salary_rows
+    luôn trả kèm) — không tự tính lại / ghi cứng tỷ lệ BH ở đây."""
+    from hrm.finalization_views import _get_salary_standard_work_days
+    from .payslip import PAYSLIP_KEY, apply_payslip_totals
+
+    p = record.get(PAYSLIP_KEY) or apply_payslip_totals(dict(record))[PAYSLIP_KEY]
     std_days = record.get('cong_chuan')
     if std_days is None:
-        std_days = max(days_in_month - sundays - 1, 1)
+        std_days = _get_salary_standard_work_days(year, month)
 
     def _fmtN(value):
         try:
@@ -267,80 +271,17 @@ def _build_default_payslip_body(record: dict, year: int, month: int) -> str:
 
     month_label = f"Tháng {str(month).zfill(2)}.{year}"
 
-    def _resolve_income_amount(input_key: str, fallback_keys: list[str]) -> float:
-        input_value = record.get(input_key)
-        if input_value is not None:
-            try:
-                return float(input_value or 0)
-            except Exception:
-                return 0
-        for key in fallback_keys:
-            value = record.get(key)
-            if value is not None:
-                try:
-                    return float(value or 0)
-                except Exception:
-                    return 0
-        return 0
-
     # ── Work days (all pre-computed in row) ──────────────────────────────────
     tong_cong = record.get('tong_cong') or 0
     cong_thu_viec = float(record.get('cong_thu_viec') or 0)
     cong_chinh_thuc = float(record.get('cong_chinh_thuc') or 0)
-    has_probation = cong_thu_viec > 0 and cong_chinh_thuc > 0
+    has_probation = cong_thu_viec > 0
     contract_status_text = 'Thử việc' if record.get('contract_status') == 'THU_VIEC' else 'Chính thức'
     so_gio_tang_ca = float(record.get('so_gio_tang_ca') or record.get('tang_ca') or 0)
-
-    # ── Income (all pre-computed in row) ─────────────────────────────────────
-    luong_ngay_cong = float(record.get('luong_ngay_cong') or 0)
     luong_ngay_cong_thu_viec = float(record.get('luong_ngay_cong_thu_viec') or 0)
     luong_ngay_cong_chinh_thuc = float(record.get('luong_ngay_cong_chinh_thuc') or 0)
     probation_rate_percent = float(record.get('probation_rate_percent') or 0)
-    luong_doanh_so = _resolve_income_amount('luong_doanh_so_input', ['luong_doanh_so'])
-    luong_ot = _resolve_income_amount('luong_ot_input', ['luong_ot', 'luong_tang_ca'])
-    ban_san_pham = _resolve_income_amount('ban_san_pham_input', ['ban_san_pham'])
-    phu_mo = _resolve_income_amount('phu_mo_input', ['phu_mo'])
-    luong_truc_ca = _resolve_income_amount('truc_ca_input', ['truc_ca', 'truc_toi'])
-    thu_nhap_khac = float(record.get('thu_nhap_khac') or 0)
-    thuong = _resolve_income_amount('thuong_input', ['thuong'])
-
-    # ── Allowances (pre-computed in row) ─────────────────────────────────────
-    phu_cap_gui_xe = float(record.get('phu_cap_gui_xe') or 0)
-    phu_cap_an_trua = float(record.get('phu_cap_an_trua') or 0)
-    # phu_cap = total allowance stored by backend; remainder = trách nhiệm + khác
-    phu_cap_total = float(record.get('phu_cap') or 0)
-    phu_cap_remainder = max(round(phu_cap_total - phu_cap_gui_xe - phu_cap_an_trua), 0)
-
-    # ── Deductions (all pre-computed in row) ─────────────────────────────────
-    bh_deduction = float(record.get('bh_deduction') or 0)
-    cong_doan = float(record.get('cong_doan') or 0)
-    phat_di_muon = float(record.get('tong_phat') or 0)
-    phat_bien_ban = float(record.get('tong_phat_bienban') or 0)
-    phat_thieu_cong = float(record.get('phat_thieu_cong') or 0)
-    thue_tncn = float(record.get('thue_tncn') or 0)
-    tam_ung = float(record.get('tam_ung') or 0)
-    dieu_chinh = float(record.get('dieu_chinh') or 0)
-
-    # ── Insurance breakdown from stored base (standard employee rates) ───────
-    # muc_luong_dong_bh is already stored in the row; just read the individual rates
-    ins_base = float(record.get('muc_luong_dong_bh') or 0)
-    if ins_base > 0:
-        bhxh = round(ins_base * 0.08)
-        bhyt = round(ins_base * 0.015)
-        bhtn = round(ins_base * 0.01)
-    else:
-        # No ins_base stored — split from total proportionally (8 : 1.5 : 1)
-        bhxh = round(bh_deduction * 80 / 105) if bh_deduction else 0
-        bhyt = round(bh_deduction * 15 / 105) if bh_deduction else 0
-        bhtn = round(bh_deduction * 10 / 105) if bh_deduction else 0
-
-    # ── Totals: follow frontend payslip formula from component fields ─────────
-    tong_luong_iii = luong_ngay_cong + luong_doanh_so + luong_ot + ban_san_pham + phu_mo + luong_truc_ca + thu_nhap_khac
-    tong_phu_cap_iv = phu_cap_gui_xe + phu_cap_an_trua + phu_cap_remainder
-    tong_thu_nhap = tong_luong_iii + tong_phu_cap_iv + thuong
-    tong_giam_tru = bhxh + bhyt + bhtn + cong_doan + phat_di_muon + phat_bien_ban + phat_thieu_cong
-    luong_thuc_linh = tong_thu_nhap - tong_giam_tru + dieu_chinh
-    con_phai_thanh_toan = luong_thuc_linh - tam_ung - thue_tncn
+    so_phien_livestream = int(record.get('so_phien_livestream') or 0)
 
     lines = [
         f"Kính gửi {record.get('ho_va_ten') or ''},",
@@ -358,45 +299,49 @@ def _build_default_payslip_body(record: dict, year: int, month: int) -> str:
         "────────────────────────────────────────",
         "  THÔNG TIN CÔNG",
         "────────────────────────────────────────",
-        f"  Công chuẩn         : {std_days} công",
+        f"  Công chuẩn         : {_fmt_num(std_days)} công",
         f"  Ngày công thực tế  : {_fmt_num(tong_cong)}",
-        *([ f"  Công TV / CT       : {_fmt_num(cong_thu_viec)} / {_fmt_num(cong_chinh_thuc)}" ] if has_probation else []),
+        *([f"  Công TV / CT       : {_fmt_num(cong_thu_viec)} / {_fmt_num(cong_chinh_thuc)}"] if has_probation else []),
         f"  Giờ tăng ca        : {_fmt_num(so_gio_tang_ca)}",
         "────────────────────────────────────────",
         "  CÁC KHOẢN THU NHẬP",
         "────────────────────────────────────────",
-        f"  Lương ngày công    : {_fmtN(luong_ngay_cong)}",
-        *([ f"  └─ Lương công TV ({round(probation_rate_percent)}%): {_fmtN(luong_ngay_cong_thu_viec)}" ] if has_probation else []),
-        *([ f"  └─ Lương công CT    : {_fmtN(luong_ngay_cong_chinh_thuc)}" ] if has_probation else []),
-        *([ f"  Lương doanh số     : {_fmtN(luong_doanh_so)}" ] if luong_doanh_so else []),
-        *([ f"  Lương OT           : {_fmtN(luong_ot)}" ] if luong_ot else []),
-        *([ f"  Bán sản phẩm       : {_fmtN(ban_san_pham)}" ] if ban_san_pham else []),
-        *([ f"  Phụ mổ             : {_fmtN(phu_mo)}" ] if phu_mo else []),
-        *([ f"  Trực Ca            : {_fmtN(luong_truc_ca)}" ] if luong_truc_ca else []),
-        *([ f"  Thu nhập khác      : {_fmtN(thu_nhap_khac)}" ] if thu_nhap_khac else []),
-        *([ f"  Thưởng             : {_fmtN(thuong)}" ] if thuong else []),
+        f"  Lương ngày công    : {_fmtN(p['luong_ngay_cong'])}",
+        *([f"  └─ Lương công TV ({round(probation_rate_percent)}%): {_fmtN(luong_ngay_cong_thu_viec)}"] if has_probation else []),
+        *([f"  └─ Lương công CT    : {_fmtN(luong_ngay_cong_chinh_thuc)}"] if has_probation else []),
+        *([f"  Lương doanh số     : {_fmtN(p['luong_doanh_so'])}"] if p['luong_doanh_so'] else []),
+        *([f"  Lương OT           : {_fmtN(p['luong_ot'])}"] if p['luong_ot'] else []),
+        *([f"  Bán sản phẩm       : {_fmtN(p['ban_san_pham'])}"] if p['ban_san_pham'] else []),
+        *([f"  Phụ mổ             : {_fmtN(p['phu_mo'])}"] if p['phu_mo'] else []),
+        *([f"  Trực Ca            : {_fmtN(p['truc_ca'])}"] if p['truc_ca'] else []),
+        *([f"  Thu nhập khác      : {_fmtN(p['thu_nhap_khac'])}"] if p['thu_nhap_khac'] else []),
+        *([f"  Thưởng             : {_fmtN(p['thuong'])}"] if p['thuong'] else []),
         "────────────────────────────────────────",
         "  CÁC KHOẢN PHỤ CẤP",
         "────────────────────────────────────────",
-        *([ f"  Phụ cấp gửi xe     : {_fmtN(phu_cap_gui_xe)}" ] if phu_cap_gui_xe else []),
-        *([ f"  Phụ cấp ăn trưa    : {_fmtN(phu_cap_an_trua)}" ] if phu_cap_an_trua else []),
-        *([ f"  Phụ cấp khác       : {_fmtN(phu_cap_remainder)}" ] if phu_cap_remainder else []),
-        f"  Tổng thu nhập      : {_fmtN(tong_thu_nhap)}",
+        *([f"  Phụ cấp gửi xe     : {_fmtN(p['phu_cap_gui_xe'])}"] if p['phu_cap_gui_xe'] else []),
+        *([f"  Phụ cấp ăn trưa    : {_fmtN(p['phu_cap_an_trua'])}"] if p['phu_cap_an_trua'] else []),
+        *([f"  Phụ cấp trách nhiệm: {_fmtN(p['phu_cap_trach_nhiem'])}"] if p['phu_cap_trach_nhiem'] else []),
+        *([f"  Phụ cấp livestream ({so_phien_livestream} phiên): {_fmtN(p['phu_cap_livestream'])}"]
+          if p['phu_cap_livestream'] else []),
+        *([f"  Phụ cấp khác       : {_fmtN(p['phu_cap_khac'])}"] if p['phu_cap_khac'] else []),
+        f"  Tổng thu nhập      : {_fmtN(p['tong_thu_nhap_vi'])}",
         "────────────────────────────────────────",
         "  CÁC KHOẢN KHẤU TRỪ",
         "────────────────────────────────────────",
-        f"  BHXH               : -{_fmtN(bhxh)}",
-        f"  BHYT               : -{_fmtN(bhyt)}",
-        f"  BHTN               : -{_fmtN(bhtn)}",
-        *([ f"  Công đoàn          : -{_fmtN(cong_doan)}" ] if cong_doan else []),
-        *([ f"  Phạt đi muộn       : -{_fmtN(phat_di_muon)}" ] if phat_di_muon else []),
-        *([ f"  Phạt (biên bản)    : -{_fmtN(phat_bien_ban)}" ] if phat_bien_ban else []),
-        *([ f"  Phạt thiếu công    : -{_fmtN(phat_thieu_cong)}" ] if phat_thieu_cong else []),
-        *([ f"  Thuế TNCN          : -{_fmtN(thue_tncn)}" ] if thue_tncn else []),
-        *([ f"  Tạm ứng            : -{_fmtN(tam_ung)}" ] if tam_ung else []),
+        f"  BHXH               : -{_fmtN(p['bhxh'])}",
+        f"  BHYT               : -{_fmtN(p['bhyt'])}",
+        f"  BHTN               : -{_fmtN(p['bhtn'])}",
+        *([f"  Công đoàn          : -{_fmtN(p['cong_doan'])}"] if p['cong_doan'] else []),
+        *([f"  Phạt đi muộn       : -{_fmtN(p['tong_phat'])}"] if p['tong_phat'] else []),
+        *([f"  Phạt (biên bản)    : -{_fmtN(p['tong_phat_bienban'])}"] if p['tong_phat_bienban'] else []),
+        *([f"  Phạt thiếu công    : -{_fmtN(p['phat_thieu_cong'])}"] if p['phat_thieu_cong'] else []),
+        *([f"  Điều chỉnh         : {_fmtN(p['dieu_chinh'])}"] if p['dieu_chinh'] else []),
+        *([f"  Thuế TNCN          : -{_fmtN(p['thue_tncn'])}"] if p['thue_tncn'] else []),
+        *([f"  Tạm ứng            : -{_fmtN(p['tam_ung'])}"] if p['tam_ung'] else []),
         "════════════════════════════════════════",
-        f"  LƯƠNG THỰC LĨNH    : {_fmtN(luong_thuc_linh)}",
-        f"  CÒN PHẢI TT        : {_fmtN(con_phai_thanh_toan)}",
+        f"  LƯƠNG THỰC LĨNH    : {_fmtN(p['luong_thuc_linh'])}",
+        f"  CÒN PHẢI TT        : {_fmtN(p['con_phai_thanh_toan'])}",
         "════════════════════════════════════════",
         "",
         "Nếu có thắc mắc về bảng lương, vui lòng liên hệ phòng Nhân sự.",
@@ -414,42 +359,6 @@ def _format_template_value(template: str, data: dict) -> str:
     for key, value in data.items():
         formatted = formatted.replace(f"{{{key}}}", str(value))
     return formatted
-
-
-def _merge_monthly_inputs_into_salary_rows(rows: list[dict], year: int, month: int) -> list[dict]:
-    if not rows:
-        return rows
-
-    employee_ids = [row.get('employee_id') for row in rows if row.get('employee_id')]
-    if not employee_ids:
-        return rows
-
-    monthly_inputs = EmployeeMonthlySalaryInput.objects.filter(
-        year=year,
-        month=month,
-        employee_id__in=employee_ids,
-    ).only('employee_id', 'luong_doanh_so', 'luong_ot', 'ban_san_pham', 'phu_mo', 'truc_ca', 'thuong')
-    monthly_input_map = {item.employee_id: item for item in monthly_inputs}
-
-    for row in rows:
-        employee_id = row.get('employee_id')
-        # Dòng của tháng đã chốt đã ghép dữ liệu lương tháng lúc chốt — không ghép số hiện tại
-        if not employee_id or row.get(FINALIZED_ROW_FLAG):
-            continue
-
-        monthly_input = monthly_input_map.get(employee_id)
-        if not monthly_input:
-            continue
-
-        row['luong_doanh_so_input'] = float(monthly_input.luong_doanh_so) if monthly_input.luong_doanh_so is not None else None
-        row['luong_ot_input'] = float(monthly_input.luong_ot) if monthly_input.luong_ot is not None else None
-        row['ban_san_pham_input'] = float(monthly_input.ban_san_pham) if monthly_input.ban_san_pham is not None else None
-        row['phu_mo_input'] = float(monthly_input.phu_mo) if monthly_input.phu_mo is not None else None
-        row['truc_ca_input'] = float(monthly_input.truc_ca) if monthly_input.truc_ca is not None else None
-        row['thuong_input'] = float(monthly_input.thuong) if monthly_input.thuong is not None else None
-        row['thuong'] = float(monthly_input.thuong) if monthly_input.thuong is not None else float(row.get('thuong') or 0)
-
-    return rows
 
 
 class SalaryAdminPermission(BasePermission):
@@ -1467,6 +1376,26 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
             qs = qs.filter(employee__department_id=dept_id)
         return qs
 
+    @action(detail=False, methods=['get'], url_path='standard-days')
+    def standard_days(self, request):
+        """Công chuẩn tính lương của 1 tháng — đúng số bảng lương dùng (finalization_views
+        _get_salary_standard_work_days), để phần xem trước cấu hình lương trên web không tự đoán."""
+        from hrm.finalization_views import _get_salary_standard_work_days
+
+        try:
+            year = int(request.query_params.get('year'))
+            month = int(request.query_params.get('month'))
+            if not 1 <= month <= 12:
+                raise ValueError
+        except (TypeError, ValueError):
+            return Response({'detail': 'year và month là bắt buộc và phải hợp lệ.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            'year': year,
+            'month': month,
+            'standard_work_days': float(_get_salary_standard_work_days(year, month)),
+        })
+
     @action(detail=False, methods=['get'], url_path='departments')
     def departments(self, request):
         departments = Department.objects.filter(is_section=False).order_by('code', 'name')
@@ -1746,8 +1675,8 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
                 'breakdown': [],
             })
 
-        # Đồng bộ chuẩn với frontend: dùng trực tiếp các trường đã được get_salary_rows() tính sẵn
-        # (luong_thuc_linh, thue_tncn, con_phai_thanh_toan) thay vì tự tính lại bằng công thức rút gọn.
+        # Dùng trực tiếp các trường get_salary_rows() đã tính (luong_thuc_linh, con_phai_thanh_toan theo
+        # phiếu lương — salary/payslip.py), KHÔNG tự tính lại: tổng khớp bảng lương / phiếu lương / Excel.
         total_luong_thuc_linh = Decimal('0')
         total_con_phai_thanh_toan = Decimal('0')
         total_thue_tncn = Decimal('0')
@@ -2002,7 +1931,6 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
         salary_rows = salary_data.get('results', []) if isinstance(salary_data, dict) else []
-        salary_rows = _merge_monthly_inputs_into_salary_rows(salary_rows, year, month)
         if not salary_rows:
             return Response(
                 {'detail': 'Không có dữ liệu bảng lương.'},
@@ -2191,7 +2119,6 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
         salary_rows = salary_data.get('results', []) if isinstance(salary_data, dict) else []
-        salary_rows = _merge_monthly_inputs_into_salary_rows(salary_rows, year, month)
         if not salary_rows:
             return Response(
                 {'detail': 'Không có dữ liệu bảng lương để gửi email.'},
@@ -2319,7 +2246,6 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
         salary_rows = salary_data.get('results', []) if isinstance(salary_data, dict) else []
-        salary_rows = _merge_monthly_inputs_into_salary_rows(salary_rows, year, month)
         if not salary_rows:
             return Response(
                 {'detail': 'Không có dữ liệu bảng lương.'},
@@ -2421,7 +2347,6 @@ class MonthlySalaryRecordViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
         salary_rows = salary_data.get('results', []) if isinstance(salary_data, dict) else []
-        salary_rows = _merge_monthly_inputs_into_salary_rows(salary_rows, year, month)
         if not salary_rows:
             return Response(
                 {'detail': 'Không có dữ liệu bảng lương để gửi email.'},

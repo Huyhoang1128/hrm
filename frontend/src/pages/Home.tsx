@@ -33,7 +33,7 @@ import { attendanceService, AttendanceRankingEntry } from '../services/attendanc
 import { salaryService, type PenaltyRecord } from '../services/salary.service';
 import { recruitmentService } from '../services/recruitment.service';
 import { useNotePrompt } from '../components/NotePromptDialog';
-import { NON_OFFICIAL_CONTRACT_TYPES, OFFICIAL_LABOR_CONTRACT_TYPES } from '../constants/contractTypes';
+import { useHrChoices } from '../utils/hrChoices';
 
 const formatBirthDate = (dateOfBirth: string): string => {
   const parts = dateOfBirth.split('-');
@@ -143,12 +143,14 @@ const Home: React.FC = () => {
     days: number;
   };
   const [expiringContracts, setExpiringContracts] = useState<ExpiringContract[]>([]);
+  // Số ngày "sắp hết hạn" do backend trả kèm danh sách (CONTRACT_EXPIRING_SOON_DAYS) — không ghi cứng.
+  const [expiringWindowDays, setExpiringWindowDays] = useState<number | null>(null);
   const [showContractAlert, setShowContractAlert] = useState(false);
 
   // Employee's own contract — non-dismissable alert if no active contract
   type MyContract = { id: number; status: string; contract_type: string; end_date: string | null };
-  // Các loại hợp đồng lao động thực sự — cam kết/thoả thuận (CONFIDENTIALITY, COMPANY_RULES, NURSING_COMMITMENT) không tính
-  const LABOR_CONTRACT_TYPES = [...NON_OFFICIAL_CONTRACT_TYPES, ...OFFICIAL_LABOR_CONTRACT_TYPES, 'SERVICE'];
+  // Các loại hợp đồng lao động thực sự (nhóm "labor" của backend) — cam kết/thoả thuận không tính
+  const LABOR_CONTRACT_TYPES = useHrChoices()?.contract_type_groups.labor ?? [];
   const [myContracts, setMyContracts] = useState<MyContract[] | null>(null); // null = not yet fetched or admin
   const [contractCheckLoading, setContractCheckLoading] = useState(false);
   const [contractCheckFailed, setContractCheckFailed] = useState(false);
@@ -209,7 +211,8 @@ const Home: React.FC = () => {
   const fetchExpiringContracts = async () => {
     try {
       const res = await managementApi.get('/api-hrm/employee-contracts/expiring-alert/');
-      const { dismissed_today, contracts } = res.data;
+      const { dismissed_today, contracts, days: windowDays } = res.data;
+      setExpiringWindowDays(typeof windowDays === 'number' ? windowDays : null);
       if (!contracts?.length) return;
 
       const today = new Date();
@@ -1356,7 +1359,7 @@ Tháng ${penalty.month}/${penalty.year} · ${Number(penalty.amount).toLocaleStri
                 <p className="text-sm text-white/80 mt-0.5">
                   {expiringContracts.filter(c => c.days <= 0).length > 0
                     ? `${expiringContracts.filter(c => c.days <= 0).length} hợp đồng đã hết hạn · ${expiringContracts.filter(c => c.days > 0).length} sắp hết hạn`
-                    : `${expiringContracts.length} hợp đồng sắp hết hạn trong 5 ngày tới`
+                    : `${expiringContracts.length} hợp đồng sắp hết hạn${expiringWindowDays !== null ? ` trong ${expiringWindowDays} ngày tới` : ''}`
                   }
                 </p>
               </div>

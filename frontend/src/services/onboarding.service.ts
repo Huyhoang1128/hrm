@@ -42,7 +42,8 @@ export interface OnboardingProcess {
   doctor_team?: string;
 
   // Contract
-  contract_type: 'PROBATION' | 'PROBATION_1M' | 'PROBATION_2M' | 'INTERN' | 'COLLABORATOR' | 'SIX_MONTH' | 'ONE_YEAR' | 'TWO_YEAR' | 'THREE_YEAR' | 'INDEFINITE' | 'SERVICE' | 'CONFIDENTIALITY' | 'COMPANY_RULES' | 'NURSING_COMMITMENT';
+  // Mã loại HĐ (employee.models.CONTRACT_TYPE) — danh sách đầy đủ lấy từ system-rules "choices.contract_type".
+  contract_type: string;
   probation_period_months: number;
   salary?: string;
   salary_note?: string;

@@ -304,12 +304,28 @@ EMAIL_BANNER_URL = os.environ.get('EMAIL_BANNER_URL', '')
 DEFAULT_PASSWORD_PREFIX = os.environ.get('DEFAULT_PASSWORD_PREFIX', 'hrm')
 # Tiền tố mã nhân viên khi đơn vị chưa cấu hình tiền tố riêng
 EMPLOYEE_ID_FALLBACK_PREFIX = os.environ.get('EMPLOYEE_ID_FALLBACK_PREFIX', 'NV')
+# Địa danh ghi trên văn bản in ("<địa danh>, ngày ... tháng ... năm ...")
+COMPANY_CITY = os.environ.get('COMPANY_CITY', 'Hà Nội')
+
+# ===== Quy định khác — web đọc qua GET /api-hrm/system-rules/ (hrm/system_rules/misc.py) =====
+# Biên bản xử lý vi phạm (bản in): giờ hạn hoàn thành biên bản trong ngày
+PENALTY_REPORT_SUBMIT_DEADLINE = os.environ.get('PENALTY_REPORT_SUBMIT_DEADLINE', '17h30')
+# Tài liệu quy định: số giây tối thiểu mở tài liệu trước khi được bấm "Đã đọc"
+REGULATION_MIN_READ_SECONDS = int(os.environ.get('REGULATION_MIN_READ_SECONDS', 10))
+# "Gửi email tài khoản cho tất cả" (reset mật khẩu mọi nhân viên đang làm): thời gian chờ giữa 2 lần
+SEND_ALL_ACCOUNT_EMAILS_COOLDOWN_SECONDS = int(os.environ.get('SEND_ALL_ACCOUNT_EMAILS_COOLDOWN_SECONDS', 120))
 
 # Cảnh báo quan trọng (hrm/important_alerts.py)
 IMPORTANT_ALERT_CONTRACT_DAYS = int(os.environ.get('IMPORTANT_ALERT_CONTRACT_DAYS', 15))
 IMPORTANT_ALERT_INSURANCE_AFTER_MONTHS = int(os.environ.get('IMPORTANT_ALERT_INSURANCE_AFTER_MONTHS', 2))
 IMPORTANT_ALERT_INSURANCE_DAYS = int(os.environ.get('IMPORTANT_ALERT_INSURANCE_DAYS', 10))
 IMPORTANT_ALERT_INSURANCE_OVERDUE_DAYS = int(os.environ.get('IMPORTANT_ALERT_INSURANCE_OVERDUE_DAYS', 30))
+
+# Hợp đồng (hrm/contract_rules.py) — web đọc qua GET /api-hrm/system-rules/ (section "hr").
+# "Sắp hết hạn": ngày kết thúc HĐ / thử việc trong [hôm nay, hôm nay + N ngày] (cảnh báo, lọc, nhãn).
+CONTRACT_EXPIRING_SOON_DAYS = int(os.environ.get('CONTRACT_EXPIRING_SOON_DAYS', 5))
+# Trang tái ký hợp đồng: mặc định liệt kê HĐ hết hạn trong N ngày tới.
+CONTRACT_RENEWAL_WINDOW_DAYS = int(os.environ.get('CONTRACT_RENEWAL_WINDOW_DAYS', 14))
 
 # Redis Configuration (for Celery if re-enabled in future)
 REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')

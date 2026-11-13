@@ -18,6 +18,7 @@ import {
 import { departmentsAPI, employeesAPI, positionsAPI } from '../utils/api';
 import { Department, Position, Employee } from '../utils/api/types';
 import salaryService, { OvertimeRateConfig, OvertimeRateLevel } from '../services/salary.service';
+import { useSystemRules } from '../services/systemRules.service';
 
 // ─────────────────────────────────────────────────────────────
 // Types
@@ -105,6 +106,10 @@ function toggleId<T extends number>(arr: T[], id: T): T[] {
 // ─────────────────────────────────────────────────────────────
 
 const OvertimeRateConfigPage: React.FC = () => {
+  // Số giờ/ngày của đơn giá OT tính từ lương lấy từ backend (salary/payroll_rules.py OT_HOURS_PER_DAY),
+  // đúng số backend chia khi tính lương — đang tải thì ghi chung chung, không đoán số.
+  const otHoursPerDay = useSystemRules()?.payroll?.ot_hours_per_day;
+  const otHoursText = otHoursPerDay != null ? `${otHoursPerDay}h` : 'số giờ/ngày';
   const [activeTab, setActiveTab] = useState<TabKey>('department');
   const [rows, setRows]           = useState<OvertimeRateConfig[]>([]);
   const [loading, setLoading]     = useState(false);
@@ -290,7 +295,7 @@ const OvertimeRateConfigPage: React.FC = () => {
   function renderRate(row: OvertimeRateConfig) {
     if (row.calc_method === 'FROM_BASIC') {
       const mul = row.multiplier && row.multiplier !== 1 ? ` × ${row.multiplier}` : '';
-      return <span className="text-sm text-primary-700 font-medium">LC ÷ công ÷ 7.5h{mul}</span>;
+      return <span className="text-sm text-primary-700 font-medium">LC ÷ công ÷ {otHoursText}{mul}</span>;
     }
     const effective = row.rate_per_hour * (row.multiplier || 1);
     return (
@@ -618,7 +623,7 @@ const OvertimeRateConfigPage: React.FC = () => {
                             {method === 'FIXED' ? 'Cố định' : 'Từ lương cơ bản'}
                           </span>
                           <span className="text-xs opacity-60">
-                            {method === 'FIXED' ? 'Nhập đơn giá trực tiếp' : 'LC ÷ công chuẩn ÷ 7.5h'}
+                            {method === 'FIXED' ? 'Nhập đơn giá trực tiếp' : `LC ÷ công chuẩn ÷ ${otHoursText}`}
                           </span>
                         </button>
                       ))}
@@ -652,7 +657,7 @@ const OvertimeRateConfigPage: React.FC = () => {
                         ) : (
                           <div className="flex items-center h-full bg-primary-50 border border-primary-100 rounded-lg px-3 py-2">
                             <p className="text-xs text-primary-700 leading-relaxed">
-                              <span className="font-semibold block">LC ÷ công chuẩn ÷ 7.5h</span>
+                              <span className="font-semibold block">LC ÷ công chuẩn ÷ {otHoursText}</span>
                               Tự động theo lương cơ bản từng nhân viên
                             </p>
                           </div>
@@ -685,7 +690,7 @@ const OvertimeRateConfigPage: React.FC = () => {
                           <p className="text-xs text-primary-600 mt-1">= {(form.rate_per_hour * form.multiplier).toLocaleString('vi-VN')}đ/h</p>
                         )}
                         {form.calc_method === 'FROM_BASIC' && form.multiplier !== 1 && (
-                          <p className="text-xs text-primary-600 mt-1">= LC ÷ công ÷ 7.5h × {form.multiplier}</p>
+                          <p className="text-xs text-primary-600 mt-1">= LC ÷ công ÷ {otHoursText} × {form.multiplier}</p>
                         )}
                       </div>
                     </div>

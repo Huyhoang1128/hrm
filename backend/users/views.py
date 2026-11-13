@@ -9,6 +9,8 @@ import secrets
 import time
 
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import connection
 from django.db.models import Q
 from django.utils import timezone
@@ -231,6 +233,22 @@ class PublicInfoView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+def _password_policy_errors(new_password, user):
+    """Response 400 nếu mật khẩu mới không đạt AUTH_PASSWORD_VALIDATORS, ngược lại None.
+
+    Mọi đường đặt mật khẩu do người dùng chọn dùng chung validate_password để chỉ có MỘT chính sách
+    (web hiển thị cùng chính sách đó qua GET /api-hrm/system-rules/ section "password").
+    """
+    try:
+        validate_password(new_password, user)
+    except DjangoValidationError as e:
+        return Response({
+            'error': ' '.join(e.messages),
+            'new_password': list(e.messages),
+        }, status=status.HTTP_400_BAD_REQUEST)
+    return None
+
+
 class ChangePasswordView(APIView):
     """
     API to change user password.
@@ -255,15 +273,21 @@ class ChangePasswordView(APIView):
                     'error': 'Mật khẩu mới và xác nhận mật khẩu không khớp'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            if len(new_password) < 6:
-                return Response({
-                    'error': 'Mật khẩu mới phải có ít nhất 6 ký tự'
-                }, status=status.HTTP_400_BAD_REQUEST)
-
             if not user.check_password(current_password):
                 return Response({
                     'error': 'Mật khẩu hiện tại không đúng'
                 }, status=status.HTTP_400_BAD_REQUEST)
+
+            if current_password == new_password:
+                return Response({
+                    'error': 'Mật khẩu mới phải khác mật khẩu hiện tại'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Chính sách mật khẩu chung (AUTH_PASSWORD_VALIDATORS) — cùng chỗ với /api-hrm/change-password/
+            # và quy định "password" web đọc qua system-rules, không tự đặt độ dài riêng.
+            invalid = _password_policy_errors(new_password, user)
+            if invalid:
+                return invalid
 
             user.set_password(new_password)
             user.save()
@@ -282,14 +306,29 @@ class ChangePasswordView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
 
+# Luồng quên mật khẩu bằng OTP qua SĐT (/api/users/forgot-password/ + verify-otp/ + reset-password/)
+# TẮT: chưa có dịch vụ gửi OTP, mã cũ là hằng số "8888" và verify-otp trả về ACCESS TOKEN thật của
+# tài khoản -> ai biết SĐT (username) là đăng nhập được tài khoản đó. Web không dùng luồng này (web
+# dùng /api-hrm/forgot-password/). Bật lại chỉ khi có OTP ngẫu nhiên gửi thật + không trả access token.
+OTP_PASSWORD_RESET_DISABLED_MESSAGE = (
+    'Chức năng đặt lại mật khẩu qua OTP chưa được bật. Vui lòng liên hệ phòng Nhân sự để được cấp lại mật khẩu.'
+)
+
+
+def _otp_reset_disabled_response():
+    return Response({'error': OTP_PASSWORD_RESET_DISABLED_MESSAGE}, status=status.HTTP_410_GONE)
+
+
 class ForgotPasswordView(APIView):
     """
-    API to initiate forgot password process.
-    Sends OTP to user's phone number (default OTP: 8888).
+    (ĐÃ TẮT — xem OTP_PASSWORD_RESET_DISABLED_MESSAGE) Bắt đầu quên mật khẩu bằng OTP qua SĐT.
     """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        return _otp_reset_disabled_response()
+
+    def _legacy_post(self, request):  # giữ để tham khảo khi làm OTP thật; không được gọi
         try:
             phone_number = request.data.get('phone_number')
 
@@ -330,11 +369,15 @@ class ForgotPasswordView(APIView):
 
 class VerifyOTPView(APIView):
     """
-    API to verify OTP and generate reset token.
+    (ĐÃ TẮT — xem OTP_PASSWORD_RESET_DISABLED_MESSAGE) Xác thực OTP. Bản cũ so với hằng số "8888" và
+    trả về access token thật của tài khoản.
     """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        return _otp_reset_disabled_response()
+
+    def _legacy_post(self, request):  # giữ để tham khảo khi làm OTP thật; không được gọi
         try:
             phone_number = request.data.get('phone_number')
             otp_code = request.data.get('otp_code')
@@ -397,11 +440,6 @@ class ResetPasswordView(APIView):
                     'error': 'Reset token và mật khẩu mới là bắt buộc'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            if len(new_password) < 6:
-                return Response({
-                    'error': 'Mật khẩu mới phải có ít nhất 6 ký tự'
-                }, status=status.HTTP_400_BAD_REQUEST)
-
             phone_number = None
             for key in request.session.keys():
                 if key.startswith('reset_token_') and request.session[key] == reset_token:
@@ -419,6 +457,10 @@ class ResetPasswordView(APIView):
                 return Response({
                     'error': 'Không tìm thấy tài khoản'
                 }, status=status.HTTP_404_NOT_FOUND)
+
+            invalid = _password_policy_errors(new_password, user)
+            if invalid:
+                return invalid
 
             user.set_password(new_password)
             user.save()

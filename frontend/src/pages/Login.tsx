@@ -58,10 +58,9 @@ export default function Login() {
     if (!formData.username.trim()) {
       errors.username = 'Vui lòng nhập tên đăng nhập';
     }
+    // Đăng nhập chỉ cần có mật khẩu: độ dài là quy tắc khi ĐẶT mật khẩu (backend kiểm tra), không chặn lúc đăng nhập.
     if (!formData.password) {
       errors.password = 'Vui lòng nhập mật khẩu';
-    } else if (formData.password.length < 6) {
-      errors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
     }
     return errors;
   };

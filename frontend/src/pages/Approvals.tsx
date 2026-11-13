@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useDebounce } from '../hooks/useDebounce';
-import { approvalService } from '../services/approval.service';
+import { approvalService, type BulkApprovePreview } from '../services/approval.service';
 import { attendanceService } from '../services/attendance.service';
 import FinalizationLockBanner from '../components/FinalizationLockBanner';
 import { workFinalizationApprovalService } from '../services/workFinalizationApproval.service';
@@ -20,6 +20,8 @@ import { EDIT_FIELD_LABELS, sortEditChanges, formatEditValue, countRealEditChang
 import deadlineExceptionService, { AppliedDeadlineException } from '../services/deadlineException.service';
 import { DeadlineExceptionBadge, DeadlineExceptionDetail } from '../components/approvals/DeadlineExceptionFlag';
 import { useNotePrompt } from '../components/NotePromptDialog';
+import { useSystemRules } from '../services/systemRules.service';
+import { choiceLabel } from '../utils/hrChoices';
 
 // Giá trị đặc biệt cho lựa chọn "Tôi là QLTT" trong dropdown Phòng ban —
 // không phải tên phòng ban thật nên không bao giờ trùng.
@@ -75,6 +77,8 @@ const TYPE_CHIP_STYLES: Record<string, { active: string; idle: string; badge: st
 
 const Approvals: React.FC = () => {
   const { user } = useAuth();
+  // Quy định hệ thống (sàn tăng ca...) — nguồn duy nhất là backend.
+  const systemRules = useSystemRules();
   const { askNote, notePromptDialog } = useNotePrompt();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<
@@ -1219,9 +1223,11 @@ const Approvals: React.FC = () => {
     // Hạn mức của rổ chứa loại đơn này — backend tính (duyet-don max_explanation_quota).
     const mExp = Number(item.max_explanation_quota ?? 0);
     const owUsed = item.online_work_used ?? 0;
-    const mOnl = item.max_online_quota ?? 3;
+    // Hạn mức online / nghỉ phép của người này — backend tính (OnlineWorkQuotaOverride /
+    // CompanyConfig, có thể = 0). Không có thì không hiện badge, không đoán số.
+    const mOnl = item.max_online_quota;
     const lUsed = item.leave_used ?? 0;
-    const mLea = item.max_leave_quota ?? 1;
+    const mLea = item.max_leave_quota;
 
     let used = 0;
     let max = 0;
@@ -1243,6 +1249,7 @@ const Approvals: React.FC = () => {
       label = 'Giải trình';
     }
 
+    if (max == null) return null;
     const ratio = max > 0 ? used / max : 0;
 
     // Premium color palette based on ratio
@@ -1419,23 +1426,19 @@ const Approvals: React.FC = () => {
   };
 
   /**
-   * Hạn để QUẢN LÝ TRỰC TIẾP vào sửa giờ đơn tăng ca của nhân viên: 10h sáng
-   * ngày lịch kế tiếp, riêng khi ngày đó là Chủ nhật thì tới hết ngày
-   * (23:59:59) — PHẢI khớp đúng backend `manager_attendance_fix_deadline()`
-   * ở hrm/deadline_utils.py, backend vẫn là chỗ chặn thật.
+   * Hạn để QUẢN LÝ TRỰC TIẾP vào sửa giờ đơn tăng ca Tại Viện/VP của nhân viên — backend
+   * trả sẵn theo từng đơn (/api-hrm/duyet-don/: manager_hours_fix_deadline, tính bằng
+   * deadline_utils.manager_attendance_fix_deadline — đúng hàm backend dùng để chặn), web không
+   * tự tính lại. null = đơn không thuộc diện QLTT sửa giờ.
    */
-  const getManagerFixDeadline = (dateStr?: string | null): Date | null => {
-    if (!dateStr) return null;
-    const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (!m) return null;
-    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + 1);
-    if (d.getDay() === 0) {            // Chủ nhật -> hết ngày
-      d.setHours(23, 59, 59, 999);
-    } else {
-      d.setHours(10, 0, 0, 0);
-    }
-    return d;
+  const getManagerFixDeadline = (req: any): Date | null => {
+    const raw = req?.manager_hours_fix_deadline;
+    if (!raw) return null;
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d;
   };
+  const formatFixDeadline = (d: Date) =>
+    d.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
 
   /**
    * Quản lý trực tiếp (hoặc HCNS/Admin) có được sửa giờ đơn tăng ca Tại Viện/VP
@@ -1456,9 +1459,7 @@ const Approvals: React.FC = () => {
     ).toUpperCase();
     if (type !== 'OVERTIME') return false;
     if (String(req.ot_type || ev.ot_type || '').toUpperCase() !== 'ONSITE') return false;
-    const deadline = getManagerFixDeadline(
-      req.attendance_date || req.registration_date || req.event_date || req.start_date || req.date,
-    );
+    const deadline = getManagerFixDeadline(req);
     return !!deadline && new Date() <= deadline;
   };
 
@@ -2318,21 +2319,6 @@ const Approvals: React.FC = () => {
       }
     });
 
-    // Helper gom nhóm theo nhân viên + tháng
-    const groupByEmpMonth = (list: any[]): Record<string, any[]> => {
-      const groups: Record<string, any[]> = {};
-      list.forEach(item => {
-        const empId = Number(item.employee_id || (typeof item.employee === 'object' ? item.employee.id : item.employee));
-        const dateStr = item.event_date || item.attendance_date || item.date || item.created_at;
-        const d = new Date(dateStr);
-        // Hạn mức theo từng loại: tách thêm theo giỏ (quota_bucket = null khi dùng chung 1 giỏ)
-        const key = `${empId}-${d.getFullYear()}-${d.getMonth() + 1}-${item.quota_bucket ?? ''}`;
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(item);
-      });
-      return groups;
-    };
-
     // 1. Đơn Giải trình tính hạn mức (LATE, EARLY_LEAVE, LATE_EARLY, INCOMPLETE_ATTENDANCE):
     // hỏi backend XEM TRƯỚC (smart_bulk_approve dry_run) — đúng thuật toán + hạn mức backend
     // dùng khi duyệt thật (rổ chung / từng giỏ / rổ gộp tách Quên chấm công; Quên chấm công
@@ -2358,66 +2344,34 @@ const Approvals: React.FC = () => {
       });
     }
 
-    // 2. Đơn Nghỉ phép (LEAVE) — check quota từ item.max_leave_quota & item.leave_used
-    if (leaveItems.length > 0) {
-      Object.entries(groupByEmpMonth(leaveItems)).forEach(([_key, group]) => {
-        const firstItem = group[0];
-        const maxLeave = Number(firstItem.max_leave_quota ?? 1);
-        const leaveUsed = Number(firstItem.leave_used ?? 0);
-        let remaining = Math.max(0, maxLeave - leaveUsed);
-
-        // FCFS: đơn tạo sớm nhất được ưu tiên duyệt trước
-        const sorted = [...group].sort((a, b) => {
-          const tsA = a.created_at ? new Date(a.created_at).getTime() : 0;
-          const tsB = b.created_at ? new Date(b.created_at).getTime() : 0;
-          return tsA - tsB;
-        });
-
-        sorted.forEach(item => {
-          // Ưu tiên số ngày backend tính (0 với chiều T7 tuần 2/4 / Chủ nhật của
-          // phòng được miễn); backend cũ chưa trả thì tự tính như trước.
-          const amount = typeof item.online_quota_amount === 'number'
-            ? item.online_quota_amount
-            : (item.expected_status === 'HALF_DAY' ? 0.5 : 1.0);
-          if (amount === 0 || remaining >= amount) {
+    // 2 + 3. Đơn Nghỉ phép tháng / Làm việc online: hỏi backend XEM TRƯỚC (bulk_approve dry_run) —
+    // đúng thứ tự xét đơn, hạn mức theo người (CompanyConfig / OnlineWorkQuotaOverride) và số ngày
+    // mỗi đơn tính vào hạn mức mà backend dùng khi duyệt thật. Web không tự xếp đơn / tự tính hạn mức.
+    if (leaveItems.length > 0 || onlineWorkItems.length > 0) {
+      const applyPreview = (list: any[], preview: BulkApprovePreview | null) => {
+        if (!preview) return;
+        const approvedIds = new Set(preview.approved);
+        const rejectNotes = new Map(preview.rejected.map(r => [r.id, r.note]));
+        list.forEach(item => {
+          if (approvedIds.has(item.id)) {
             approvalItems.push(item);
-            remaining -= amount;
-          } else {
-            rejectionItems.push(item);
+          } else if (rejectNotes.has(item.id)) {
+            rejectionItems.push({ ...item, reject_note: rejectNotes.get(item.id) });
           }
         });
-      });
-    }
-
-    // 3. Đơn Online Work — check quota từ item.max_online_quota & item.online_work_used
-    if (onlineWorkItems.length > 0) {
-      Object.entries(groupByEmpMonth(onlineWorkItems)).forEach(([_key, group]) => {
-        const firstItem = group[0];
-        const maxOnline = Number(firstItem.max_online_quota ?? 3);
-        const onlineUsed = Number(firstItem.online_work_used ?? 0);
-        let remaining = Math.max(0, maxOnline - onlineUsed);
-
-        // FCFS: đơn tạo sớm nhất được ưu tiên duyệt trước
-        const sorted = [...group].sort((a, b) => {
-          const tsA = a.created_at ? new Date(a.created_at).getTime() : 0;
-          const tsB = b.created_at ? new Date(b.created_at).getTime() : 0;
-          return tsA - tsB;
-        });
-
-        sorted.forEach(item => {
-          // Ưu tiên số ngày backend tính (0 với chiều T7 tuần 2/4 / Chủ nhật của
-          // phòng được miễn); backend cũ chưa trả thì tự tính như trước.
-          const amount = typeof item.online_quota_amount === 'number'
-            ? item.online_quota_amount
-            : (item.expected_status === 'HALF_DAY' ? 0.5 : 1.0);
-          if (amount === 0 || remaining >= amount) {
-            approvalItems.push(item);
-            remaining -= amount;
-          } else {
-            rejectionItems.push(item);
-          }
-        });
-      });
+      };
+      try {
+        const [leavePreview, onlinePreview] = await Promise.all([
+          leaveItems.length > 0 ? approvalService.previewBulkApproveMonthlyLeaveRequests(leaveItems.map(i => i.id)) : null,
+          onlineWorkItems.length > 0 ? approvalService.previewBulkApproveOnlineWorkRequests(onlineWorkItems.map(i => i.id)) : null,
+        ]);
+        applyPreview(leaveItems, leavePreview);
+        applyPreview(onlineWorkItems, onlinePreview);
+      } catch (error: any) {
+        setErrorMessage('Không tính được hạn mức nghỉ phép / làm online để duyệt nhanh: ' + (error.response?.data?.error || error.message));
+        setErrorModalOpen(true);
+        return;
+      }
     }
 
     // 4. Đơn tự do (Đăng ký OT, Live...) — approve hết, không tính quota
@@ -2783,16 +2737,8 @@ const Approvals: React.FC = () => {
     const text = String(value).trim();
     if (!text) return '-';
 
-    const normalized = text
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[_-]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .toUpperCase();
-
-    if (normalized === 'SUPERVISOR') return 'Quản lý';
-    return text;
+    // Nhãn theo danh sách cấp bậc của backend (RANK_CHOICES) — không chép bảng nhãn ở web.
+    return choiceLabel(systemRules?.choices?.rank, text);
   };
 
   const toggleWorkNote = (noteKey: string) => {
@@ -2903,8 +2849,12 @@ const Approvals: React.FC = () => {
         workForm: getWfValue(emp, ['hinh_thuc_lam_viec', 'work_form', 'work_type'], detail.work_form),
       })
     ) {
-      const computed = Number((insuranceBaseNumber * 0.105).toFixed(2));
-      return formatWfAllowance(computed);
+      // Tỷ lệ BH phần người lao động theo backend (system-rules payroll.insurance_rates) — không ghi cứng 10,5%.
+      const insuranceRate = systemRules?.payroll?.insurance_rates?.total;
+      if (insuranceRate !== undefined) {
+        const computed = Number((insuranceBaseNumber * insuranceRate).toFixed(2));
+        return formatWfAllowance(computed);
+      }
     }
 
     return getWfValue(emp, ['khau_tru_bhxh', 'si_deduction', 'bhxh', 'bhxh_deduction'], fallback);
@@ -4724,7 +4674,7 @@ const Approvals: React.FC = () => {
                                                             <button
                                                               onClick={() => openOtEditModal(item)}
                                                               className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white rounded-md border border-indigo-200 transition-colors"
-                                                              title="Sửa lại giờ tăng ca thực tế cho nhân viên (hạn 10h sáng hôm sau, Chủ nhật tới hết ngày)"
+                                                              title={`Sửa lại giờ tăng ca thực tế cho nhân viên${!(isAdmin || isHR) && getManagerFixDeadline(item) ? ` (hạn ${formatFixDeadline(getManagerFixDeadline(item)!)})` : ''}`}
                                                             >
                                                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                                               <span className="text-xs font-semibold uppercase tracking-wider">Sửa giờ</span>
@@ -4870,7 +4820,7 @@ const Approvals: React.FC = () => {
                                                     <button
                                                       onClick={() => openOtEditModal(item)}
                                                       className="flex-1 h-9 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
-                                                      title="Sửa lại giờ tăng ca thực tế (hạn 10h sáng hôm sau, Chủ nhật tới hết ngày)"
+                                                      title={`Sửa lại giờ tăng ca thực tế${!(isAdmin || isHR) && getManagerFixDeadline(item) ? ` (hạn ${formatFixDeadline(getManagerFixDeadline(item)!)})` : ''}`}
                                                     >
                                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                                       Sửa giờ
@@ -5110,15 +5060,15 @@ const Approvals: React.FC = () => {
             <div className="p-5 space-y-4">
               <div className="p-3 rounded-lg bg-indigo-50 border border-indigo-100 text-xs text-indigo-700">
                 Sửa lại cho đúng giờ tăng ca thực tế của nhân viên. Số giờ sẽ được tính lại tự động theo
-                giờ vào/ra mới. Tối thiểu 30 phút mới được tính tăng ca — nếu thực tế làm dưới 30 phút
-                thì huỷ đơn thay vì sửa giờ.
+                giờ vào/ra mới.
+                {/* Sàn tăng ca lấy từ backend (overtime.min_minutes) — đúng số backend chặn khi sửa giờ. */}
+                {systemRules?.overtime?.min_applies_to.includes('OVERTIME') &&
+                  ` Tối thiểu ${systemRules.overtime.min_minutes} phút mới được tính tăng ca — nếu thực tế làm dưới ${systemRules.overtime.min_minutes} phút thì huỷ đơn thay vì sửa giờ.`}
                 {!(isAdmin || isHR) && (() => {
-                  const dl = getManagerFixDeadline(
-                    otEditItem.attendance_date || otEditItem.registration_date || otEditItem.event_date || otEditItem.start_date,
-                  );
+                  const dl = getManagerFixDeadline(otEditItem);
                   return dl ? (
                     <div className="mt-1 font-semibold">
-                      Hạn sửa: {dl.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      Hạn sửa: {formatFixDeadline(dl)}
                     </div>
                   ) : null;
                 })()}
@@ -5948,15 +5898,21 @@ const Approvals: React.FC = () => {
                                           const [h1, m1] = ci.split(':').map(Number);
                                           const [h2, m2] = co.split(':').map(Number);
                                           const hours = ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60;
+                                          // Ngưỡng 1 ngày công lấy từ backend (shift_config_utils.FULL_DAY_HOURS_THRESHOLD
+                                          // — đúng hằng số engine dùng khi duyệt Quên chấm công). Chưa tải thì chỉ hiện số giờ.
+                                          const threshold = systemRules?.attendance?.full_day_hours_threshold;
+                                          const fullDay = threshold != null && hours >= threshold;
                                           return (
-                                            <div className={`p-3 rounded-lg border shadow-sm ${hours >= 5.5 ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+                                            <div className={`p-3 rounded-lg border shadow-sm ${fullDay ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
                                               <span className="text-xs text-gray-400 font-semibold uppercase tracking-widest block mb-1">Tổng giờ</span>
-                                              <span className={`text-lg font-semibold ${hours >= 5.5 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                              <span className={`text-lg font-semibold ${fullDay ? 'text-emerald-600' : 'text-amber-600'}`}>
                                                 {hours.toFixed(1)}h
                                               </span>
-                                              <span className={`block text-xs font-bold uppercase mt-0.5 ${hours >= 5.5 ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                                {hours >= 5.5 ? '→ 1.0 công' : '→ 0.5 công'}
-                                              </span>
+                                              {threshold != null && (
+                                                <span className={`block text-xs font-bold uppercase mt-0.5 ${fullDay ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                                  {fullDay ? '→ 1.0 công' : '→ 0.5 công'}
+                                                </span>
+                                              )}
                                             </div>
                                           );
                                         }

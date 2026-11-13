@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { assetsAPI } from '../../utils/api';
-import { ASSET_TYPE_MAX_LENGTH } from './assetTypes';
+import { useAssetRules } from './assetTypes';
 
 interface AssetTypeInputProps {
   value: string;
@@ -13,6 +13,8 @@ interface AssetTypeInputProps {
  * nhất, tránh "CCDCVP" / "CCDC VP" thành 2 loại khác nhau.
  */
 export default function AssetTypeInput({ value, onChange }: AssetTypeInputProps) {
+  // Độ dài tối đa = ASSET_TYPE_MAX_LENGTH của backend (system-rules "assets").
+  const typeMaxLength = useAssetRules()?.type_max_length;
   const [suggestions, setSuggestions] = useState<Array<{ label: string; count: number }>>([]);
 
   useEffect(() => {
@@ -34,7 +36,7 @@ export default function AssetTypeInput({ value, onChange }: AssetTypeInputProps)
         onChange={onChange}
         className="input-field mt-1"
         placeholder="Gõ tự do, VD: CCDC văn phòng, Laptop, Sim..."
-        maxLength={ASSET_TYPE_MAX_LENGTH}
+        maxLength={typeMaxLength}
         autoComplete="off"
       />
       <datalist id="asset-type-suggestions">

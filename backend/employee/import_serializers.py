@@ -17,7 +17,7 @@ from .models import (
     Employee, Department, Position, CompanyUnit,
     GENDER, EMPLOYMENT_STATUS, WORK_FORM, EDUCATION_LEVEL,
     MARITAL_STATUS, CONTRACT_TYPE, FILE_STATUS, PROBATION_RATE,
-    WORK_LOCATION,
+    WORK_LOCATION, normalize_rank,
 )
 from hrm.models import EmployeeContract
 
@@ -569,6 +569,9 @@ def process_row(row_dict, field_series, row_index):
         v = _safe_phone(get(simple_str_field)) if simple_str_field in _phone_fields else _safe_str(get(simple_str_field))
         if v is not None:
             data[simple_str_field] = v
+    # Cấp bậc lưu mã (RANK_CHOICES): file Excel ghi nhãn ("Nhân viên"...) -> đổi sang mã; giá trị lạ giữ nguyên.
+    if data.get("rank"):
+        data["rank"] = normalize_rank(data["rank"])
 
     # Choice fields
     for field, mapping in [

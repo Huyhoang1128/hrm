@@ -6,6 +6,7 @@ import { SelectBox } from '../components/LandingLayout/SelectBox';
 import ConfirmDialog from '../components/ConfirmDialog';
 import FeedbackDialog from '../components/FeedbackDialog';
 import FilePreviewModal from '../components/Common/FilePreviewModal';
+import { formatBytes, useSystemRules } from '../services/systemRules.service';
 import {
   PlusIcon,
   PencilSquareIcon,
@@ -102,6 +103,9 @@ const AnnouncementList: React.FC = () => {
 
   const userRole = (user?.role || '').toUpperCase();
   const canManage = userRole === 'ADMIN' || userRole === 'HR' || user?.is_super_admin;
+  // Định dạng + dung lượng file đính kèm do backend quy định (hrm/upload_limits.py, backend chặn khi lưu).
+  const attachmentRules = useSystemRules()?.uploads?.announcement_attachment ?? null;
+  const fileExt = (name: string) => (name.includes('.') ? name.split('.').pop()!.toLowerCase() : '');
 
   // ── List state ──
   const [announcements, setAnnouncements] = useState<any[]>([]);
@@ -241,7 +245,24 @@ const AnnouncementList: React.FC = () => {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files || []);
-    setAttachmentFiles(prev => [...prev, ...selected]);
+    // Chưa tải được quy định thì để backend kiểm tra khi lưu.
+    const rejected: string[] = [];
+    const accepted = selected.filter((f) => {
+      if (!attachmentRules) return true;
+      if (!attachmentRules.extensions.includes(fileExt(f.name))) {
+        rejected.push(`"${f.name}": định dạng không được hỗ trợ`);
+        return false;
+      }
+      if (f.size > attachmentRules.max_bytes) {
+        rejected.push(`"${f.name}": vượt quá ${formatBytes(attachmentRules.max_bytes)}`);
+        return false;
+      }
+      return true;
+    });
+    setAttachmentFiles(prev => [...prev, ...accepted]);
+    if (rejected.length) {
+      setFeedback({ open: true, variant: 'error', title: 'Không thêm được file', message: rejected.join('; ') });
+    }
     e.target.value = '';
   };
 
@@ -288,7 +309,7 @@ const AnnouncementList: React.FC = () => {
       setFeedback({
         open: true, variant: 'error',
         title: 'Có lỗi xảy ra',
-        message: err.response?.data?.detail || err.message || 'Lỗi không xác định',
+        message: err.response?.data?.attachments || err.response?.data?.detail || err.message || 'Lỗi không xác định',
       });
     } finally {
       setSubmitting(false);
@@ -755,7 +776,7 @@ const AnnouncementList: React.FC = () => {
                       <span className="text-xs text-gray-400">{existingAttachments.length + attachmentFiles.length} file</span>
                     )}
                   </div>
-                  <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" multiple onChange={handleFileChange} className="hidden" />
+                  <input ref={fileInputRef} type="file" accept={attachmentRules?.extensions.map((x) => `.${x}`).join(',')} multiple onChange={handleFileChange} className="hidden" />
 
                   {/* Existing attachments */}
                   {existingAttachments.length > 0 && (
@@ -797,7 +818,11 @@ const AnnouncementList: React.FC = () => {
                     <ArrowUpTrayIcon className="h-4 w-4" />
                     Thêm file đính kèm
                   </button>
-                  <p className="text-xs text-gray-400 mt-1.5">PDF, DOC, DOCX, XLS, XLSX, PNG, JPG · Tối đa 10MB/file</p>
+                  {attachmentRules && (
+                    <p className="text-xs text-gray-400 mt-1.5">
+                      {attachmentRules.extensions.map((x) => x.toUpperCase()).join(', ')} · Tối đa {formatBytes(attachmentRules.max_bytes)}/file
+                    </p>
+                  )}
                 </div>
 
                 {/* Actions */}

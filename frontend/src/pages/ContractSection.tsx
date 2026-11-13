@@ -12,29 +12,12 @@ import {
 import ContractPlaceholderModal from './ContractPlaceholderModal';
 import PdfPreviewModal from '../components/Common/PdfPreviewModal';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { useHrChoices, choiceLabel } from '../utils/hrChoices';
 
 const fmtDate = (d: string | null | undefined) => {
   if (!d) return '';
   const [y, m, day] = d.split('-');
   return `${day}/${m}/${y}`;
-};
-
-const CONTRACT_TYPE_LABELS: Record<string, string> = {
-  PROBATION: 'Hợp đồng thử việc',
-  PROBATION_1M: 'Thử việc 1 tháng',
-  PROBATION_2M: 'Thử việc 2 tháng',
-  INTERN: 'Hợp đồng thực tập sinh',
-  COLLABORATOR: 'Hợp đồng cộng tác viên',
-  SIX_MONTH: 'Hợp đồng lao động 6 tháng',
-  ONE_YEAR: 'Hợp đồng lao động 12 tháng',
-  TWO_YEAR: 'Hợp đồng lao động 24 tháng',
-  THREE_YEAR: 'Hợp đồng lao động 36 tháng',
-  INDEFINITE: 'Hợp đồng vô thời hạn',
-  SERVICE: 'Hợp đồng dịch vụ',
-  CONFIDENTIALITY: 'Thoả thuận bảo mật',
-  COMPANY_RULES: 'Cam kết đọc hiểu nội quy công ty',
-  NURSING_COMMITMENT: 'Cam kết của CBNV Điều dưỡng',
-  APPENDIX: 'Phụ lục hợp đồng',
 };
 
 const CONTRACT_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -87,6 +70,8 @@ type Props = {
 };
 
 const ContractSection: React.FC<Props> = ({ onboardingId, employeeId, employeeProfile }) => {
+  // Nhãn loại hợp đồng theo backend (CONTRACT_DOCUMENT_TYPE, system-rules "choices").
+  const contractTypeOptions = useHrChoices()?.contract_document_type;
   const [contracts, setContracts] = useState<EmployeeContract[]>([]);
   const [templates, setTemplates] = useState<ContractTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -229,7 +214,7 @@ const ContractSection: React.FC<Props> = ({ onboardingId, employeeId, employeePr
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <h4 className="text-sm font-bold text-gray-900">
-                      {CONTRACT_TYPE_LABELS[contract.contract_type] || contract.contract_type_display}
+                      {choiceLabel(contractTypeOptions, contract.contract_type, contract.contract_type_display)}
                     </h4>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${CONTRACT_STATUS_CONFIG[contract.status]?.color}`}>
                       {CONTRACT_STATUS_CONFIG[contract.status]?.label || contract.status}

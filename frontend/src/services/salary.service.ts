@@ -11,6 +11,60 @@ export interface SalaryFormulaConfig {
   salary_adjustments?: Record<string, unknown>;
 }
 
+/**
+ * Các dòng phiếu lương do backend tính (backend/salary/payslip.py — nguồn duy nhất của thực lĩnh /
+ * còn phải thanh toán). Bảng lương, phiếu lương, Excel, tổng lương đều đọc đúng các số này.
+ */
+export interface PayslipBreakdown {
+  luong_ngay_cong: number;
+  luong_doanh_so: number;
+  luong_ot: number;
+  ban_san_pham: number;
+  phu_mo: number;
+  truc_ca: number;
+  thu_nhap_khac: number;
+  tong_luong_iii: number;
+  phu_cap_gui_xe: number;
+  phu_cap_an_trua: number;
+  phu_cap_trach_nhiem: number;
+  phu_cap_livestream: number;
+  phu_cap_khac: number;
+  tong_phu_cap_iv: number;
+  thuong: number;
+  tong_thu_nhap_vi: number;
+  bhxh: number;
+  bhyt: number;
+  bhtn: number;
+  tong_bh: number;
+  cong_doan: number;
+  tong_phat: number;
+  tong_phat_bienban: number;
+  phat_thieu_cong: number;
+  tong_giam_tru_vii: number;
+  dieu_chinh: number;
+  luong_thuc_linh: number;
+  tam_ung: number;
+  thue_tncn: number;
+  con_phai_thanh_toan: number;
+}
+
+/** Thuế TNCN của 1 bậc (backend tính bằng đúng biểu thuế của tháng lương). */
+export interface PayrollTaxBracketLine {
+  bac: number;
+  tu: number;
+  den: number | null;
+  thue_suat: number;
+  thu_nhap_trong_bac: number;
+  thue: number;
+}
+
+/** Cách tính phụ cấp theo ngày công (để phiếu lương ghi "N ngày × đơn giá"); null = nhập tay / cố định. */
+export interface AllowanceFormulaDetails {
+  gui_xe: { mode: 'daily'; so_ngay: number; don_gia: number } | { mode: 'monthly' } | null;
+  an_trua: { so_cong: number; cong_chuan: number; muc_ngay: number } | null;
+  trach_nhiem: { so_cong: number; cong_chuan: number; muc_ngay: number } | null;
+}
+
 export interface SalaryRecord {
   employee_id: number;
   ma_nv: string;
@@ -33,6 +87,7 @@ export interface SalaryRecord {
   lam_them_gio: number;
   thuong?: number;
   phu_cap_gui_xe: number;
+  phu_cap_trach_nhiem?: number;
   phu_cap_khac: number;
   phu_cap_livestream?: number;
   so_phien_livestream?: number;
@@ -53,6 +108,9 @@ export interface SalaryRecord {
   cong_thieu?: number;
   phat_thieu_cong?: number;
   bh_deduction: number;
+  /** Mức lương đóng BH của tháng (0: thử việc / HĐ không chính thức) */
+  muc_luong_dong_bh?: number;
+  cong_doan?: number;
   so_gio_tang_ca: number;
   luong_tang_ca: number;
   contract_type?: string;
@@ -60,7 +118,13 @@ export interface SalaryRecord {
   phu_cap_an_trua?: number;
   tong_thu_nhap_chiu_thue?: number;
   thue_tncn?: number;
-  tax_method?: 'PROGRESSIVE' | 'FLAT_10_PROBATION' | 'FLAT_10_NON_OFFICIAL' | 'FLAT_10_MIXED_LT14';
+  /** PROGRESSIVE hoặc một phương pháp khấu trừ cố định FLAT_* (backend có thể thêm loại mới) */
+  tax_method?: string;
+  /** Tỷ lệ thuế cố định đã áp (phương pháp FLAT_*), null nếu luỹ tiến */
+  thue_suat_co_dinh?: number | null;
+  /** Thuế từng bậc (luỹ tiến) — backend tính, web chỉ hiển thị */
+  bac_thue_tncn?: PayrollTaxBracketLine[];
+  cach_tinh_phu_cap?: AllowanceFormulaDetails;
   so_nguoi_phu_thuoc?: number;
   thu_nhap_tinh_thue?: number;
   giam_tru_ban_than?: number;
@@ -68,6 +132,16 @@ export interface SalaryRecord {
   bao_hiem_bat_buoc?: number;
   tam_ung: number;
   luong_thuc_linh: number;
+  con_phai_thanh_toan: number;
+  /** Các dòng phiếu lương (backend tính, đã gồm dữ liệu lương tháng nhập tay) */
+  phieu_luong: PayslipBreakdown;
+  /** Dữ liệu lương tháng nhập tay đã ghép (null = không nhập) */
+  luong_doanh_so_input?: number | null;
+  luong_ot_input?: number | null;
+  ban_san_pham_input?: number | null;
+  phu_mo_input?: number | null;
+  truc_ca_input?: number | null;
+  thuong_input?: number | null;
   year: number;
   month: number;
 }
@@ -1001,6 +1075,16 @@ class SalaryService {
 
   async getPayslipEmailBatchStatus(batchId: string): Promise<PayslipEmailBatchStatus> {
     const response = await managementApi.get(`/api/v1/salary/records/payslip-email-batch/${batchId}/`);
+    return response.data;
+  }
+
+  /** Công chuẩn tính lương của 1 tháng — đúng số bảng lương dùng (backend). */
+  async getStandardWorkDays(params: { year: number; month: number }): Promise<{
+    year: number;
+    month: number;
+    standard_work_days: number;
+  }> {
+    const response = await managementApi.get('/api/v1/salary/records/standard-days/', { params });
     return response.data;
   }
 

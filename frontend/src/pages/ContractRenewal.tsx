@@ -28,8 +28,6 @@ type ContractTemplate = {
   company_unit: number | null;
 };
 
-const RENEWAL_DAYS = 14;
-
 const formatDate = (value: string | null) => {
   if (!value) return '—';
   const [year, month, day] = value.split('-');
@@ -62,6 +60,8 @@ const nextDate = (value: string | null) => {
 
 const ContractRenewal: React.FC = () => {
   const [contracts, setContracts] = useState<RenewalContract[]>([]);
+  // Số ngày tái ký do backend quyết định (CONTRACT_RENEWAL_WINDOW_DAYS) và trả kèm danh sách — không ghi cứng.
+  const [renewalDays, setRenewalDays] = useState<number | null>(null);
   const [templates, setTemplates] = useState<ContractTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -75,10 +75,9 @@ const ContractRenewal: React.FC = () => {
   const fetchContracts = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await managementApi.get('/api-hrm/employee-contracts/renewal-candidates/', {
-        params: { days: RENEWAL_DAYS },
-      });
+      const { data } = await managementApi.get('/api-hrm/employee-contracts/renewal-candidates/');
       const list: RenewalContract[] = Array.isArray(data) ? data : data.data || [];
+      setRenewalDays(typeof data?.days === 'number' ? data.days : null);
       setContracts(list);
       setSelectedIds(new Set());
     } finally {
@@ -248,7 +247,7 @@ const ContractRenewal: React.FC = () => {
       <div>
         <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Tái ký hợp đồng</h1>
         <p className="text-sm text-gray-900 mt-1">
-          Danh sách nhân sự có hợp đồng sẽ hết hạn trong {RENEWAL_DAYS} ngày tới.
+          Danh sách nhân sự có hợp đồng sẽ hết hạn{renewalDays !== null ? ` trong ${renewalDays} ngày tới` : ' sắp tới'}.
         </p>
       </div>
 
@@ -313,7 +312,9 @@ const ContractRenewal: React.FC = () => {
         {loading ? (
           <div className="p-10 text-center text-gray-600">Đang tải danh sách tái ký hợp đồng...</div>
         ) : filteredContracts.length === 0 ? (
-          <div className="p-10 text-center text-gray-500">Không có hợp đồng nào hết hạn trong {RENEWAL_DAYS} ngày tới.</div>
+          <div className="p-10 text-center text-gray-500">
+            Không có hợp đồng nào hết hạn{renewalDays !== null ? ` trong ${renewalDays} ngày tới` : ' sắp tới'}.
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">

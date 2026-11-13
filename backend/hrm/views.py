@@ -6,7 +6,8 @@ import re
 from users.utils import get_user_display_name
 from employee.models import EmployeeStatusHistory, TEMPORARILY_OFF_STATUSES
 from datetime import date
-from employee.models import PROBATION_CONTRACT_TYPES, NON_OFFICIAL_CONTRACT_TYPES, OFFICIAL_LABOR_CONTRACT_TYPES
+from employee.models import PROBATION_CONTRACT_TYPES, NON_OFFICIAL_CONTRACT_TYPES, OFFICIAL_LABOR_CONTRACT_TYPES, LABOR_CONTRACT_TYPES
+from employee.models import rank_label
 
 logger = logging.getLogger(__name__)
 
@@ -496,15 +497,6 @@ def _employee_stats_at(ref_date):
     }
 
 
-_EDUCATION_CODE_TO_FORM_LABEL = {
-    'MASTER': 'Thạc sĩ',
-    'BACHELOR': 'Cử nhân đại học',
-    'ASSOCIATE': 'Cử nhân cao đẳng',
-    'HIGH_SCHOOL': 'Trung cấp',
-    'OTHER': 'Khác',
-}
-
-
 def _self_update_prefill(onboarding) -> dict:
     """Thông tin cá nhân hiện có của NV, theo tên field của form onboarding — để form
     tự cập nhật hồ sơ điền sẵn, NV chỉ sửa chỗ sai (ô để trống sẽ ghi đè thành trống)."""
@@ -518,7 +510,8 @@ def _self_update_prefill(onboarding) -> dict:
         'candidate_phone': e.phone_number or '',
         'date_of_birth': iso(e.date_of_birth),
         'gender': e.gender or '',
-        'education_level': _EDUCATION_CODE_TO_FORM_LABEL.get(e.education_level or '', ''),
+        # Form nhận việc dùng mã EDUCATION_LEVEL (danh sách từ system-rules "choices").
+        'education_level': e.education_level or '',
         'ethnicity': e.ethnicity or '',
         'birth_place': e.birth_place or '',
         'nationality': e.nationality or '',
@@ -689,6 +682,22 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             if not is_admin_or_hr and request_employee and request_employee.position and request_employee.position.is_management:
                 queryset = queryset.filter(manager_id=request_employee.id)
 
+            # active_in_month=YYYY-MM: chỉ người thuộc phạm vi chốt công của tháng đó —
+            # ĐÚNG tập backend chốt ở finalize-all / finalize-department
+            # (finalization_views._active_in_month_q). Trang Chốt công dùng tham số này
+            # thay vì tự đặt luật riêng ở web (trước đây "nghỉ việc trong 46 ngày tính từ
+            # HÔM NAY" — lệch với tháng đang chọn).
+            active_in_month = self.request.query_params.get('active_in_month')
+            if active_in_month:
+                from rest_framework.exceptions import ValidationError as DRFValidationError
+                from .finalization_views import _active_in_month_q
+                try:
+                    _y, _m = (int(part) for part in active_in_month.split('-'))
+                    month_q = _active_in_month_q(_y, _m)
+                except (TypeError, ValueError):
+                    raise DRFValidationError({'active_in_month': 'Định dạng phải là YYYY-MM.'})
+                queryset = queryset.filter(month_q)
+
         # Filter theo employment_status computed:
         #   - SUSPENDED: stored_status in (SUSPENDED, PAUSED) (manual override)
         #   - INACTIVE : không thuộc nhóm SUSPENDED, end_date <= today
@@ -725,6 +734,15 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                     queryset = queryset.filter(end_date__gte=end_date_from)
                 if end_date_to:
                     queryset = queryset.filter(end_date__lte=end_date_to)
+
+        # ?expiring_soon=true: HĐ hoặc thử việc sắp hết hạn — cùng cửa sổ ngày với cảnh báo HĐ
+        # (CONTRACT_EXPIRING_SOON_DAYS, hrm/contract_rules.py) để web không tự tính số ngày.
+        if (self.request.query_params.get('expiring_soon') or '').lower() in ('1', 'true', 'yes'):
+            from .contract_rules import expiring_soon_window
+            window = expiring_soon_window(timezone.now().date())
+            queryset = queryset.filter(
+                Q(contract_end_date__range=window) | Q(probation_end_date__range=window)
+            )
         return queryset
 
     def perform_create(self, serializer):
@@ -1270,12 +1288,10 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
         try:
             # ===== GENERATE PASSWORD =====
-            # Generate random password (12 chars) with uppercase, lowercase, numbers, special chars
-            import secrets
-            import string
-            
-            password_chars = string.ascii_uppercase + string.ascii_lowercase + string.digits + "!@#$%^&*"
-            new_password = ''.join(secrets.choice(password_chars) for _ in range(12))
+            # Mật khẩu ngẫu nhiên RESET_PASSWORD_LENGTH ký tự (chữ hoa, thường, số, ký tự đặc biệt) —
+            # trang "Cấp lại mật khẩu" đọc đúng độ dài này qua system-rules "password".
+            from hrm.utils import generate_reset_password
+            new_password = generate_reset_password()
             
             logger.info(f"Generated random password for employee {employee.employee_id} (user: {user.username})")
             
@@ -5634,6 +5650,7 @@ class CompanyAnnouncementViewSet(viewsets.ModelViewSet):
             extra['created_by'] = Employee.objects.get(user=self.request.user)
         except Employee.DoesNotExist:
             pass
+        self._validate_attachment_files()
         attachment = self.request.FILES.get('attachment')
         if attachment and getattr(settings, 'CLOUDFLY_ENABLED', False):
             extra['attachment'] = upload_file_to_cloudfly(attachment, 'company/announcements')
@@ -5644,6 +5661,7 @@ class CompanyAnnouncementViewSet(viewsets.ModelViewSet):
         from .utils import upload_file_to_cloudfly
         from django.conf import settings
         extra = {}
+        self._validate_attachment_files()
         attachment = self.request.FILES.get('attachment')
         if attachment and getattr(settings, 'CLOUDFLY_ENABLED', False):
             extra['attachment'] = upload_file_to_cloudfly(attachment, 'company/announcements')
@@ -5656,6 +5674,25 @@ class CompanyAnnouncementViewSet(viewsets.ModelViewSet):
                 announcement=announcement, id__in=remove_ids
             ).delete()
         self._save_attachments(announcement)
+
+    def _validate_attachment_files(self):
+        """Chặn file sai định dạng / quá dung lượng TRƯỚC khi lưu thông báo (hrm/upload_limits.py,
+        web đọc cùng hằng số qua system-rules "uploads")."""
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+        from .upload_limits import (
+            ANNOUNCEMENT_ATTACHMENT_EXTENSIONS, ANNOUNCEMENT_ATTACHMENT_MAX_BYTES, file_extension, format_mb,
+        )
+        files = list(self.request.FILES.getlist('attachments'))
+        single = self.request.FILES.get('attachment')
+        if single:
+            files.append(single)
+        for f in files:
+            if file_extension(f.name) not in ANNOUNCEMENT_ATTACHMENT_EXTENSIONS:
+                raise DRFValidationError({'attachments': f'File "{f.name}": định dạng không được hỗ trợ.'})
+            if f.size > ANNOUNCEMENT_ATTACHMENT_MAX_BYTES:
+                raise DRFValidationError({
+                    'attachments': f'File "{f.name}" vượt quá {format_mb(ANNOUNCEMENT_ATTACHMENT_MAX_BYTES)}.'
+                })
 
     def _save_attachments(self, announcement):
         from .utils import upload_file_to_cloudfly
@@ -8224,10 +8261,12 @@ class OnboardingProcessViewSet(viewsets.ModelViewSet):
                 if employee.is_hr:
                     qs = base_qs
                 else:
+                    from employee.models import MANAGER_RANKS, normalize_rank
                     MANAGER_POSITIONS = ['TP AI', 'Leader', 'Trưởng phòng tập sự', 'Phó phòng', 'Trưởng phòng', 'Phó Giám đốc', 'Giám đốc', 'Chủ tịch']
+                    # rank lưu mã (RANK_CHOICES); normalize_rank để bản ghi còn nhãn cũ vẫn khớp.
                     is_manager = (
                         (employee.position and employee.position.title in MANAGER_POSITIONS) or
-                        (employee.rank and employee.rank in MANAGER_POSITIONS)
+                        (employee.rank and normalize_rank(employee.rank) in MANAGER_RANKS)
                     )
 
                     if is_manager:
@@ -9601,7 +9640,8 @@ def forgot_password(request):
     POST /api-hrm/forgot-password/
     Body: { "employee_id": "NV80018" }
     """
-    import secrets, string, logging
+    import logging
+    from hrm.utils import generate_reset_password
     logger = logging.getLogger(__name__)
 
     employee_id = (request.data.get('employee_id') or '').strip().upper()
@@ -9623,8 +9663,8 @@ def forgot_password(request):
         return Response({'error': 'Nhân viên chưa có email. Vui lòng liên hệ phòng Nhân sự.'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        chars = string.ascii_uppercase + string.ascii_lowercase + string.digits + "!@#$%"
-        new_password = ''.join(secrets.choice(chars) for _ in range(12))
+        # Cùng bộ sinh với HR "Cấp lại" (RESET_PASSWORD_LENGTH) — web đọc độ dài qua system-rules.
+        new_password = generate_reset_password()
         user.set_password(new_password)
         user.save()
 
@@ -9652,6 +9692,24 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 
+SEND_ALL_ACCOUNT_EMAILS_BATCH_PREFIX = 'EMAIL_ALL_'
+
+
+def _send_all_account_emails_retry_after():
+    """Số giây còn phải chờ trước khi được "gửi tất cả" lần nữa (0 = được gửi)."""
+    from django.conf import settings
+    from hrm.models import EmailBatch
+    cooldown = int(getattr(settings, 'SEND_ALL_ACCOUNT_EMAILS_COOLDOWN_SECONDS', 0) or 0)
+    if cooldown <= 0:
+        return 0
+    last = (EmailBatch.objects.filter(batch_id__startswith=SEND_ALL_ACCOUNT_EMAILS_BATCH_PREFIX)
+            .order_by('-created_at').values_list('created_at', flat=True).first())
+    if not last:
+        return 0
+    remaining = cooldown - (timezone.now() - last).total_seconds()
+    return max(int(-(-remaining // 1)), 0)
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def send_account_emails(request):
@@ -9668,6 +9726,18 @@ def send_account_emails(request):
     try:
         send_all = request.data.get('send_all', False)
         employee_ids = request.data.get('employee_ids', [])
+
+        # "Gửi tất cả" reset mật khẩu MỌI nhân viên đang làm -> chặn bấm lặp trong
+        # SEND_ALL_ACCOUNT_EMAILS_COOLDOWN_SECONDS (dựa trên lô "gửi tất cả" gần nhất trong DB nên
+        # đúng cho mọi worker / mọi trình duyệt; web đọc cùng số qua system-rules "account").
+        if send_all:
+            retry_after = _send_all_account_emails_retry_after()
+            if retry_after > 0:
+                return Response({
+                    'success': False,
+                    'message': f'Vừa gửi email tài khoản cho tất cả nhân viên. Vui lòng thử lại sau {retry_after} giây.',
+                    'retry_after': retry_after,
+                }, status=status.HTTP_429_TOO_MANY_REQUESTS)
 
         # Query employees
         if send_all:
@@ -9693,8 +9763,9 @@ def send_account_emails(request):
                 'message': 'Không tìm thấy nhân viên nào có email'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Tạo batch ID
-        batch_id = f"EMAIL_{timezone.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+        # Tạo batch ID (lô "gửi tất cả" có tiền tố riêng để tính thời gian chờ ở trên)
+        batch_prefix = SEND_ALL_ACCOUNT_EMAILS_BATCH_PREFIX if send_all else 'EMAIL_'
+        batch_id = f"{batch_prefix}{timezone.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
         
         # Tạo EmailBatch record
         email_batch = EmailBatch.objects.create(
@@ -9715,7 +9786,8 @@ def send_account_emails(request):
             employee.user.password = make_password(new_password)
             employee.user.save(update_fields=['password'])
             reset_count += 1
-            logger.info(f"🔑 Reset password for {employee.user.username} -> {new_password}")
+            # KHÔNG ghi mật khẩu vào log (bảo mật) — chỉ ghi tài khoản đã được cấp lại.
+            logger.info(f"🔑 Reset password for {employee.user.username}")
             
             email_queue_objects.append(
                 EmailQueue(
@@ -9842,6 +9914,15 @@ class ContractTemplateViewSet(viewsets.ModelViewSet):
     serializer_class = ContractTemplateSerializer
     permission_classes = [IsAuthenticated]
  
+    def _validate_template_file(self, file):
+        """Mẫu hợp đồng chỉ nhận đuôi CONTRACT_TEMPLATE_EXTENSIONS (.docx — engine điền placeholder đọc
+        Word); web đọc cùng hằng số qua system-rules "uploads"."""
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+        from .upload_limits import CONTRACT_TEMPLATE_EXTENSIONS, file_extension
+        if file and file_extension(file.name) not in CONTRACT_TEMPLATE_EXTENSIONS:
+            allowed = ', '.join(f'.{ext}' for ext in CONTRACT_TEMPLATE_EXTENSIONS)
+            raise DRFValidationError({'file': f'Chỉ chấp nhận file {allowed}.'})
+
     def perform_create(self, serializer):
         """✅ FIX: Upload file lên S3 dùng presigned URLs"""
         from django.conf import settings
@@ -9850,6 +9931,7 @@ class ContractTemplateViewSet(viewsets.ModelViewSet):
         from io import BytesIO
 
         file = self.request.FILES.get('file')
+        self._validate_template_file(file)
         file_key = None
 
         if file:
@@ -9917,6 +9999,7 @@ class ContractTemplateViewSet(viewsets.ModelViewSet):
         from io import BytesIO
 
         file = self.request.FILES.get('file')
+        self._validate_template_file(file)
         
         if file:
             try:
@@ -10229,8 +10312,9 @@ class EmployeeContractViewSet(viewsets.ModelViewSet):
             '{{chu_tai_khoan}}': employee.bank_account_holder or '',
             '{{phong_ban}}': employee.department.name if employee.department else '',
             '{{vi_tri}}': employee.position.title if employee.position else '',
-            '{{chuc_vu}}': employee.rank or '',
-            '{{rank}}': employee.rank or '',
+            # rank lưu mã -> in nhãn (Nhân viên, Trưởng phòng...) vào hợp đồng.
+            '{{chuc_vu}}': rank_label(employee.rank),
+            '{{rank}}': rank_label(employee.rank),
             '{{quan_ly_truc_tiep}}': employee.manager.full_name if employee.manager else '',
             '{{hinh_thuc_lam_viec}}': employee.work_form or '',
             '{{dia_diem_lam_viec}}': employee.work_location or '',
@@ -10775,38 +10859,34 @@ class EmployeeContractViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def expiring_soon(self, request):
-        """Lấy danh sách hợp đồng sắp hết hạn trong 7 ngày."""
-        import datetime
-        today = timezone.now().date()
-        in_7_days = today + datetime.timedelta(days=7)
+        """Lấy danh sách hợp đồng sắp hết hạn (CONTRACT_EXPIRING_SOON_DAYS ngày — hrm/contract_rules.py)."""
+        from .contract_rules import expiring_soon_days, expiring_soon_window
+        start, end = expiring_soon_window(timezone.now().date())
 
         contracts = EmployeeContract.objects.filter(
             status='SIGNED',
-            end_date__range=[today, in_7_days]
+            end_date__range=[start, end]
         ).select_related('employee', 'onboarding_process')
 
         return Response({
             'success': True,
+            'days': expiring_soon_days(),
             'count': contracts.count(),
             'data': EmployeeContractSerializer(contracts, many=True).data
         })
 
     @action(detail=False, methods=['get'], url_path='renewal-candidates')
     def renewal_candidates(self, request):
-        """Lấy danh sách hợp đồng cần tái ký trong N ngày tới (mặc định 14 ngày)."""
+        """Lấy danh sách hợp đồng cần tái ký trong N ngày tới (mặc định CONTRACT_RENEWAL_WINDOW_DAYS)."""
         from datetime import timedelta
+        from .contract_rules import resolve_renewal_window_days
 
-        raw_days = request.query_params.get('days', '14')
-        try:
-            days = int(raw_days)
-        except (TypeError, ValueError):
-            days = 14
-        days = max(1, min(days, 90))
+        days = resolve_renewal_window_days(request.query_params.get('days'))
 
         today = timezone.now().date()
         deadline = today + timedelta(days=days)
 
-        labor_contract_types = sorted(NON_OFFICIAL_CONTRACT_TYPES | OFFICIAL_LABOR_CONTRACT_TYPES | {'SERVICE'})
+        labor_contract_types = sorted(LABOR_CONTRACT_TYPES)
 
         qs = (
             EmployeeContract.objects
@@ -10831,12 +10911,12 @@ class EmployeeContractViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get', 'post'], url_path='expiring-alert')
     def expiring_alert(self, request):
         """
-        GET  → Trả về danh sách hợp đồng SIGNED hết hạn trong 5 ngày
-               kèm trạng thái dismissed_today của user hiện tại.
+        GET  → Trả về danh sách hợp đồng SIGNED hết hạn trong CONTRACT_EXPIRING_SOON_DAYS ngày
+               (hrm/contract_rules.py) kèm trạng thái dismissed_today của user hiện tại.
         POST → Đánh dấu user đã dismiss cảnh báo hôm nay (lưu vào cache).
         """
         from django.core.cache import cache
-        from datetime import timedelta
+        from .contract_rules import expiring_soon_days, expiring_soon_window
 
         user_id = request.user.id
         today_str = timezone.now().date().isoformat()
@@ -10847,25 +10927,24 @@ class EmployeeContractViewSet(viewsets.ModelViewSet):
             return Response({'success': True, 'dismissed_today': True})
 
         dismissed_today = bool(cache.get(cache_key))
-        today = timezone.now().date()
-        in_5_days = today + timedelta(days=5)
+        today, deadline = expiring_soon_window(timezone.now().date())
 
         employee = Employee.objects.filter(user=request.user).first()
         if not employee:
             return Response({
                 'dismissed_today': dismissed_today,
+                'days': expiring_soon_days(),
                 'contracts': [],
             })
 
-        LABOR_CONTRACT_TYPES = sorted(NON_OFFICIAL_CONTRACT_TYPES | OFFICIAL_LABOR_CONTRACT_TYPES | {'SERVICE'})
         qs = (
             EmployeeContract.objects
             .filter(
                 employee=employee,
                 status='SIGNED',
-                contract_type__in=LABOR_CONTRACT_TYPES,
+                contract_type__in=sorted(LABOR_CONTRACT_TYPES),
                 end_date__gte=today,
-                end_date__lte=in_5_days,
+                end_date__lte=deadline,
             )
             .select_related('employee')
             .order_by('end_date')
@@ -10873,6 +10952,7 @@ class EmployeeContractViewSet(viewsets.ModelViewSet):
         serializer = EmployeeContractSerializer(qs, many=True, context={'request': request})
         return Response({
             'dismissed_today': dismissed_today,
+            'days': expiring_soon_days(),
             'contracts': serializer.data,
         })
 
@@ -11795,12 +11875,17 @@ class ChangeAvatarView(APIView):
         if not avatar_file:
             return Response({'error': 'Vui lòng tải lên file ảnh avatar'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Kiểm tra content type
-        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
+        # Định dạng + dung lượng theo hrm/upload_limits.py (web đọc cùng hằng số qua system-rules "uploads").
+        from .upload_limits import AVATAR_ALLOWED_TYPES, AVATAR_MAX_BYTES, format_mb
         content_type = getattr(avatar_file, 'content_type', '') or ''
-        if content_type not in allowed_types:
+        if content_type not in AVATAR_ALLOWED_TYPES:
             return Response(
                 {'error': 'Chỉ hỗ trợ định dạng ảnh: JPEG, PNG, WebP, GIF'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if avatar_file.size > AVATAR_MAX_BYTES:
+            return Response(
+                {'error': f'Kích thước ảnh không được vượt quá {format_mb(AVATAR_MAX_BYTES)}.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

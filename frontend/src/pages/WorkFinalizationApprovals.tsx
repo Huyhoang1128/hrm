@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import ExcelJS from 'exceljs';
 import { SelectBox } from '../components/LandingLayout/SelectBox';
+import { choiceLabel, useHrChoices } from '../utils/hrChoices';
 import {
   ArrowPathIcon,
   CheckCircleIcon,
@@ -73,26 +74,13 @@ const WORK_FORM_LABELS: Record<string, string> = {
   CTTV: 'Cộng tác viên',
 };
 
-const RANK_LABELS: Record<string, string> = {
-  CHAIRMAN: 'Chủ tịch',
-  DIRECTOR: 'Giám đốc',
-  DEPUTY_DIRECTOR: 'Phó Giám đốc',
-  LEADER: 'Leader',
-  SUPERVISOR: 'Quản lý',
-  MANAGER: 'Trưởng phòng',
-  MANAGER_TRAINEE: 'Trưởng phòng tập sự',
-  DEPUTY_MANAGER: 'Phó phòng',
-  STAFF: 'Nhân viên',
-  INTERN: 'Thực tập sinh',
-};
-
-const formatRankDisplay = (value: any) => {
-  if (value === undefined || value === null || value === '') return value;
-  const text = String(value).trim();
-  return RANK_LABELS[text.toUpperCase()] || text;
-};
-
 const WorkFinalizationApprovals: React.FC = () => {
+  // Nhãn cấp bậc theo danh sách backend (RANK_CHOICES, system-rules "choices") — không chép bảng nhãn.
+  const rankChoices = useHrChoices()?.rank;
+  const formatRankDisplay = (value: any) => {
+    if (value === undefined || value === null || value === '') return value;
+    return choiceLabel(rankChoices, String(value).trim());
+  };
   const { user } = useAuth();
   const [currentEmployee, setCurrentEmployee] = useState<any>(null);
 

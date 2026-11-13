@@ -1,10 +1,10 @@
-import { BRAND } from '@/config/brand';
+import { BRAND as BUILD_BRAND, useBrand } from '@/config/brand';
 
 const sections: { title: string; items: string[] }[] = [
   {
     title: '1. Phạm vi áp dụng',
     items: [
-      `Điều khoản này áp dụng cho mọi người dùng được cấp tài khoản trên hệ thống ${BRAND.appName}.`,
+      `Điều khoản này áp dụng cho mọi người dùng được cấp tài khoản trên hệ thống ${BUILD_BRAND.appName}.`,
       'Bằng việc đăng nhập và sử dụng hệ thống, bạn đồng ý tuân thủ các điều khoản dưới đây.',
     ],
   },
@@ -38,6 +38,8 @@ const sections: { title: string; items: string[] }[] = [
 ];
 
 export default function TermsOfService() {
+  // Tên công ty / phòng HCNS theo cấu hình backend.
+  const BRAND = useBrand();
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="prose prose-lg max-w-none">

@@ -260,6 +260,13 @@ def leave_deadline(start_date: _dt.date, total_days: float, employee=None):
 # tháng khi tạo SAU khi ngày nghỉ đã qua (xem taodon_views.py, nhánh LEAVE).
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Ân hạn "đi làm trở lại": số giờ tính từ giờ vào ca của ngày làm việc kế tiếp, và mốc dự phòng khi
+# không tra được giờ vào ca. Báo cáo "Mở khoá nhưng vẫn quá mốc" (grant_timing_report_views) và web
+# đọc qua GET /api-hrm/system-rules/ (attendance.return_to_work_grace_hours / _fallback_time).
+RETURN_TO_WORK_GRACE_HOURS = 3
+RETURN_TO_WORK_FALLBACK_TIME = _dt.time(10, 0)
+
+
 def unauthorized_absence_deadline(last_absence_date: _dt.date, employee=None):
     """3 giờ sau giờ vào ca (ca sớm nhất trong ngày) của ngày làm việc kế
     tiếp sau last_absence_date. Nếu không xác định được ca làm ngày đó (nhân
@@ -275,8 +282,8 @@ def unauthorized_absence_deadline(last_absence_date: _dt.date, employee=None):
     d = next_working_day(last_absence_date, employee)
     shift_start = get_shift_start_time(employee, d, half='FULL') if employee else None
     if shift_start:
-        return _combine_aware(d, shift_start) + _dt.timedelta(hours=3)
-    return _combine_aware(d, _dt.time(10, 0))
+        return _combine_aware(d, shift_start) + _dt.timedelta(hours=RETURN_TO_WORK_GRACE_HOURS)
+    return _combine_aware(d, RETURN_TO_WORK_FALLBACK_TIME)
 
 
 # Đơn Nghỉ không phép chuyển sang áp ĐÚNG luật nghỉ phép từ 28/09/2026 (HCNS
@@ -452,10 +459,15 @@ def overtime_deadline_for(attendance_date: _dt.date, start_time, employee):
 # với `_leave_deadline_cutoff` ở trên.
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Giờ chốt hạn QLTT sửa giờ (ngày lịch kế tiếp) — web không tự tính: /api-hrm/duyet-don/ trả sẵn
+# hạn của từng đơn (manager_hours_fix_deadline).
+MANAGER_ATTENDANCE_FIX_TIME = _dt.time(10, 0)
+
+
 def manager_attendance_fix_deadline(event_date: _dt.date):
     """10h00 sáng NGÀY LỊCH kế tiếp sau event_date; riêng khi ngày đó rơi vào
     Chủ nhật thì nới tới hết ngày (23:59:59)."""
     d = event_date + _dt.timedelta(days=1)
     if d.weekday() == 6:  # Chủ nhật
         return _end_of_day(d)
-    return _combine_aware(d, _dt.time(10, 0))
+    return _combine_aware(d, MANAGER_ATTENDANCE_FIX_TIME)

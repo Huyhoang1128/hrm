@@ -1661,6 +1661,9 @@ ASSET_CONDITION = [
     ('POOR', 'Kém'),
     ('BROKEN', 'Hỏng'),
 ]
+# Tình trạng KHÔNG được bàn giao cho nhân viên — Asset.assign_to_employee chặn; web đọc cùng danh sách
+# qua GET /api-hrm/system-rules/ (section "assets") để ẩn/khoá tài sản khi bàn giao.
+UNASSIGNABLE_ASSET_CONDITIONS = ('POOR', 'BROKEN')
 
 DEPRECIATION_METHOD = [
     ('STRAIGHT_LINE', 'Đường thẳng'),
@@ -1899,6 +1902,13 @@ class Asset(models.Model):
                 raise ValidationError("Định dạng assigned_date không hợp lệ (YYYY-MM-DD)")
         if not isinstance(assigned_date, date):
             assigned_date = timezone.now().date()
+
+        if self.condition in UNASSIGNABLE_ASSET_CONDITIONS:
+            err = ValidationError(
+                f"Tài sản đang ở tình trạng {self.get_condition_display()} — không thể bàn giao"
+            )
+            err.error_code = 'CONDITION_UNASSIGNABLE'  # type: ignore[attr-defined]
+            raise err
 
         # ---- Validate quantity ----
         try:

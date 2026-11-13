@@ -1033,39 +1033,40 @@ class ShiftConfigForDepartmentView(APIView):
 
 class ShiftConfigForEmployeeView(APIView):
     """
-    GET /shifts/employee/<emp_id>/
-    Trả về ca của một nhân viên cụ thể (ưu tiên: cá nhân > vị trí > phòng ban > chung).
+    GET /shifts/employee/<emp_id>/[?date=YYYY-MM-DD]
+    Trả về các ca áp dụng cho một nhân viên vào ngày `date` (mặc định hôm nay) — ĐÚNG tập ca
+    engine chấm công dùng để khớp giờ vào/ra: ca đã đăng ký cho ngày đó (Đăng ký ca / kế hoạch
+    ca tuần) + mọi ca gán theo cá nhân / vị trí / phòng ban (fallback ca mặc định công ty).
+
+    Trước đây view tự lọc theo field `apply_to_all` (không còn trên ShiftConfig) nên luôn lỗi 500.
     """
     permission_classes = [IsAuthenticated]
 
     def get(self, request, emp_id):
-        employee = get_object_or_404(Employee, pk=emp_id)
-        today    = datetime.date.today()
-
-        def active_filter(qs):
-            return qs.filter(is_active=True).filter(
-                Q(effective_from__isnull=True) | Q(effective_from__lte=today)
-            ).filter(
-                Q(effective_to__isnull=True) | Q(effective_to__gte=today)
-            )
-
-        # 1. Gán cụ thể cho cá nhân
-        personal = active_filter(
-            ShiftConfig.objects.filter(apply_to_employees=employee)
+        from .shift_config_utils import (
+            get_all_candidate_shifts_for_employee, get_registered_shift_configs_for_date,
         )
-        # 2. Gán theo vị trí
-        position_shifts = active_filter(
-            ShiftConfig.objects.filter(apply_to_positions=employee.position)
-        ) if employee.position else ShiftConfig.objects.none()
-        # 3. Gán theo phòng ban
-        dept_shifts = active_filter(
-            ShiftConfig.objects.filter(apply_to_departments=employee.department)
-        ) if employee.department else ShiftConfig.objects.none()
-        # 4. Ca chung
-        all_shifts = active_filter(ShiftConfig.objects.filter(apply_to_all=True))
 
-        # Merge (theo ưu tiên)
-        combined = (personal | position_shifts | dept_shifts | all_shifts).distinct().order_by("start_time")
+        employee = get_object_or_404(Employee, pk=emp_id)
+        date_str = request.query_params.get("date")
+        try:
+            ref_date = datetime.date.fromisoformat(date_str) if date_str else datetime.date.today()
+        except ValueError:
+            return _err("date phải có dạng YYYY-MM-DD")
+
+        registered = get_registered_shift_configs_for_date(employee, ref_date) or []
+        candidates = get_all_candidate_shifts_for_employee(employee.employee_id, ref_date)
+        combined = sorted(
+            {s.pk: s for s in [*registered, *candidates]}.values(), key=lambda s: s.start_time,
+        )
+        registered_ids = {s.pk for s in registered}
+        personal_ids = set(ShiftConfig.objects.filter(apply_to_employees=employee).values_list("id", flat=True))
+        position_ids = set(
+            ShiftConfig.objects.filter(apply_to_positions=employee.position_id).values_list("id", flat=True)
+        ) if employee.position_id else set()
+        dept_ids = set(
+            ShiftConfig.objects.filter(apply_to_departments=employee.department_id).values_list("id", flat=True)
+        ) if employee.department_id else set()
 
         def serialize(s):
             return {
@@ -1077,12 +1078,17 @@ class ShiftConfigForEmployeeView(APIView):
                 "apply_scope_display": s.get_apply_scope_display() if s.apply_scope else None,
                 "start_time":    str(s.start_time),
                 "end_time":      str(s.end_time),
+                # Giờ nghỉ giữa ca (ra trưa / vào lại) — web dựng lựa chọn giờ quên chấm công
+                # từ đúng giờ vào/ra/nghỉ của các ca này thay vì danh sách giờ ghi cứng.
+                "break_start_time": str(s.break_start_time) if s.break_start_time else None,
+                "break_end_time":   str(s.break_end_time) if s.break_end_time else None,
                 "working_hours": float(s.working_hours or 0),
                 "is_default":    s.is_default,
                 "scope": (
-                    "personal" if s in personal
-                    else "position" if s in position_shifts
-                    else "department" if s in dept_shifts
+                    "registered" if s.pk in registered_ids
+                    else "personal" if s.pk in personal_ids
+                    else "position" if s.pk in position_ids
+                    else "department" if s.pk in dept_ids
                     else "company"
                 ),
             }

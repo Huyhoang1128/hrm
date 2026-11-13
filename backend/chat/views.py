@@ -46,8 +46,12 @@ from hrm.utils import upload_file_to_cloudfly
 from users.utils import get_user_display_name
 
 
+# Giới hạn ảnh chat + icon reaction — web đọc cùng các hằng số qua GET /api-hrm/system-rules/ (section "chat").
 CHAT_IMAGE_MAX_SIZE = 500 * 1024
 CHAT_IMAGE_TYPES = {'image/jpeg', 'image/png', 'image/gif', 'image/webp'}
+# Ảnh gốc tải lên làm icon reaction (trước khi tự thu nhỏ) và cạnh icon sau khi chuẩn hoá (px).
+REACTION_SOURCE_MAX_SIZE = 15 * 1024 * 1024
+REACTION_ICON_SIZE = 96
 
 
 def _ensure_chat_user(auth_user):
@@ -536,7 +540,7 @@ class ChatImageUploadView(APIView):
 		if not image:
 			return Response({'detail': 'Vui lòng chọn ảnh.'}, status=status.HTTP_400_BAD_REQUEST)
 		if image.size > CHAT_IMAGE_MAX_SIZE:
-			return Response({'detail': 'Kích thước ảnh tối đa là 500 KB.'}, status=status.HTTP_400_BAD_REQUEST)
+			return Response({'detail': f'Kích thước ảnh tối đa là {CHAT_IMAGE_MAX_SIZE // 1024} KB.'}, status=status.HTTP_400_BAD_REQUEST)
 		if image.content_type not in CHAT_IMAGE_TYPES:
 			return Response({'detail': 'Chỉ hỗ trợ ảnh JPEG, PNG, GIF hoặc WebP.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -715,9 +719,9 @@ DEFAULT_REACTIONS = ['👍', '👏', '👌', '❤️', '😂', '🎉']
 
 
 def _optimize_reaction_image(uploaded_file):
-	"""Normalize a reaction asset to a tiny, transparent 96x96 WebP."""
-	if uploaded_file.size > 15 * 1024 * 1024:
-		raise ValueError('Ảnh gốc không được vượt quá 15MB.')
+	"""Normalize a reaction asset to a tiny, transparent REACTION_ICON_SIZE x REACTION_ICON_SIZE WebP."""
+	if uploaded_file.size > REACTION_SOURCE_MAX_SIZE:
+		raise ValueError(f'Ảnh gốc không được vượt quá {REACTION_SOURCE_MAX_SIZE // (1024 * 1024)}MB.')
 	try:
 		image = Image.open(uploaded_file)
 		image = ImageOps.exif_transpose(image)
@@ -725,9 +729,10 @@ def _optimize_reaction_image(uploaded_file):
 		if image.width * image.height > 25_000_000:
 			raise ValueError('Kích thước ảnh quá lớn.')
 		image = image.convert('RGBA')
-		image.thumbnail((96, 96), Image.Resampling.LANCZOS)
-		canvas = Image.new('RGBA', (96, 96), (0, 0, 0, 0))
-		canvas.alpha_composite(image, ((96 - image.width) // 2, (96 - image.height) // 2))
+		size = REACTION_ICON_SIZE
+		image.thumbnail((size, size), Image.Resampling.LANCZOS)
+		canvas = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+		canvas.alpha_composite(image, ((size - image.width) // 2, (size - image.height) // 2))
 		output = BytesIO()
 		canvas.save(output, format='WEBP', quality=80, method=6)
 		return ContentFile(output.getvalue(), name=f'{uuid.uuid4().hex}.webp')

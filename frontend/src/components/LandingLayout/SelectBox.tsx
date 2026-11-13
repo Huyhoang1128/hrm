@@ -181,7 +181,8 @@ function SelectBoxInner<T>({
   }
 
   // LISTBOX MODE (Standard)
-  const fallbackSelected = selected || (placeholder ? { value, label: placeholder } : options[0]);
+  // options có thể rỗng lúc đang tải (danh sách lấy từ backend) -> null để Listbox luôn là controlled.
+  const fallbackSelected = selected || (placeholder ? { value, label: placeholder } : options[0] ?? null);
 
   const listboxOptions = (
     <Listbox.Options className={portal ? optionsCls : inlineOptionsCls} style={portal ? menuStyle : undefined}>

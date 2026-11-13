@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { companyConfigAPI, CompanyConfig } from '../utils/api';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useSystemRules } from '../services/systemRules.service';
+import {
+  COMPANY_CONFIG_FORM_NUMERIC_FIELDS, numberInputProps, numericPayload,
+} from '../utils/companyConfigForm';
 import {
   ArrowLeftIcon,
   Cog6ToothIcon,
@@ -21,27 +25,9 @@ const CompanyConfigEdit: React.FC = () => {
     code: '',
     name: '',
     description: '',
-    default_working_hours_per_day: 8,
-    default_working_days_per_week: 5,
-    overtime_multiplier_weekday: 1.5,
-    overtime_multiplier_weekend: 2.0,
-    overtime_multiplier_holiday: 3.0,
-    late_threshold_minutes: 15,
-    early_leave_threshold_minutes: 15,
-    half_day_threshold_hours: 4,
-    annual_leave_days_per_year: 12,
-    sick_leave_days_per_year: 12,
-    maternity_leave_days: 180,
-    paternity_leave_days: 14,
-    max_explanation_count_per_month: 3,
-    supplement_work_hours_per_month: 10.0,
+    // Ô số: điền từ cấu hình đang sửa (loadCompanyConfig).
     lock_employee_self_edit: false,
     explanation_quota_mode: 'COMBINED',
-    max_late_explanation_per_month: 1,
-    max_early_leave_explanation_per_month: 1,
-    max_incomplete_attendance_explanation_per_month: 1,
-    manager_combined_explanation_quota: 5,
-    manager_incomplete_explanation_quota: null,
     is_active: true,
     effective_from: new Date().toISOString().split('T')[0],
     effective_to: '',
@@ -78,10 +64,10 @@ const CompanyConfigEdit: React.FC = () => {
         supplement_work_hours_per_month: config.supplement_work_hours_per_month,
         lock_employee_self_edit: !!config.lock_employee_self_edit,
         explanation_quota_mode: config.explanation_quota_mode || 'COMBINED',
-        max_late_explanation_per_month: config.max_late_explanation_per_month ?? 1,
-        max_early_leave_explanation_per_month: config.max_early_leave_explanation_per_month ?? 1,
-        max_incomplete_attendance_explanation_per_month: config.max_incomplete_attendance_explanation_per_month ?? 1,
-        manager_combined_explanation_quota: config.manager_combined_explanation_quota ?? 5,
+        max_late_explanation_per_month: config.max_late_explanation_per_month,
+        max_early_leave_explanation_per_month: config.max_early_leave_explanation_per_month,
+        max_incomplete_attendance_explanation_per_month: config.max_incomplete_attendance_explanation_per_month,
+        manager_combined_explanation_quota: config.manager_combined_explanation_quota,
         manager_incomplete_explanation_quota: config.manager_incomplete_explanation_quota ?? null,
         is_active: config.is_active,
         effective_from: config.effective_from.split('T')[0],
@@ -94,6 +80,9 @@ const CompanyConfigEdit: React.FC = () => {
       setLoadingData(false);
     }
   };
+
+  // Giới hạn / mặc định các ô số theo backend (system-rules "hr.company_config_fields").
+  const fieldRules = useSystemRules()?.hr?.company_config_fields ?? null;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -133,33 +122,10 @@ const CompanyConfigEdit: React.FC = () => {
         code: formData.code.trim(),
         name: formData.name.trim(),
         description: formData.description?.trim() || '',
-        default_working_hours_per_day: Number(formData.default_working_hours_per_day) || 8,
-        default_working_days_per_week: Number(formData.default_working_days_per_week) || 5,
-        overtime_multiplier_weekday: Number(formData.overtime_multiplier_weekday) || 1.5,
-        overtime_multiplier_weekend: Number(formData.overtime_multiplier_weekend) || 2.0,
-        overtime_multiplier_holiday: Number(formData.overtime_multiplier_holiday) || 3.0,
-        late_threshold_minutes: Number(formData.late_threshold_minutes) || 15,
-        early_leave_threshold_minutes: Number(formData.early_leave_threshold_minutes) || 15,
-        half_day_threshold_hours: Number(formData.half_day_threshold_hours) || 4,
-        annual_leave_days_per_year: Number(formData.annual_leave_days_per_year) || 12,
-        sick_leave_days_per_year: Number(formData.sick_leave_days_per_year) || 12,
-        maternity_leave_days: Number(formData.maternity_leave_days) || 180,
-        paternity_leave_days: Number(formData.paternity_leave_days) || 14,
-        max_explanation_count_per_month: Number(formData.max_explanation_count_per_month) || 3,
-        supplement_work_hours_per_month: Number(formData.supplement_work_hours_per_month) || 10.0,
+        // Ô số: gửi đúng giá trị đã nhập (kể cả 0) — không thay bằng số mặc định ghi cứng.
+        ...numericPayload(formData, COMPANY_CONFIG_FORM_NUMERIC_FIELDS, fieldRules),
         lock_employee_self_edit: !!formData.lock_employee_self_edit,
         explanation_quota_mode: formData.explanation_quota_mode === 'PER_TYPE' ? 'PER_TYPE' : 'COMBINED',
-        max_late_explanation_per_month: Number(formData.max_late_explanation_per_month) || 0,
-        max_early_leave_explanation_per_month: Number(formData.max_early_leave_explanation_per_month) || 0,
-        max_incomplete_attendance_explanation_per_month: Number(formData.max_incomplete_attendance_explanation_per_month) || 0,
-        manager_combined_explanation_quota: Number(formData.manager_combined_explanation_quota) || 0,
-        // Để trống = Quên chấm công tính chung rổ gộp (null).
-        manager_incomplete_explanation_quota:
-          formData.manager_incomplete_explanation_quota === null
-          || formData.manager_incomplete_explanation_quota === undefined
-          || String(formData.manager_incomplete_explanation_quota) === ''
-            ? null
-            : Number(formData.manager_incomplete_explanation_quota),
         is_active: formData.is_active !== false,
         effective_from: formData.effective_from,
         effective_to: formData.effective_to || undefined,
@@ -303,11 +269,9 @@ const CompanyConfigEdit: React.FC = () => {
               <input
                 type="number"
                 name="default_working_hours_per_day"
-                value={formData.default_working_hours_per_day}
+                value={formData.default_working_hours_per_day ?? ''}
                 onChange={handleInputChange}
-                min="1"
-                max="24"
-                step="0.5"
+                {...numberInputProps(fieldRules, 'default_working_hours_per_day')}
                 className="input-field w-full"
                 required
               />
@@ -320,10 +284,9 @@ const CompanyConfigEdit: React.FC = () => {
               <input
                 type="number"
                 name="default_working_days_per_week"
-                value={formData.default_working_days_per_week}
+                value={formData.default_working_days_per_week ?? ''}
                 onChange={handleInputChange}
-                min="1"
-                max="7"
+                {...numberInputProps(fieldRules, 'default_working_days_per_week')}
                 className="input-field w-full"
                 required
               />
@@ -336,11 +299,9 @@ const CompanyConfigEdit: React.FC = () => {
               <input
                 type="number"
                 name="overtime_multiplier_weekday"
-                value={formData.overtime_multiplier_weekday}
+                value={formData.overtime_multiplier_weekday ?? ''}
                 onChange={handleInputChange}
-                min="1"
-                max="10"
-                step="0.1"
+                {...numberInputProps(fieldRules, 'overtime_multiplier_weekday')}
                 className="input-field w-full"
                 required
               />
@@ -353,11 +314,9 @@ const CompanyConfigEdit: React.FC = () => {
               <input
                 type="number"
                 name="overtime_multiplier_weekend"
-                value={formData.overtime_multiplier_weekend}
+                value={formData.overtime_multiplier_weekend ?? ''}
                 onChange={handleInputChange}
-                min="1"
-                max="10"
-                step="0.1"
+                {...numberInputProps(fieldRules, 'overtime_multiplier_weekend')}
                 className="input-field w-full"
                 required
               />
@@ -370,11 +329,9 @@ const CompanyConfigEdit: React.FC = () => {
               <input
                 type="number"
                 name="overtime_multiplier_holiday"
-                value={formData.overtime_multiplier_holiday}
+                value={formData.overtime_multiplier_holiday ?? ''}
                 onChange={handleInputChange}
-                min="1"
-                max="10"
-                step="0.1"
+                {...numberInputProps(fieldRules, 'overtime_multiplier_holiday')}
                 className="input-field w-full"
                 required
               />
@@ -387,11 +344,9 @@ const CompanyConfigEdit: React.FC = () => {
               <input
                 type="number"
                 name="half_day_threshold_hours"
-                value={formData.half_day_threshold_hours}
+                value={formData.half_day_threshold_hours ?? ''}
                 onChange={handleInputChange}
-                min="0"
-                max="12"
-                step="0.5"
+                {...numberInputProps(fieldRules, 'half_day_threshold_hours')}
                 className="input-field w-full"
                 required
               />
@@ -404,10 +359,9 @@ const CompanyConfigEdit: React.FC = () => {
               <input
                 type="number"
                 name="late_threshold_minutes"
-                value={formData.late_threshold_minutes}
+                value={formData.late_threshold_minutes ?? ''}
                 onChange={handleInputChange}
-                min="0"
-                max="240"
+                {...numberInputProps(fieldRules, 'late_threshold_minutes')}
                 className="input-field w-full"
                 required
               />
@@ -420,10 +374,9 @@ const CompanyConfigEdit: React.FC = () => {
               <input
                 type="number"
                 name="early_leave_threshold_minutes"
-                value={formData.early_leave_threshold_minutes}
+                value={formData.early_leave_threshold_minutes ?? ''}
                 onChange={handleInputChange}
-                min="0"
-                max="240"
+                {...numberInputProps(fieldRules, 'early_leave_threshold_minutes')}
                 className="input-field w-full"
                 required
               />
@@ -451,10 +404,9 @@ const CompanyConfigEdit: React.FC = () => {
               <input
                 type="number"
                 name="annual_leave_days_per_year"
-                value={formData.annual_leave_days_per_year}
+                value={formData.annual_leave_days_per_year ?? ''}
                 onChange={handleInputChange}
-                min="0"
-                max="365"
+                {...numberInputProps(fieldRules, 'annual_leave_days_per_year')}
                 className="input-field w-full"
                 required
               />
@@ -467,10 +419,9 @@ const CompanyConfigEdit: React.FC = () => {
               <input
                 type="number"
                 name="sick_leave_days_per_year"
-                value={formData.sick_leave_days_per_year}
+                value={formData.sick_leave_days_per_year ?? ''}
                 onChange={handleInputChange}
-                min="0"
-                max="365"
+                {...numberInputProps(fieldRules, 'sick_leave_days_per_year')}
                 className="input-field w-full"
                 required
               />
@@ -483,10 +434,9 @@ const CompanyConfigEdit: React.FC = () => {
               <input
                 type="number"
                 name="maternity_leave_days"
-                value={formData.maternity_leave_days}
+                value={formData.maternity_leave_days ?? ''}
                 onChange={handleInputChange}
-                min="0"
-                max="365"
+                {...numberInputProps(fieldRules, 'maternity_leave_days')}
                 className="input-field w-full"
                 required
               />
@@ -499,10 +449,9 @@ const CompanyConfigEdit: React.FC = () => {
               <input
                 type="number"
                 name="paternity_leave_days"
-                value={formData.paternity_leave_days}
+                value={formData.paternity_leave_days ?? ''}
                 onChange={handleInputChange}
-                min="0"
-                max="365"
+                {...numberInputProps(fieldRules, 'paternity_leave_days')}
                 className="input-field w-full"
                 required
               />
@@ -530,10 +479,9 @@ const CompanyConfigEdit: React.FC = () => {
               <input
                 type="number"
                 name="max_explanation_count_per_month"
-                value={formData.max_explanation_count_per_month}
+                value={formData.max_explanation_count_per_month ?? ''}
                 onChange={handleInputChange}
-                min="0"
-                max="100"
+                {...numberInputProps(fieldRules, 'max_explanation_count_per_month')}
                 className="input-field w-full"
                 required
               />
@@ -560,10 +508,9 @@ const CompanyConfigEdit: React.FC = () => {
               <input
                 type="number"
                 name="max_late_explanation_per_month"
-                value={formData.max_late_explanation_per_month ?? 0}
+                value={formData.max_late_explanation_per_month ?? ''}
                 onChange={handleInputChange}
-                min="0"
-                max="100"
+                {...numberInputProps(fieldRules, 'max_late_explanation_per_month')}
                 disabled={formData.explanation_quota_mode !== 'PER_TYPE'}
                 className="input-field w-full disabled:bg-gray-50 disabled:text-gray-400"
               />
@@ -573,10 +520,9 @@ const CompanyConfigEdit: React.FC = () => {
               <input
                 type="number"
                 name="max_early_leave_explanation_per_month"
-                value={formData.max_early_leave_explanation_per_month ?? 0}
+                value={formData.max_early_leave_explanation_per_month ?? ''}
                 onChange={handleInputChange}
-                min="0"
-                max="100"
+                {...numberInputProps(fieldRules, 'max_early_leave_explanation_per_month')}
                 disabled={formData.explanation_quota_mode !== 'PER_TYPE'}
                 className="input-field w-full disabled:bg-gray-50 disabled:text-gray-400"
               />
@@ -586,10 +532,9 @@ const CompanyConfigEdit: React.FC = () => {
               <input
                 type="number"
                 name="max_incomplete_attendance_explanation_per_month"
-                value={formData.max_incomplete_attendance_explanation_per_month ?? 0}
+                value={formData.max_incomplete_attendance_explanation_per_month ?? ''}
                 onChange={handleInputChange}
-                min="0"
-                max="100"
+                {...numberInputProps(fieldRules, 'max_incomplete_attendance_explanation_per_month')}
                 disabled={formData.explanation_quota_mode !== 'PER_TYPE'}
                 className="input-field w-full disabled:bg-gray-50 disabled:text-gray-400"
               />
@@ -599,10 +544,9 @@ const CompanyConfigEdit: React.FC = () => {
               <input
                 type="number"
                 name="manager_combined_explanation_quota"
-                value={formData.manager_combined_explanation_quota ?? 0}
+                value={formData.manager_combined_explanation_quota ?? ''}
                 onChange={handleInputChange}
-                min="0"
-                max="100"
+                {...numberInputProps(fieldRules, 'manager_combined_explanation_quota')}
                 disabled={formData.explanation_quota_mode !== 'PER_TYPE'}
                 className="input-field w-full disabled:bg-gray-50 disabled:text-gray-400"
               />
@@ -614,8 +558,7 @@ const CompanyConfigEdit: React.FC = () => {
                 name="manager_incomplete_explanation_quota"
                 value={formData.manager_incomplete_explanation_quota ?? ''}
                 onChange={handleInputChange}
-                min="0"
-                max="100"
+                {...numberInputProps(fieldRules, 'manager_incomplete_explanation_quota')}
                 placeholder="Để trống: tính chung rổ gộp"
                 disabled={formData.explanation_quota_mode !== 'PER_TYPE'}
                 className="input-field w-full disabled:bg-gray-50 disabled:text-gray-400"
@@ -629,11 +572,9 @@ const CompanyConfigEdit: React.FC = () => {
               <input
                 type="number"
                 name="supplement_work_hours_per_month"
-                value={formData.supplement_work_hours_per_month}
+                value={formData.supplement_work_hours_per_month ?? ''}
                 onChange={handleInputChange}
-                min="0"
-                max="200"
-                step="0.5"
+                {...numberInputProps(fieldRules, 'supplement_work_hours_per_month')}
                 className="input-field w-full"
                 required
               />

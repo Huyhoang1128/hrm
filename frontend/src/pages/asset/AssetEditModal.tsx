@@ -5,7 +5,7 @@ import { assetsAPI, departmentsAPI, employeesAPI, Asset, positionsAPI, companyUn
 import { SelectBox, SelectOption } from '../../components/LandingLayout/SelectBox';
 import FeedbackDialog from '../../components/FeedbackDialog';
 import AssetTypeInput from './AssetTypeInput';
-import { isMultiHolderType, normalizeAssetType } from './assetTypes';
+import { isMultiHolderType, normalizeAssetType, useAssetRules } from './assetTypes';
 
 interface AssetEditModalProps {
   isOpen: boolean;
@@ -66,6 +66,8 @@ const REGIONS: SelectOption<string>[] = [
 ];
 
 export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: AssetEditModalProps) {
+  // Quy định Phân loại / bàn giao tài sản lấy từ backend (system-rules "assets").
+  const assetRules = useAssetRules();
   const [loading, setLoading] = useState(false);
   const [departments, setDepartments] = useState<SelectOption<string>[]>([]);
   const [employees, setEmployees] = useState<SelectOption<string>[]>([]);
@@ -116,7 +118,7 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
     depreciation_method: 'STRAIGHT_LINE',
   });
   // Mã loại chuẩn (SIM, DESKTOP...) suy ra từ ô Phân loại gõ tự do
-  const typeCode = normalizeAssetType(formData.asset_type);
+  const typeCode = normalizeAssetType(formData.asset_type, assetRules);
   // Ảnh: URL ảnh hiện có + file mới chọn + cờ xoá ảnh
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
   const [purchaseImageUrl, setPurchaseImageUrl] = useState<string | null>(null);
@@ -388,7 +390,7 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
         specifications = { phone_number, network_provider, doctor, region, position_id, position_title: positionTitle, sim_type, sim_company, sim_company_name: simCompanyName, cancellation_report_date };
       } else if (typeCode === 'OTHER') {
         specifications = { type_name: other_type_name, quantity: parseInt(monitor_quantity) || 0 };
-      } else if (isMultiHolderType(typeCode)) {
+      } else if (isMultiHolderType(typeCode, assetRules)) {
         // Phân loại gõ tự do: giống "Khác" — có Số lượng
         specifications = { quantity: parseInt(monitor_quantity) || 0 };
       }
@@ -571,7 +573,7 @@ export default function AssetEditModal({ isOpen, onClose, onSuccess, asset }: As
                         )}
 
                         {/* MONITOR Specific Fields (Số lượng) */}
-                        {isMultiHolderType(typeCode) && (
+                        {isMultiHolderType(typeCode, assetRules) && (
                           <div className="sm:col-span-2 bg-violet-50/60 p-4 rounded-xl border border-violet-100 mb-4">
                             <h4 className="text-xs font-semibold uppercase tracking-wide text-violet-500 mb-3 flex items-center gap-1.5">
                               <div className="w-1.5 h-1.5 bg-violet-500 rounded-full"></div>

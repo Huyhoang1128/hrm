@@ -44,6 +44,8 @@ import { CITIZEN_ID_ISSUE_PLACE_OPTIONS } from '../constants/onboarding';
 import ChangePasswordModal from '../components/Layout/ChangePasswordModal';
 import FeedbackDialog from '../components/FeedbackDialog';
 import PdfFrame from '../components/Common/PdfFrame';
+import { formatBytes, useSystemRules } from '../services/systemRules.service';
+import { choiceLabel } from '../utils/hrChoices';
 
 interface TeamMember {
   id: number;
@@ -69,19 +71,6 @@ interface MyContract {
   created_at: string;
 }
 
-const CONTRACT_TYPE_MAP: Record<string, string> = {
-  PROBATION: 'Hợp đồng thử việc',
-  INTERN: 'Hợp đồng thực tập',
-  COLLABORATOR: 'Hợp đồng cộng tác viên',
-  ONE_YEAR: 'Hợp đồng 1 năm',
-  TWO_YEAR: 'Hợp đồng 2 năm',
-  INDEFINITE: 'Hợp đồng không xác định thời hạn',
-  SERVICE: 'Hợp đồng dịch vụ',
-  CONFIDENTIALITY: 'Cam kết bảo mật',
-  COMPANY_RULES: 'Nội quy công ty',
-  NURSING_COMMITMENT: 'Cam kết nuôi dưỡng',
-};
-
 const getDaysUntilExpiry = (endDate: string | null | undefined): number | null => {
   if (!endDate) return null;
   const today = new Date();
@@ -91,13 +80,14 @@ const getDaysUntilExpiry = (endDate: string | null | undefined): number | null =
   return Math.floor((end.getTime() - today.getTime()) / 86400000);
 };
 
-const getContractDisplayStatus = (contract: MyContract): { label: string; className: string } => {
+// expiringDays: số ngày "sắp hết hạn" từ backend (CONTRACT_EXPIRING_SOON_DAYS); null = chưa tải, không gắn nhãn.
+const getContractDisplayStatus = (contract: MyContract, expiringDays: number | null): { label: string; className: string } => {
   if (contract.status === 'SIGNED') {
     const days = getDaysUntilExpiry(contract.end_date);
     if (days !== null && days < 0) {
       return { label: 'Đã hết hạn', className: 'bg-red-100 text-red-700' };
     }
-    if (days !== null && days <= 5) {
+    if (days !== null && expiringDays !== null && days <= expiringDays) {
       return { label: `Sắp hết hạn (${days} ngày)`, className: 'bg-amber-100 text-amber-600' };
     }
     return { label: 'Đang hiệu lực', className: 'bg-emerald-100 text-emerald-600' };
@@ -114,6 +104,13 @@ const getContractDisplayStatus = (contract: MyContract): { label: string; classN
 const Profile: React.FC = () => {
   const { user, updateUser } = useAuth();
   const navigate = useNavigate();
+  // Nhãn loại HĐ và số ngày "sắp hết hạn" theo backend (GET /api-hrm/system-rules/).
+  const systemRules = useSystemRules();
+  const expiringDays = systemRules?.hr?.contract_expiring_soon_days ?? null;
+  const isContractExpiringSoon = (endDate: string | null | undefined): boolean => {
+    const days = getDaysUntilExpiry(endDate);
+    return expiringDays !== null && days !== null && days >= 0 && days <= expiringDays;
+  };
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [department, setDepartment] = useState<Department | null>(null);
   const [manager, setManager] = useState<Employee | null>(null);
@@ -153,6 +150,10 @@ const Profile: React.FC = () => {
   const [viewingDoc, setViewingDoc] = useState<OnboardingDocument | null>(null);
   const [docReadable, setDocReadable] = useState(false);
   const [markingReadId, setMarkingReadId] = useState<number | null>(null);
+  // Giới hạn ảnh đại diện + thời gian đọc tối thiểu tài liệu quy định: lấy từ backend (system-rules,
+  // `systemRules` khai báo ở đầu component), backend kiểm tra cùng con số — không ghi cứng ở web.
+  const avatarRules = systemRules?.uploads?.avatar ?? null;
+  const minReadSeconds = systemRules?.regulation?.min_read_seconds ?? null;
 
   // My contracts state
   const [myContracts, setMyContracts] = useState<MyContract[]>([]);
@@ -375,14 +376,22 @@ const Profile: React.FC = () => {
     setEditForm(prev => ({ ...prev, [field]: value }));
   };
 
+  const avatarTypesLabel = avatarRules
+    ? Array.from(new Set(avatarRules.types.map((t) => t.split('/')[1]?.toUpperCase()).filter(Boolean))).join(', ')
+    : '';
+
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Client-side file size validation (5 MB limit)
-    const MAX_SIZE_MB = 5;
-    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-      alert(`Kích thước ảnh không được vượt quá ${MAX_SIZE_MB}MB.`);
+    // Chặn sớm theo giới hạn backend (chưa tải được quy định thì để backend kiểm tra).
+    if (avatarRules && !avatarRules.types.includes(file.type)) {
+      alert(`Chỉ hỗ trợ ảnh định dạng ${avatarTypesLabel}.`);
+      if (avatarInputRef.current) avatarInputRef.current.value = '';
+      return;
+    }
+    if (avatarRules && file.size > avatarRules.max_bytes) {
+      alert(`Kích thước ảnh không được vượt quá ${formatBytes(avatarRules.max_bytes)}.`);
       if (avatarInputRef.current) avatarInputRef.current.value = '';
       return;
     }
@@ -395,9 +404,10 @@ const Profile: React.FC = () => {
       if (user?.hrm_user) {
         updateUser({ hrm_user: { ...user.hrm_user, avatar_url: result.avatar_url } });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Avatar upload failed:', err);
-      alert('Tải ảnh đại diện thất bại. Vui lòng thử lại.');
+      // Backend báo đúng lý do (sai định dạng / quá dung lượng) thì hiện lý do đó.
+      alert(err?.response?.data?.error || 'Tải ảnh đại diện thất bại. Vui lòng thử lại.');
     } finally {
       setAvatarUploading(false);
       // Reset file input so the same file can be selected again
@@ -553,7 +563,7 @@ const Profile: React.FC = () => {
             <input
               ref={avatarInputRef}
               type="file"
-              accept="image/*"
+              accept={avatarRules ? avatarRules.types.join(',') : 'image/*'}
               className="hidden"
               onChange={handleAvatarChange}
               id="avatar-upload"
@@ -565,7 +575,11 @@ const Profile: React.FC = () => {
               <PhotoIcon className="h-4 w-4 mr-2 text-gray-400" />
               {avatarUploading ? 'Đang tải...' : 'Thay đổi ảnh'}
             </label>
-            <p className="mt-1 text-xs text-gray-400">PNG, JPG, GIF tối đa 5MB</p>
+            {avatarRules && (
+              <p className="mt-1 text-xs text-gray-400">
+                {avatarTypesLabel} tối đa {formatBytes(avatarRules.max_bytes)}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -894,7 +908,7 @@ const Profile: React.FC = () => {
                 <DocumentTextIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
                 <span className="text-gray-900">
                   {employee.contract_type_display ||
-                    (employee.contract_type ? CONTRACT_TYPE_MAP[employee.contract_type] : undefined) ||
+                    (employee.contract_type ? choiceLabel(systemRules?.choices?.contract_type, employee.contract_type) : undefined) ||
                     employee.contract_type ||
                     'Chưa cập nhật'}
                 </span>
@@ -1134,7 +1148,7 @@ const Profile: React.FC = () => {
             );
             const history = sorted.filter((c) => c !== active);
             const { label, className } = active
-              ? getContractDisplayStatus(active)
+              ? getContractDisplayStatus(active, expiringDays)
               : { label: '', className: '' };
 
             return (
@@ -1142,7 +1156,7 @@ const Profile: React.FC = () => {
                 {/* Active contract */}
                 {active ? (
                   <div className={`rounded-2xl border p-5 ${
-                    getDaysUntilExpiry(active.end_date) !== null && getDaysUntilExpiry(active.end_date)! <= 5
+                    isContractExpiringSoon(active.end_date)
                       ? 'border-amber-300 bg-amber-50'
                       : 'border-emerald-300 bg-emerald-50'
                   }`}>
@@ -1176,7 +1190,7 @@ const Profile: React.FC = () => {
                         </div>
                       )}
                     </div>
-                    {getDaysUntilExpiry(active.end_date) !== null && getDaysUntilExpiry(active.end_date)! <= 5 && getDaysUntilExpiry(active.end_date)! >= 0 && (
+                    {isContractExpiringSoon(active.end_date) && (
                       <div className="mt-3 flex items-center gap-2 text-amber-700 bg-amber-100 rounded-xl px-3 py-2 text-sm">
                         <ExclamationTriangleIcon className="h-4 w-4 flex-shrink-0" />
                         Hợp đồng sắp hết hạn trong {getDaysUntilExpiry(active.end_date)} ngày. Vui lòng liên hệ phòng HCNS để gia hạn nhằm tiếp tục sử dụng dịch vụ.
@@ -1201,7 +1215,7 @@ const Profile: React.FC = () => {
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Lịch sử hợp đồng</p>
                     <div className="divide-y divide-gray-100 border border-gray-100 rounded-2xl overflow-hidden">
                       {history.map((c) => {
-                        const { label: hLabel, className: hClass } = getContractDisplayStatus(c);
+                        const { label: hLabel, className: hClass } = getContractDisplayStatus(c, expiringDays);
                         return (
                           <div key={c.id} className="flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 gap-3 flex-wrap">
                             <div className="min-w-0">
@@ -1613,8 +1627,10 @@ const Profile: React.FC = () => {
                   className="w-full h-full border-0"
                   title={viewingDoc.document_name}
                   onLoad={() => {
-                    // Fallback: timer 10s đảm bảo user có đủ thời gian xem
-                    setTimeout(() => setDocReadable(true), 10000);
+                    // Đếm thời gian đọc tối thiểu theo quy định backend (system-rules "regulation");
+                    // chưa tải được quy định thì không chặn bằng số đoán.
+                    if (minReadSeconds == null) setDocReadable(true);
+                    else setTimeout(() => setDocReadable(true), minReadSeconds * 1000);
                   }}
                 />
               ) : (
@@ -1630,7 +1646,9 @@ const Profile: React.FC = () => {
                   ? 'Bạn đã đọc tài liệu này'
                   : docReadable
                   ? 'Có thể xác nhận đã đọc'
-                  : 'Vui lòng đọc hết tài liệu (tối thiểu 10 giây)...'}
+                  : minReadSeconds
+                  ? `Vui lòng đọc hết tài liệu (tối thiểu ${minReadSeconds} giây)...`
+                  : 'Vui lòng đọc hết tài liệu...'}
               </p>
               {!viewingDoc.is_read && (
                 <button

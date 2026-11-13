@@ -26,6 +26,7 @@ from employee.models import Employee
 
 from .deadline_exception_models import DeadlineExceptionGrant
 from .deadline_utils import (
+    RETURN_TO_WORK_GRACE_HOURS,
     get_shift_start_time,
     next_working_day,
     unauthorized_absence_deadline,
@@ -42,9 +43,9 @@ TYPE_LABEL = {
 
 # Vì sao trễ — tách ra để HCNS biết lỗi thuộc về ai, thay vì gộp một cục.
 CAUSE_LABEL = {
-    "HCNS_UNLOCK_LATE": "HCNS mở khoá sau mốc 3 giờ",
-    "CREATED_LATE": "Nhân viên tạo đơn sau mốc 3 giờ",
-    "APPROVED_LATE": "Quản lý duyệt sau mốc 3 giờ",
+    "HCNS_UNLOCK_LATE": f"HCNS mở khoá sau mốc {RETURN_TO_WORK_GRACE_HOURS} giờ",
+    "CREATED_LATE": f"Nhân viên tạo đơn sau mốc {RETURN_TO_WORK_GRACE_HOURS} giờ",
+    "APPROVED_LATE": f"Quản lý duyệt sau mốc {RETURN_TO_WORK_GRACE_HOURS} giờ",
     "NO_REQUEST_YET": "Đã mở khoá nhưng chưa thấy đơn nào",
 }
 

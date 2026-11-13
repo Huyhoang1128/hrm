@@ -15,6 +15,7 @@ import PdfPreviewModal from '../components/Common/PdfPreviewModal';
 import ContractPlaceholderModal from './ContractPlaceholderModal';
 import { SelectBox, MultiSelectBox, SelectOption } from '../components/LandingLayout/SelectBox';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { useSystemRules } from '../services/systemRules.service';
 
 const fmtDate = (d: string | null | undefined) => {
   if (!d) return '';
@@ -110,6 +111,9 @@ type BatchState = {
 } | null;
 
 const BulkContracts: React.FC = () => {
+  // Số ngày "sắp hết hạn" theo backend (CONTRACT_EXPIRING_SOON_DAYS, system-rules "hr") — chưa tải thì không đếm / không lọc.
+  const expiringDays = useSystemRules()?.hr?.contract_expiring_soon_days ?? null;
+  const expiringLabel = `Sắp hết hạn${expiringDays !== null ? ` (≤ ${expiringDays} ngày)` : ''}`;
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [templates, setTemplates] = useState<ContractTemplate[]>([]);
   const [contractsMap, setContractsMap] = useState<Record<number, EmployeeContract[]>>({});
@@ -452,7 +456,7 @@ const BulkContracts: React.FC = () => {
         signed++;
         const days = getDaysUntilExpiry(activeSigned.end_date);
         // Bỏ qua cảnh báo sắp hết hạn nếu NV đã nghỉ việc
-        if (!resigned && days !== null && days <= 5) expiringSoon++;
+        if (!resigned && days !== null && expiringDays !== null && days <= expiringDays) expiringSoon++;
       }
       // Hết hạn: SIGNED đã qua end_date hoặc status EXPIRED trong DB — bỏ qua nếu đã nghỉ việc
       const hasExpired = contracts.some(
@@ -462,11 +466,11 @@ const BulkContracts: React.FC = () => {
       if (contracts.some((c) => c.status === 'PENDING_SIGN')) pendingSign++;
     }
     return { signed, expiringSoon, alreadyExpired, noContract, pendingSign };
-  }, [employees, contractsMap]);
+  }, [employees, contractsMap, expiringDays]);
 
   const statusFilterOptions: { value: string; label: string }[] = [
     { value: 'SIGNED',          label: 'Đang hiệu lực' },
-    { value: 'SIGNED_EXPIRING', label: 'Sắp hết hạn (≤ 5 ngày)' },
+    { value: 'SIGNED_EXPIRING', label: expiringLabel },
     { value: 'EXPIRED',         label: 'Hết hạn' },
     { value: 'PENDING_SIGN',    label: 'Chờ ký' },
     { value: 'DRAFT',           label: 'Nháp' },
@@ -491,7 +495,7 @@ const BulkContracts: React.FC = () => {
         const latest = (contractsMap[e.id] || [])[0];
         const latestEffective = latest ? effectiveStatus(latest.status, latest.end_date) : 'NONE';
         const days = latest ? getDaysUntilExpiry(latest.end_date) : null;
-        const isExpiringSoon = latestEffective === 'SIGNED' && days !== null && days <= 5;
+        const isExpiringSoon = latestEffective === 'SIGNED' && days !== null && expiringDays !== null && days <= expiringDays;
         const matched = filterStatuses.some((f) => {
           // Đã nghỉ việc → không match các filter cảnh báo HĐ
           if (resigned && (f === 'SIGNED_EXPIRING' || f === 'EXPIRED' || f === 'NONE')) return false;
@@ -503,7 +507,7 @@ const BulkContracts: React.FC = () => {
       }
       return true;
     }),
-    [employees, search, filterDept, filterUnit, filterStatuses, contractsMap]
+    [employees, search, filterDept, filterUnit, filterStatuses, contractsMap, expiringDays]
   );
 
   const filteredRows = useMemo(
@@ -550,7 +554,7 @@ const BulkContracts: React.FC = () => {
           </div>
           <div>
             <p className="text-xl font-bold text-amber-600">{summaryStats.expiringSoon}</p>
-            <p className="text-xs text-amber-600">Sắp hết hạn (≤ 5 ngày)</p>
+            <p className="text-xs text-amber-600">{expiringLabel}</p>
           </div>
         </div>
 

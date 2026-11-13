@@ -645,10 +645,15 @@ const RecruitmentNeedDetail: React.FC = () => {
     REJECTED: 'bg-red-100 text-red-800',
   };
 
+  // Màu badge theo mã trạng thái (RECRUITMENT_STATUS backend, nhãn là status_display từ API);
+  // mã khác -> màu trung tính.
   const STATUS_COLORS: Record<string, string> = {
-    OPEN: 'bg-emerald-100 text-emerald-800',
+    DRAFT: 'bg-gray-100 text-gray-700',
+    PENDING_APPROVAL: 'bg-yellow-100 text-yellow-800',
+    APPROVED: 'bg-emerald-100 text-emerald-800',
     IN_PROGRESS: 'bg-primary-100 text-primary-800',
     FILLED: 'bg-gray-100 text-gray-800',
+    EXPIRED: 'bg-orange-100 text-orange-800',
     CANCELLED: 'bg-red-100 text-red-800',
   };
 

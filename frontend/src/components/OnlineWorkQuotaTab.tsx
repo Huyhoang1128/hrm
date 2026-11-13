@@ -10,6 +10,7 @@ import {
 import { departmentsAPI, employeesAPI, positionsAPI } from '../utils/api';
 import { Department, Position, Employee } from '../utils/api/types';
 import { SelectBox } from './LandingLayout/SelectBox';
+import { useSystemRules } from '../services/systemRules.service';
 import {
   listOnlineWorkQuotaOverrides,
   createOnlineWorkQuotaOverride,
@@ -25,11 +26,19 @@ const SCOPE_TABS: { key: OnlineWorkQuotaScope; label: string; icon: React.Compon
   { key: 'department', label: 'Phòng ban', icon: BuildingOfficeIcon },
 ];
 
-/** 0 → 10 ngày, bước 0,5 (khớp CompanyConfig cho phép nửa ngày). */
-const QUOTA_OPTIONS: { value: number; label: string }[] = Array.from({ length: 21 }, (_, i) => i / 2).map((n) => ({
-  value: n,
-  label: n === 0 ? 'Không có ngày online' : `Tối đa ${String(n).replace('.', ',')} ngày online`,
-}));
+const quotaLabel = (n: number) => (n === 0 ? 'Không có ngày online' : `Tối đa ${String(n).replace('.', ',')} ngày online`);
+
+/** Lựa chọn hạn mức: min → max, bước `step` — lấy từ backend (attendance.online_quota_override =
+ *  validator của OnlineWorkQuotaOverride.max_online_days; bước = nửa ngày, đơn vị đơn online tính
+ *  vào hạn mức). Giá trị đang lưu nằm ngoài lưới vẫn được giữ trong danh sách. */
+const buildQuotaOptions = (rule?: { min: number; max: number; step: number }, current?: number) => {
+  if (!rule) return current != null ? [{ value: current, label: quotaLabel(current) }] : [];
+  const count = Math.floor((rule.max - rule.min) / rule.step + 1e-9) + 1;
+  const opts = Array.from({ length: count }, (_, i) => rule.min + i * rule.step).map((n) => ({ value: n, label: quotaLabel(n) }));
+  return current != null && !opts.some((o) => o.value === current)
+    ? [{ value: current, label: quotaLabel(current) }, ...opts]
+    : opts;
+};
 
 function scopeIcon(o: OnlineWorkQuotaOverride) {
   if (o.employee) return UserIcon;
@@ -45,6 +54,7 @@ function scopeLabel(o: OnlineWorkQuotaOverride): string {
 }
 
 const OnlineWorkQuotaTab: React.FC = () => {
+  const quotaRule = useSystemRules()?.attendance?.online_quota_override;
   const [overrides, setOverrides] = useState<OnlineWorkQuotaOverride[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
@@ -202,7 +212,7 @@ const OnlineWorkQuotaTab: React.FC = () => {
             <SelectBox<number>
               label="Hạn mức"
               value={newQuota}
-              options={QUOTA_OPTIONS}
+              options={buildQuotaOptions(quotaRule, newQuota)}
               onChange={setNewQuota}
             />
           </div>
@@ -252,7 +262,7 @@ const OnlineWorkQuotaTab: React.FC = () => {
                       <SelectBox<number>
                         label=""
                         value={Number(o.max_online_days)}
-                        options={QUOTA_OPTIONS}
+                        options={buildQuotaOptions(quotaRule, Number(o.max_online_days))}
                         onChange={v => handleUpdateQuota(o.id, v)}
                         portal
                       />

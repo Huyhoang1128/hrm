@@ -18,14 +18,13 @@ import {
 } from '../components/feedback/FeedbackStatus';
 import feedbackService, {
   FEEDBACK_FEATURE_NAME,
-  FEEDBACK_IT_TOPICS,
   FEEDBACK_OPEN_STATUSES,
   FEEDBACK_STATUS_OPTIONS,
-  FEEDBACK_TOPIC_OPTIONS,
   FeedbackItem,
   FeedbackStatus,
   FeedbackSummary,
 } from '../services/feedback.service';
+import { useSystemRules } from '../services/systemRules.service';
 
 const Sender = ({ fb }: { fb: FeedbackItem }) =>
   fb.is_anonymous || !fb.employee_name ? (
@@ -189,6 +188,7 @@ function FeedbackDetailModal({
 }
 
 const FeedbackManagement = () => {
+  const feedbackRules = useSystemRules()?.feedback ?? null;
   const [items, setItems] = useState<FeedbackItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
@@ -262,10 +262,13 @@ const FeedbackManagement = () => {
     { value: '', label: 'Tất cả', count: summary?.open },
     ...FEEDBACK_STATUS_OPTIONS.map((o) => ({ ...o, count: summary?.[o.value] })),
   ];
+  // Danh sách vấn đề + nhóm do IT xử lý lấy từ backend (system-rules "feedback").
+  const allTopicOptions = feedbackRules?.topics ?? [];
   const topicOptions = summary?.topics
-    ? FEEDBACK_TOPIC_OPTIONS.filter((o) => summary.topics.includes(o.value))
-    : FEEDBACK_TOPIC_OPTIONS;
-  const isItScope = !!summary?.topics?.length && summary.topics.every((t) => FEEDBACK_IT_TOPICS.includes(t));
+    ? allTopicOptions.filter((o) => summary.topics.includes(o.value))
+    : allTopicOptions;
+  const isItScope = !!feedbackRules && !!summary?.topics?.length
+    && summary.topics.every((t) => feedbackRules.it_topics.includes(t));
 
   return (
     <div className="space-y-6">

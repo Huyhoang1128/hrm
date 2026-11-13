@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { XMarkIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { API_BASE_URL } from '../../utils/api';
+import { useSystemRules } from '../../services/systemRules.service';
 
 interface ChangePasswordModalProps {
   onClose: () => void;
@@ -57,6 +58,10 @@ const PasswordInput = ({
 );
 
 const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSuccess }) => {
+  // Chính sách mật khẩu = AUTH_PASSWORD_VALIDATORS của backend (validate_password) — web chỉ đọc lại,
+  // không tự thêm quy tắc riêng (trước đây web đòi chữ hoa/thường/số mà backend không đòi).
+  const passwordRules = useSystemRules()?.password ?? null;
+  const minLength = passwordRules?.min_length ?? null;
   const [submitting, setSubmitting] = useState(false);
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -84,10 +89,8 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSu
     
     if (!form.new_password.trim()) {
       errs.new_password = 'Vui lòng nhập mật khẩu mới';
-    } else if (form.new_password.length < 8) {
-      errs.new_password = 'Mật khẩu mới phải có ít nhất 8 ký tự';
-    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(form.new_password)) {
-      errs.new_password = 'Mật khẩu phải chứa chữ hoa, chữ thường và số';
+    } else if (minLength != null && form.new_password.length < minLength) {
+      errs.new_password = `Mật khẩu mới phải có ít nhất ${minLength} ký tự`;
     }
     
     if (!form.confirm_password.trim()) {
@@ -137,7 +140,7 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSu
         if (data.old_password) {
           setErrors({ old_password: data.old_password[0] || 'Mật khẩu hiện tại không đúng' });
         } else if (data.new_password) {
-          setErrors({ new_password: data.new_password[0] || 'Mật khẩu mới không hợp lệ' });
+          setErrors({ new_password: data.new_password.join(' ') || 'Mật khẩu mới không hợp lệ' });
         } else if (data.error) {
           setErrors({ general: data.error });
         } else if (data.detail) {
@@ -188,8 +191,9 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSu
           <div className="bg-primary-50 border border-primary-200 rounded-lg p-3 text-xs text-primary-700">
             <p className="font-medium mb-1">📌 Yêu cầu mật khẩu:</p>
             <ul className="list-disc list-inside space-y-0.5 text-xs">
-              <li>Tối thiểu 8 ký tự</li>
-              <li>Có chữ hoa, chữ thường và số</li>
+              {(passwordRules?.help_texts ?? []).map((text) => (
+                <li key={text}>{text}</li>
+              ))}
               <li>Khác mật khẩu hiện tại</li>
             </ul>
           </div>

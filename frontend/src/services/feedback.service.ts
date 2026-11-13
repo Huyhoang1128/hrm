@@ -1,22 +1,13 @@
 import { managementApi } from '../utils/api';
 
-export type FeedbackTopic = 'HRM_APP' | 'IT_SUPPORT' | 'WORK' | 'POLICY' | 'ENVIRONMENT' | 'MANAGEMENT' | 'CAREER' | 'OTHER';
+/**
+ * Mã vấn đề / mã câu hỏi của form góp ý. Danh sách vấn đề, nhóm vấn đề do IT xử lý, các câu hỏi và
+ * giới hạn ảnh / độ dài câu trả lời lấy từ backend (GET /api-hrm/system-rules/ section "feedback",
+ * nguồn: hrm/feedback_models.py + hrm/feedback_views.py) — không ghi cứng ở web.
+ */
+export type FeedbackTopic = string;
 export type FeedbackStatus = 'NEW' | 'IN_PROGRESS' | 'RESOLVED';
-export type FeedbackAnswerField = 'difficulties' | 'support_needed' | 'career_sharing' | 'work_proposal' | 'other_sharing';
-
-export const FEEDBACK_TOPIC_OPTIONS: { value: FeedbackTopic; label: string }[] = [
-  { value: 'HRM_APP', label: 'Lỗi / góp ý về app HRM' },
-  { value: 'IT_SUPPORT', label: 'Máy tính, thiết bị, mạng (IT)' },
-  { value: 'WORK', label: 'Công việc & quy trình' },
-  { value: 'POLICY', label: 'Chế độ, chính sách, lương thưởng' },
-  { value: 'ENVIRONMENT', label: 'Môi trường làm việc & đồng nghiệp' },
-  { value: 'MANAGEMENT', label: 'Quản lý & lãnh đạo' },
-  { value: 'CAREER', label: 'Định hướng phát triển bản thân' },
-  { value: 'OTHER', label: 'Khác' },
-];
-
-/** Vấn đề do bộ phận IT xử lý; còn lại do HCNS xử lý (khớp Feedback.IT_TOPICS ở backend). */
-export const FEEDBACK_IT_TOPICS: FeedbackTopic[] = ['HRM_APP', 'IT_SUPPORT'];
+export type FeedbackAnswerField = string;
 
 /** Trạng thái "chưa xử lý xong" — tab "Tất cả" ẩn góp ý đã xử lý. */
 export const FEEDBACK_OPEN_STATUSES = 'NEW,IN_PROGRESS';
@@ -29,19 +20,6 @@ export const FEEDBACK_STATUS_OPTIONS: { value: FeedbackStatus; label: string }[]
   { value: 'IN_PROGRESS', label: 'Đang xử lý' },
   { value: 'RESOLVED', label: 'Đã xử lý' },
 ];
-
-/** Các câu hỏi giữ nguyên nội dung form "LẮNG NGHE CHIA SẺ". */
-export const FEEDBACK_QUESTIONS: { field: FeedbackAnswerField; question: string }[] = [
-  { field: 'difficulties', question: 'Bạn có gặp khó khăn, bức xúc trong công việc cần được hỗ trợ và giải quyết không?' },
-  { field: 'support_needed', question: 'Bạn cần hỗ trợ gì để hoàn thành tốt công việc trong thời gian tiếp theo?' },
-  { field: 'career_sharing', question: 'Bạn có muốn chia sẻ gì với BLĐ về định hướng công việc, mong muốn phát triển của bản thân không?' },
-  { field: 'work_proposal', question: 'Đề xuất trong công việc cá nhân của bạn?' },
-  { field: 'other_sharing', question: 'Ngoài công việc ra, bạn có thể chia sẻ với chúng tôi bất cứ điều gì bạn muốn.' },
-];
-
-/** Giới hạn khớp backend (hrm/feedback_views.py). */
-export const FEEDBACK_MAX_IMAGES = 5;
-export const FEEDBACK_MAX_IMAGE_MB = 10;
 
 export interface FeedbackAttachment {
   id: number;
@@ -111,7 +89,8 @@ export interface FeedbackNotices {
 class FeedbackService {
   /** Mọi nhân sự đều gửi được. Gửi multipart để kèm ảnh. */
   async submit(
-    data: { topic: FeedbackTopic; is_anonymous: boolean } & Partial<Record<FeedbackAnswerField, string>>,
+    // Câu trả lời theo mã câu hỏi (system-rules "feedback".questions).
+    data: { topic: FeedbackTopic; is_anonymous: boolean; [field: FeedbackAnswerField]: string | boolean },
     images: File[] = [],
   ): Promise<{ id: number }> {
     const formData = new FormData();
