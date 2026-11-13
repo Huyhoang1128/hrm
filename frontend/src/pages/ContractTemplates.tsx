@@ -5,6 +5,7 @@ import { companyUnitsAPI } from '../utils/api/hrm.api';
 import type { CompanyUnit } from '../utils/api/types';
 import { SelectBox } from '../components/LandingLayout/SelectBox';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { useHrChoices } from '../utils/hrChoices';
 import {
   DocumentTextIcon,
   PlusIcon,
@@ -20,24 +21,6 @@ const formatDate = (d: Date | string) => {
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const yyyy = date.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
-};
-
-const CONTRACT_TYPE_LABELS: Record<string, string> = {
-  PROBATION: 'Hợp đồng thử việc',
-  PROBATION_1M: 'Thử việc 1 tháng',
-  PROBATION_2M: 'Thử việc 2 tháng',
-  INTERN: 'Hợp đồng thực tập sinh',
-  COLLABORATOR: 'Hợp đồng cộng tác viên',
-  SIX_MONTH: 'Hợp đồng lao động 6 tháng',
-  ONE_YEAR: 'Hợp đồng lao động 12 tháng',
-  TWO_YEAR: 'Hợp đồng lao động 24 tháng',
-  THREE_YEAR: 'Hợp đồng lao động 36 tháng',
-  INDEFINITE: 'Hợp đồng vô thời hạn',
-  SERVICE: 'Hợp đồng dịch vụ',
-  CONFIDENTIALITY: 'Thoả thuận bảo mật',
-  COMPANY_RULES: 'Cam kết đọc hiểu nội quy công ty',
-  NURSING_COMMITMENT: 'Cam kết của CBNV Điều dưỡng',
-  APPENDIX: 'Phụ lục hợp đồng',
 };
 
 type ContractTemplate = {
@@ -58,6 +41,8 @@ type ContractTemplate = {
 };
 
 export default function ContractTemplates() {
+  // Loại mẫu hợp đồng theo backend (CONTRACT_DOCUMENT_TYPE, system-rules "choices") — không chép cứng.
+  const contractTypeOptions = useHrChoices()?.contract_document_type ?? [];
   const [templates, setTemplates] = useState<ContractTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -486,7 +471,7 @@ export default function ContractTemplates() {
                   onChange={e => setEditForm({ ...editForm, contract_type: e.target.value })}
                   className="input-field w-full"
                 >
-                  {Object.entries(CONTRACT_TYPE_LABELS).map(([value, label]) => (
+                  {contractTypeOptions.map(({ value, label }) => (
                     <option key={value} value={value}>{label}</option>
                   ))}
                 </select>
@@ -585,7 +570,7 @@ export default function ContractTemplates() {
                   onChange={e => setForm({ ...form, contract_type: e.target.value })}
                   className="input-field w-full"
                 >
-                  {Object.entries(CONTRACT_TYPE_LABELS).map(([value, label]) => (
+                  {contractTypeOptions.map(({ value, label }) => (
                     <option key={value} value={value}>{label}</option>
                   ))}
                 </select>

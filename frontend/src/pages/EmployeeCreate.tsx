@@ -9,6 +9,7 @@ import { ruleEngineAPI } from '../utils/ruleEngineApi';
 import { useNavigate } from 'react-router-dom';
 import { SelectBox, SelectOption } from '@/components/LandingLayout/SelectBox';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { useHrChoices } from '../utils/hrChoices';
 
 const genderOptions: SelectOption<'M' | 'F' | 'O'>[] = [
   { value: 'M', label: 'Nam' },
@@ -16,14 +17,11 @@ const genderOptions: SelectOption<'M' | 'F' | 'O'>[] = [
   { value: 'O', label: 'Khác' },
 ];
 
-const employmentOptions: SelectOption<'ACTIVE' | 'PROBATION' | 'INACTIVE'>[] = [
-  { value: 'ACTIVE', label: 'Đang làm việc' },
-  { value: 'PROBATION', label: 'Thử việc' },
-  { value: 'INACTIVE', label: 'Đã nghỉ' },
-];
-
 const EmployeeCreate: React.FC = () => {
   const navigate = useNavigate();
+  // Trạng thái làm việc theo backend (EMPLOYMENT_STATUS, system-rules "choices"). Bản cũ có 'PROBATION'
+  // — không phải trạng thái lưu được (thử việc là loại HĐ) nên backend từ chối.
+  const employmentOptions = useHrChoices()?.employment_status ?? [];
   const [loading, setLoading] = useState(false);
   const [departments, setDepartments] = useState<any[]>([]);
   const [positions, setPositions] = useState<any[]>([]);
@@ -413,7 +411,7 @@ const EmployeeCreate: React.FC = () => {
                 value={formData.employment_status}
                 options={employmentOptions}
                 onChange={(val) =>
-                  setFormData({ ...formData, employment_status: val })
+                  setFormData({ ...formData, employment_status: val as EmployeeCreateData['employment_status'] })
                 }
               />
             </div>

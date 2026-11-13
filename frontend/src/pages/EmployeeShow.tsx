@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { employeesAPI, Employee, managementApi } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { formatDate } from '../utils/dateUtils';
-import { employmentStatusLabel } from '../constants/employmentStatus';
+import { useHrChoices, choiceLabel } from '../utils/hrChoices';
 import { WORK_LOCATION_OPTIONS } from '../constants/onboarding';
 import {
   ArrowLeftIcon,
@@ -39,20 +39,6 @@ const PROBATION_RATE_LABELS: Record<string, string> = {
   OPTION_3: 'Tháng đầu 100%, tháng sau 100%',
 };
 
-const CONTRACT_TYPE_LABELS: Record<string, string> = {
-  PROBATION: 'Hợp đồng thử việc',
-  PROBATION_1M: 'Thử việc 1 tháng',
-  PROBATION_2M: 'Thử việc 2 tháng',
-  INTERN: 'Hợp đồng thực tập sinh',
-  COLLABORATOR: 'Hợp đồng cộng tác viên',
-  SIX_MONTH: 'Hợp đồng lao động 6 tháng',
-  ONE_YEAR: 'Hợp đồng lao động 12 tháng',
-  TWO_YEAR: 'Hợp đồng lao động 24 tháng',
-  THREE_YEAR: 'Hợp đồng lao động 36 tháng',
-  INDEFINITE: 'Hợp đồng vô thời hạn',
-  SERVICE: 'Hợp đồng dịch vụ',
-};
-
 const MARITAL_STATUS_LABELS: Record<string, string> = {
   SINGLE: 'Độc thân',
   MARRIED: 'Đã kết hôn',
@@ -60,41 +46,11 @@ const MARITAL_STATUS_LABELS: Record<string, string> = {
   WIDOWED: 'Góa',
 };
 
-const WORK_FORM_LABELS: Record<string, string> = {
-  FULL_TIME: 'Toàn thời gian',
-  PART_TIME: 'Bán thời gian',
-  CONTRACT: 'Hợp đồng',
-  INTERN: 'Thực tập',
-  COLLABORATOR: 'Cộng tác viên',
-};
-
-const EDUCATION_LEVEL_LABELS: Record<string, string> = {
-  HIGH_SCHOOL: 'Trung học phổ thông',
-  ASSOCIATE: 'Cao đẳng',
-  BACHELOR: 'Đại học',
-  MASTER: 'Thạc sĩ',
-  DOCTORATE: 'Tiến sĩ',
-  OTHER: 'Khác',
-};
-
 const FILE_STATUS_LABELS: Record<string, string> = {
   COMPLETE: 'Nộp đủ',
   NEED_SUPPLEMENT: 'Cần bổ sung hồ sơ',
   NOT_SUBMITTED: 'Chưa nộp',
   PENDING_REVIEW: 'Chờ rà soát',
-};
-
-const RANK_LABELS: Record<string, string> = {
-  CHAIRMAN: 'Chủ tịch',
-  DIRECTOR: 'Giám đốc',
-  DEPUTY_DIRECTOR: 'Phó Giám đốc',
-  LEADER: 'Leader',
-  SUPERVISOR: 'Quản lý',
-  MANAGER: 'Trưởng phòng',
-  MANAGER_TRAINEE: 'Trưởng phòng tập sự',
-  DEPUTY_MANAGER: 'Phó phòng',
-  STAFF: 'Nhân viên',
-  INTERN: 'Thực tập sinh',
 };
 
 const CCCD_ISSUE_PLACE_LABELS: Record<string, string> = {
@@ -153,6 +109,8 @@ const EmployeeShow: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  // Nhãn cấp bậc / trạng thái / loại HĐ / hình thức / học vấn theo danh sách backend (system-rules "choices").
+  const choices = useHrChoices();
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -414,17 +372,17 @@ const EmployeeShow: React.FC = () => {
           <div className="grid grid-cols-2 gap-4">
             <InfoField label="Phòng ban" value={employee.department?.name} />
             <InfoField label="Vị trí" value={employee.position?.title} />
-            <InfoField label="Cấp bậc" value={emp.rank ? (RANK_LABELS[emp.rank] ?? emp.rank) : undefined} />
+            <InfoField label="Cấp bậc" value={emp.rank ? choiceLabel(choices?.rank, emp.rank) : undefined} />
             <InfoField label="Bộ phận" value={emp.section} />
             <InfoField label="Quản lý trực tiếp" value={employee.manager_name} />
             <InfoField label="Quản lý cấp 2" value={emp.manager_level_2_name} />
             <InfoField label="Team Bác sĩ" value={emp.doctor_team} />
-            <InfoField label="Hình thức làm việc" value={emp.work_form ? (WORK_FORM_LABELS[emp.work_form] || emp.work_form) : null} />
+            <InfoField label="Hình thức làm việc" value={emp.work_form ? choiceLabel(choices?.work_form, emp.work_form) : null} />
             <InfoField label="Địa điểm làm việc" value={emp.work_location ? (WORK_LOCATION_OPTIONS.find(o => o.value === emp.work_location)?.label || emp.work_location) : null} />
             <InfoField label="Vùng/Miền" value={emp.region} />
             <InfoField label="Khối" value={emp.block} />
             <InfoField label="Đơn vị" value={emp.company_unit?.name} />
-            <InfoField label="Trạng thái" value={employmentStatusLabel(emp.employment_status) || 'Đang làm việc'} />
+            <InfoField label="Trạng thái" value={choiceLabel(choices?.employment_status, emp.employment_status) || 'Đang làm việc'} />
             <InfoField label="Ghi chú công việc" value={emp.employment_status_notes} full />
           </div>
         </div>
@@ -497,7 +455,7 @@ const EmployeeShow: React.FC = () => {
             <h3 className="text-sm font-bold text-gray-900">Trình độ học vấn</h3>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <InfoField label="Trình độ" value={emp.education_level ? (EDUCATION_LEVEL_LABELS[emp.education_level] || emp.education_level) : null} />
+            <InfoField label="Trình độ" value={emp.education_level ? choiceLabel(choices?.education_level, emp.education_level) : null} />
           </div>
         </div>
 
@@ -536,7 +494,7 @@ const EmployeeShow: React.FC = () => {
               const ctype = cc?.contract_type ?? emp.contract_type;
               const ctypeDisplay = cc?.contract_type_display
                 ?? emp.contract_type_display
-                ?? (ctype ? CONTRACT_TYPE_LABELS[ctype] || ctype : null);
+                ?? (ctype ? choiceLabel(choices?.contract_document_type, ctype) : null);
               const startDate = cc?.start_date ?? emp.contract_start_date;
               const endDate = cc?.end_date ?? emp.contract_end_date;
               return (
@@ -589,7 +547,7 @@ const EmployeeShow: React.FC = () => {
                   <div key={c.id} className="flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 gap-3 flex-wrap">
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-800 truncate">
-                        {c.template_name || c.contract_type_display || CONTRACT_TYPE_LABELS[c.contract_type] || c.contract_type}
+                        {c.template_name || c.contract_type_display || choiceLabel(choices?.contract_document_type, c.contract_type)}
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">
                         {c.start_date ? formatDate(c.start_date) : '—'}
