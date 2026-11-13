@@ -710,8 +710,8 @@ class RegistrationRequestViewSet(BulkRejectMixin, FinalizationLockMixin, viewset
         # chặn ở lúc tạo thì vẫn lách được bằng cách tạo đơn 30 phút rồi sửa
         # xuống 20 phút. Áp dụng cho cả Online lẫn Offline (HCNS chốt
         # 2026-09-23, Thông báo HCNS "Dưới 30 phút không tính OT").
-        if (d.get("registration_type") or "").upper() == "OVERTIME":
-            from .overtime_reconciliation import OT_MIN_DURATION_MINUTES
+        from .overtime_reconciliation import OT_MIN_DURATION_MINUTES, OT_MIN_DURATION_TYPES
+        if (d.get("registration_type") or "").upper() in OT_MIN_DURATION_TYPES:
             new_hours = d.get("hours")
             if new_hours is not None and float(new_hours) * 60 < OT_MIN_DURATION_MINUTES:
                 return Response(
@@ -2141,6 +2141,11 @@ class OnlineWorkRequestViewSet(BulkRejectMixin, FinalizationLockMixin, viewsets.
         ids = request.data.get("ids", [])
         approval_note = request.data.get("approval_note", "Đã duyệt hàng loạt")
         quota_exceeded_note = "Từ chối tự động: Vượt quá hạn mức làm việc online tối đa của tháng này."
+        # dry_run=true: chỉ XEM TRƯỚC — chạy đúng vòng duyệt + hạn mức bên dưới nhưng KHÔNG lưu gì,
+        # trả về đơn nào sẽ duyệt / bị từ chối vì vượt hạn mức. Trang Phê duyệt dùng để hiện hộp
+        # xác nhận thay vì tự xếp đơn & tự tính hạn mức ở web.
+        dry_run = str(request.data.get("dry_run", "")).lower() in ("1", "true", "yes")
+        preview = {"approved": [], "rejected": []}
 
 
         approver = self._get_approver(request)
@@ -2189,6 +2194,9 @@ class OnlineWorkRequestViewSet(BulkRejectMixin, FinalizationLockMixin, viewsets.
             from .stats_utils import online_quota_amount
             this_amount = online_quota_amount(event.employee, event.event_date, d)
             if this_amount > 0 and online_quota_cache[key] < this_amount:
+                if dry_run:
+                    preview["rejected"].append({"id": event.id, "note": quota_exceeded_note})
+                    continue
                 d.update({
                     "status": "REJECTED",
                     "approval_note": quota_exceeded_note,
@@ -2253,6 +2261,9 @@ class OnlineWorkRequestViewSet(BulkRejectMixin, FinalizationLockMixin, viewsets.
                 # Trừ quota cache ngay khi có bất kỳ bước duyệt nào (kể cả chưa APPROVED hoàn toàn)
                 # để tránh duyệt vượt quota trong cùng 1 batch khi Manager duyệt bước 1
                 online_quota_cache[key] -= this_amount
+                if dry_run:
+                    preview["approved"].append(event.id)
+                    continue
                 if approval_note: d["approval_note"] = approval_note
                 event.data = d
                 event.save(update_fields=["data", "updated_at"])
@@ -2264,6 +2275,8 @@ class OnlineWorkRequestViewSet(BulkRejectMixin, FinalizationLockMixin, viewsets.
 
                 results.append(event.id)
             
+        if dry_run:
+            return Response({"dry_run": True, **preview, "errors": errors})
         return Response({"success_count": len(results), "error_count": len(errors), "results": results, "errors": errors})
 
     @action(detail=True, methods=["post"])

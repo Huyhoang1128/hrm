@@ -7,6 +7,7 @@ import {
   LockOpenIcon,
 } from '@heroicons/react/24/outline';
 import { SelectBox } from '../components/LandingLayout/SelectBox';
+import { useSystemRules } from '../services/systemRules.service';
 import grantTimingReportService, {
   GrantTimingCause,
   GrantTimingReport as Report,
@@ -79,6 +80,10 @@ interface Props {
 export default function GrantTimingReport({
   embedded = false, year: yearProp, month: monthProp, onCount, onApplyPenalty,
 }: Props) {
+  // Mốc ân hạn "đi làm trở lại" (số giờ sau giờ vào ca, mốc dự phòng) lấy từ backend
+  // (deadline_utils.RETURN_TO_WORK_GRACE_HOURS / _FALLBACK_TIME — đúng hằng số báo cáo dùng).
+  const attRules = useSystemRules()?.attendance;
+  const graceLabel = attRules ? `${attRules.return_to_work_grace_hours} giờ` : '';
   const today = new Date();
   const [yearState, setYear] = useState(today.getFullYear());
   const [monthState, setMonth] = useState(today.getMonth() + 1);
@@ -118,10 +123,10 @@ export default function GrantTimingReport({
       <div className="flex flex-wrap items-end gap-3 mb-5">
         <div className="mr-auto">
           {!embedded && (
-            <h1 className="text-2xl font-extrabold text-gray-900">Mở khoá nhưng vẫn quá mốc 3 giờ</h1>
+            <h1 className="text-2xl font-extrabold text-gray-900">Mở khoá nhưng vẫn quá mốc {graceLabel || 'ân hạn'}</h1>
           )}
           <p className="text-sm text-gray-500 mt-0.5">
-            Trường hợp đột xuất phải tạo và duyệt trong 3 giờ đầu của ngày làm việc kế tiếp.
+            Trường hợp đột xuất phải tạo và duyệt trong {graceLabel ? `${graceLabel} đầu` : 'thời gian ân hạn'} của ngày làm việc kế tiếp.
             Trang này chỉ <b>cảnh báo</b>, không sinh tiền phạt.
           </p>
         </div>
@@ -163,7 +168,7 @@ export default function GrantTimingReport({
             {[
               { label: 'Lần mở khoá đã rà', value: s.grants_checked, cls: 'text-gray-900' },
               { label: 'Có cảnh báo', value: s.late_rows, cls: 'text-rose-600' },
-              { label: 'Đúng mốc 3 giờ', value: s.on_time_rows, cls: 'text-emerald-600' },
+              { label: graceLabel ? `Đúng mốc ${graceLabel}` : 'Đúng mốc', value: s.on_time_rows, cls: 'text-emerald-600' },
               { label: 'HCNS mở khoá muộn', value: s.by_cause.HCNS_UNLOCK_LATE || 0, cls: 'text-amber-600' },
             ].map((c) => (
               <div key={c.label} className="bg-white rounded-xl border border-gray-100 p-4">
@@ -179,7 +184,7 @@ export default function GrantTimingReport({
             <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-900 flex gap-2">
               <InformationCircleIcon className="w-4 h-4 shrink-0 mt-0.5" />
               <span>
-                <b>{s.by_cause.HCNS_UNLOCK_LATE}/{s.late_rows} dòng là do HCNS mở khoá sau mốc 3 giờ</b>{' '}
+                <b>{s.by_cause.HCNS_UNLOCK_LATE}/{s.late_rows} dòng là do HCNS mở khoá sau mốc {graceLabel || 'ân hạn'}</b>{' '}
                 — những ca này nhân viên không còn cách nào kịp, <b>không nên quy lỗi cho họ</b>.
                 Với các dòng đó hệ thống cũng không tính thêm lỗi tạo/duyệt muộn nữa.
               </span>
@@ -190,7 +195,7 @@ export default function GrantTimingReport({
             <div className="mb-4 rounded-lg bg-slate-100 border border-slate-300 px-4 py-3 text-sm text-slate-700 flex gap-2">
               <InformationCircleIcon className="w-4 h-4 shrink-0 mt-0.5" />
               <span>
-                <b>{s.fallback_rows} dòng dùng mốc dự phòng 10h00</b> vì không tra được giờ vào ca
+                <b>{s.fallback_rows} dòng dùng mốc dự phòng{attRules ? ` ${attRules.return_to_work_fallback_time.replace(':', 'h')}` : ''}</b> vì không tra được giờ vào ca
                 của ngày làm việc kế tiếp — nên rà tay trước khi kết luận.
               </span>
             </div>
@@ -225,7 +230,7 @@ export default function GrantTimingReport({
           {rows.length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-100 p-10 text-center">
               <ClockIcon className="w-10 h-10 mx-auto text-emerald-500 mb-2" />
-              <p className="font-semibold text-gray-700">Không có trường hợp nào vượt mốc 3 giờ</p>
+              <p className="font-semibold text-gray-700">Không có trường hợp nào vượt mốc {graceLabel || 'ân hạn'}</p>
               <p className="text-sm text-gray-500 mt-1">
                 {s.grants_checked > 0
                   ? `Đã rà ${s.grants_checked} lần mở khoá trong tháng.`
@@ -241,7 +246,7 @@ export default function GrantTimingReport({
                       <th className="px-4 py-2">Ngày nghỉ</th>
                       <th className="px-4 py-2">Nhân viên</th>
                       <th className="px-4 py-2">Loại đơn</th>
-                      <th className="px-4 py-2">Hạn 3 giờ</th>
+                      <th className="px-4 py-2">Hạn {graceLabel}</th>
                       <th className="px-4 py-2">HCNS mở khoá</th>
                       <th className="px-4 py-2">Tạo đơn</th>
                       <th className="px-4 py-2">QLTT duyệt</th>

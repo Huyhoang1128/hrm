@@ -75,6 +75,8 @@ const ShiftRegistration: React.FC = () => {
   const [loadingScope, setLoadingScope] = useState(true);
   const [weekMonday, setWeekMonday] = useState<Date>(() => addDays(getMonday(new Date()), 7));
   const [existingReg, setExistingReg] = useState<ShiftRegistrationType | null>(null);
+  // Hạn đăng ký của tuần đang xem — backend tính (kể cả khi tuần chưa có đăng ký nào).
+  const [weekDeadline, setWeekDeadline] = useState<string | null>(null);
   const [selections, setSelections] = useState<Record<string, number>>({}); // dateYMD -> 0=Nghỉ, 1=Ca1, 2=Ca2
   const [loadingWeek, setLoadingWeek] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -98,15 +100,14 @@ const ShiftRegistration: React.FC = () => {
     return opts;
   }, [scope]);
 
-  // Hạn đăng ký: hết Thứ 7 (23:59:59) tuần liền trước
+  // Hạn đăng ký: backend trả (shift_registration_deadline) — không tự tính "hết Thứ 7 tuần trước".
+  // Chưa tải được thì không khoá form (backend vẫn chặn khi lưu).
   const deadline = useMemo(() => {
-    if (existingReg?.registration_deadline) return new Date(existingReg.registration_deadline);
-    const sat = addDays(weekMonday, -2);
-    sat.setHours(23, 59, 59, 999);
-    return sat;
-  }, [existingReg, weekMonday]);
+    const raw = existingReg?.registration_deadline ?? weekDeadline;
+    return raw ? new Date(raw) : null;
+  }, [existingReg, weekDeadline]);
 
-  const pastDeadline = new Date() > deadline;
+  const pastDeadline = deadline != null && new Date() > deadline;
   const canEdit = !!scope?.in_scope && !pastDeadline;
 
   // Kiểm tra phạm vi áp dụng 1 lần
@@ -146,6 +147,11 @@ const ShiftRegistration: React.FC = () => {
   const fetchWeek = async () => {
     setLoadingWeek(true);
     setMessage(null);
+    setWeekDeadline(null);
+    shiftRegistrationService
+      .getRegistrationDeadline(toYMD(weekMonday))
+      .then(setWeekDeadline)
+      .catch(() => setWeekDeadline(null));
     try {
       const regs = await shiftRegistrationService.list({ week_start_date: toYMD(weekMonday) });
       const reg = regs.find((r) => r.employee === employeeId) || regs[0] || null;
@@ -299,9 +305,11 @@ const ShiftRegistration: React.FC = () => {
                 <ClockIcon className="h-5 w-5 text-primary-600" />
                 Tuần {fmtDM(weekDates[0])} – {fmtDM(weekDates[6])}
               </div>
-              <p className="text-xs text-gray-400 mt-0.5">
-                Hạn đăng ký: {deadline.toLocaleString('vi-VN')} (hết Thứ 7 tuần trước)
-              </p>
+              {deadline && (
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Hạn đăng ký: {deadline.toLocaleString('vi-VN')}
+                </p>
+              )}
             </div>
             <button
               onClick={() => setWeekMonday((w) => addDays(w, 7))}
@@ -320,7 +328,7 @@ const ShiftRegistration: React.FC = () => {
             <>
               {!canEdit && pastDeadline && (
                 <div className="mx-5 mt-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                  Đã quá hạn đăng ký cho tuần này (hạn: hết Thứ 7 tuần trước). Nếu cần thay đổi ca
+                  Đã quá hạn đăng ký cho tuần này (hạn: {deadline?.toLocaleString('vi-VN')}). Nếu cần thay đổi ca
                   cho 1 ngày cụ thể, liên hệ quản lý trực tiếp hoặc HCNS
                   — đơn sẽ cần quản lý trực tiếp và HR duyệt.
                 </div>

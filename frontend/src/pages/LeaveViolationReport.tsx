@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { SelectBox } from '../components/LandingLayout/SelectBox';
 import GrantTimingReport from './GrantTimingReport';
+import { useSystemRules } from '../services/systemRules.service';
 import violationReportService, {
   FinalizePreview,
   ViolationReport,
@@ -80,7 +81,8 @@ const fmtDateTime = (s?: string | null) => {
  *  thật, thay vì gõ vội "ok" cho qua (HCNS 2026-10-12). */
 const REASON_HINTS: Record<string, { apply: string[]; waive: string[] }> = {
   LATE_CREATED: {
-    apply: ['Tạo đơn muộn quá 3h làm việc', 'Tạo đơn sau hạn, không có lý do chính đáng', 'Đã nhắc nhưng vẫn tạo muộn'],
+    // "{GRACE}" được thay bằng số giờ ân hạn backend trả (attendance.return_to_work_grace_hours)
+    apply: ['Tạo đơn muộn quá {GRACE}', 'Tạo đơn sau hạn, không có lý do chính đáng', 'Đã nhắc nhưng vẫn tạo muộn'],
     waive: ['HCNS mở khoá muộn nên không kịp tạo', 'Nghỉ đột xuất, có xác nhận của quản lý', 'Lỗi hệ thống khi tạo đơn'],
   },
   NO_REQUEST: {
@@ -100,8 +102,9 @@ const REASON_HINTS: Record<string, { apply: string[]; waive: string[] }> = {
     waive: ['Nửa còn lại là giờ công ty cho nghỉ', 'Có đi làm nửa còn lại, quên quẹt thẻ', 'Đã có đơn khác cho nửa còn lại'],
   },
 };
-const hintsFor = (code: string, action: 'apply' | 'waive' | 'clear') =>
-  action === 'clear' ? ['Bấm nhầm', 'Xem xét lại, trả về tính tự động'] : (REASON_HINTS[code]?.[action] || []);
+const hintsFor = (code: string, action: 'apply' | 'waive' | 'clear', graceHours: number | null) =>
+  (action === 'clear' ? ['Bấm nhầm', 'Xem xét lại, trả về tính tự động'] : (REASON_HINTS[code]?.[action] || []))
+    .map((h) => h.replace('{GRACE}', graceHours != null ? `${graceHours}h làm việc` : 'mốc ân hạn'));
 
 /** Dòng đưa vào hộp áp/gỡ phạt — nhận cả dòng vi phạm lẫn dòng từ tab mốc 3
  *  giờ, nên chỉ đòi những trường chung. */
@@ -149,6 +152,8 @@ const fmtOverdue = (m?: number | null) => {
 };
 
 const LeaveViolationReport: React.FC = () => {
+  // Số giờ ân hạn "đi làm trở lại" — backend (deadline_utils.RETURN_TO_WORK_GRACE_HOURS).
+  const graceHours = useSystemRules()?.attendance?.return_to_work_grace_hours ?? null;
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -384,7 +389,7 @@ const LeaveViolationReport: React.FC = () => {
                         side: 'EMPLOYEE' | 'MANAGER' = 'EMPLOYEE') => {
     setOvTarget({ row, action });
     setOvSide(side);
-    setOvReason(hintsFor(codeForSide(row.violation_code, side), action)[0] || '');
+    setOvReason(hintsFor(codeForSide(row.violation_code, side), action, graceHours)[0] || '');
   };
 
   const submitOverride = async () => {
@@ -644,7 +649,7 @@ const LeaveViolationReport: React.FC = () => {
                   <li>Đã bấm tạo đơn nhưng bị chặn, rồi hôm đó vẫn nghỉ</li>
                 </ul>
                 <p className="text-xs text-gray-500 mt-1">
-                  Vì công ty cho khai báo muộn trong 3 giờ đầu với trường hợp đột xuất.
+                  Vì công ty cho khai báo muộn trong {graceHours != null ? `${graceHours} giờ đầu` : 'thời gian ân hạn'} với trường hợp đột xuất.
                 </p>
               </div>
             </div>
@@ -688,7 +693,7 @@ const LeaveViolationReport: React.FC = () => {
               {([
                 ['LATE', 'Tạo đơn quá hạn'],
                 ['HALF', 'Chỉ có đơn nửa ngày'],
-                ['GRANT', 'Mở khoá sau 3h làm việc'],
+                ['GRANT', graceHours != null ? `Mở khoá sau ${graceHours}h làm việc` : 'Mở khoá sau mốc ân hạn'],
               ] as const).map(([k, label]) => {
                 const on = warnSub === k;
                 const n = k === 'LATE' ? warnLate.length
@@ -1210,7 +1215,7 @@ const LeaveViolationReport: React.FC = () => {
                         aria-pressed={on}
                         onClick={() => {
                           setOvSide(k);
-                          setOvReason(hintsFor(codeForSide(ovTarget.row.violation_code, k), 'apply')[0] || '');
+                          setOvReason(hintsFor(codeForSide(ovTarget.row.violation_code, k), 'apply', graceHours)[0] || '');
                         }}
                         className={`flex-1 text-left px-3 py-2 rounded-lg ring-1 ${
                           on ? 'bg-rose-50 text-rose-800 ring-rose-300' : 'bg-white text-gray-600 ring-gray-200'
@@ -1235,9 +1240,9 @@ const LeaveViolationReport: React.FC = () => {
             <label htmlFor="ov-reason" className="block text-sm font-semibold text-gray-700 mt-4 mb-1">
               Lý do <span className="text-rose-600">*</span>
             </label>
-            {hintsFor(codeForSide(ovTarget.row.violation_code, ovSide), ovTarget.action).length > 0 && (
+            {hintsFor(codeForSide(ovTarget.row.violation_code, ovSide), ovTarget.action, graceHours).length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
-                {hintsFor(codeForSide(ovTarget.row.violation_code, ovSide), ovTarget.action).map((h) => {
+                {hintsFor(codeForSide(ovTarget.row.violation_code, ovSide), ovTarget.action, graceHours).map((h) => {
                   const on = ovReason.trim() === h;
                   return (
                     <button

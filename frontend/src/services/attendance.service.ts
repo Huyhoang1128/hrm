@@ -570,6 +570,9 @@ class AttendanceService {
       remaining_online_work?: number;
       // Phòng ban được làm online chiều T7 tuần 2/4 & Chủ nhật không giới hạn
       online_weekend_unlimited?: boolean;
+      // {'YYYY-MM-DD': {morning, afternoon, full_day}} — số ngày mỗi buổi online tính vào hạn mức
+      // ở từng ngày của tháng (backend stats_utils.online_quota_amount); null khi không xem theo 1 người.
+      online_quota_cost_by_date?: Record<string, { morning: number; afternoon: number; full_day: number }> | null;
       approved_online_work?: number;
       approved_leave?: number;
       max_leave_per_month?: number;
@@ -1149,6 +1152,18 @@ class AttendanceService {
   }
 
   /**
+   * Các ca áp dụng cho 1 nhân viên vào ngày `date` (YYYY-MM-DD) — đúng tập ca engine chấm công
+   * dùng (ca đã đăng ký + ca gán cá nhân/vị trí/phòng ban, fallback ca mặc định). Cấu hình ca
+   * (ShiftConfig) là nguồn duy nhất của giờ vào/ra/nghỉ; web dựng lựa chọn giờ từ đây.
+   */
+  async getEmployeeShifts(employeeId: number, date?: string): Promise<EmployeeShiftConfig[]> {
+    const response = await managementApi.get(`/api/v1/hrm/attendance/shifts/employee/${employeeId}/`, {
+      params: date ? { date } : undefined,
+    });
+    return response.data?.data?.shifts ?? [];
+  }
+
+  /**
    * Tính toán & lưu bảng xếp hạng cho một tháng (chỉ HR/superuser)
    */
   async computeRanking(year: number, month: number): Promise<any> {
@@ -1239,4 +1254,19 @@ export interface RegistrationRequest {
   hr_approved_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** 1 ca của nhân viên — GET /api/v1/hrm/attendance/shifts/employee/<id>/ (ShiftConfigForEmployeeView). */
+export interface EmployeeShiftConfig {
+  id: number;
+  name: string;
+  code: string;
+  shift_type: string;
+  start_time: string; // 'HH:MM:SS'
+  end_time: string;
+  break_start_time: string | null;
+  break_end_time: string | null;
+  working_hours: number;
+  is_default: boolean;
+  scope?: 'registered' | 'personal' | 'position' | 'department' | 'company';
 }

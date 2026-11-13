@@ -26,6 +26,7 @@ import {
   ChevronRightIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../contexts/AuthContext';
+import { useSystemRules } from '../services/systemRules.service';
 import { attendanceService, AttendanceRecord } from '../services/attendance.service';
 import { approvalService } from '../services/approval.service';
 import shiftRegistrationService, { Ca2Request, caLabels } from '../services/shiftRegistration.service';
@@ -195,6 +196,8 @@ const EmployeeMonthAttendance: React.FC<EmployeeMonthAttendanceProps> = ({
   showKpiCards = true,
 }) => {
   const { user } = useAuth();
+  // Quy định hệ thống (sàn tăng ca...) — nguồn duy nhất là backend.
+  const systemRules = useSystemRules();
   // Sửa thẳng giờ check-in/check-out thô (khác "Sửa đơn" — đây là sửa bản
   // ghi chấm công gốc) — mirror đúng điều kiện canEditAttendance cũ của
   // AttendanceCalendar.tsx (internal dialog), giờ chuyển hẳn vào đây vì
@@ -882,8 +885,9 @@ const EmployeeMonthAttendance: React.FC<EmployeeMonthAttendanceProps> = ({
             </div>
 
             {(() => {
-              const maxMonthlyLeave = attendanceStats?.max_leave_per_month || 1;
-              const remainingMonthlyLeave = attendanceStats?.remaining_leave ?? maxMonthlyLeave;
+              // Hạn mức lấy từ API stats (CompanyConfig) — 0 là hợp lệ; đang tải thì hiện "—", không đoán số.
+              const maxMonthlyLeave = attendanceStats?.max_leave_per_month ?? '—';
+              const remainingMonthlyLeave = attendanceStats?.remaining_leave ?? '—';
               return (
                 <div className="group bg-white p-4 rounded-xl border border-primary-100 hover:shadow-md transition-all duration-300">
                   <div className="flex items-center gap-3 mb-2">
@@ -901,9 +905,10 @@ const EmployeeMonthAttendance: React.FC<EmployeeMonthAttendanceProps> = ({
             })()}
 
             {(() => {
-              const maxOnline = attendanceStats?.max_online_work_per_month || 3;
-              const usedOnline = (attendanceStats?.max_online_work_per_month || 0) - (attendanceStats?.remaining_online_work || 0);
-              const remainingOnline = Math.max(0, maxOnline - usedOnline);
+              // Hạn mức online theo người (OnlineWorkQuotaOverride có thể = 0) do API stats tính —
+              // đang tải thì hiện "—", không đoán số.
+              const maxOnline = attendanceStats?.max_online_work_per_month ?? '—';
+              const remainingOnline = attendanceStats?.remaining_online_work ?? '—';
               return (
                 <div className="group bg-white p-4 rounded-xl border border-emerald-100 hover:shadow-md transition-all duration-300">
                   <div className="flex items-center gap-3 mb-2">
@@ -1653,7 +1658,10 @@ const EmployeeMonthAttendance: React.FC<EmployeeMonthAttendanceProps> = ({
                 </div>
               </div>
               <p className="text-xs text-gray-500">
-                Tối thiểu 30 phút mới được tính tăng ca. Số giờ được tính lại tự động theo giờ vào/ra mới.
+                {/* Sàn tăng ca lấy từ backend (overtime.min_minutes) — đúng số backend chặn khi sửa giờ. */}
+                {systemRules?.overtime?.min_applies_to.includes('OVERTIME') &&
+                  `Tối thiểu ${systemRules.overtime.min_minutes} phút mới được tính tăng ca. `}
+                Số giờ được tính lại tự động theo giờ vào/ra mới.
                 {(hoursModal.item.data?.status || '').toUpperCase() === 'APPROVED' &&
                   ' Đơn đã duyệt sẽ quay lại "Chờ duyệt" để HCNS duyệt lại.'}
               </p>

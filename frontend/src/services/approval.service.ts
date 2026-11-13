@@ -38,6 +38,13 @@ export interface ApprovalActionRequest {
   next_approver_id?: number;
 }
 
+/** Kết quả xem trước duyệt hàng loạt (dry_run): đơn sẽ duyệt / bị từ chối vì vượt hạn mức / lỗi khác. */
+export interface BulkApprovePreview {
+  approved: number[];
+  rejected: Array<{ id: number; note: string }>;
+  errors: Array<{ id: number; error: string }>;
+}
+
 class ApprovalService {
   // Lấy danh sách các đơn chờ duyệt
   async getPendingApprovals(): Promise<ApprovalRequest[]> {
@@ -803,6 +810,21 @@ class ApprovalService {
       ids,
       dry_run: true,
     });
+    return response.data;
+  }
+
+  /**
+   * XEM TRƯỚC duyệt hàng loạt đơn Nghỉ phép tháng / Làm việc online (bulk_approve dry_run) —
+   * backend chạy đúng vòng duyệt + hạn mức (thứ tự xét đơn, hạn mức theo người, số ngày mỗi đơn
+   * tính vào hạn mức) rồi trả về đơn nào sẽ duyệt / bị từ chối vì vượt hạn mức, KHÔNG lưu gì.
+   */
+  async previewBulkApproveMonthlyLeaveRequests(ids: number[]): Promise<BulkApprovePreview> {
+    const response = await managementApi.post('/api-hrm/monthly-leave-requests/bulk_approve/', { ids, dry_run: true });
+    return response.data;
+  }
+
+  async previewBulkApproveOnlineWorkRequests(ids: number[]): Promise<BulkApprovePreview> {
+    const response = await managementApi.post('/api-hrm/online-work-requests/bulk_approve/', { ids, dry_run: true });
     return response.data;
   }
 

@@ -21,8 +21,11 @@ _SHIFT_TYPE_TO_RULE_TYPE = {
     'OTHER':     'SHIFT_RULE_MORNING',
 }
 
-# Shifts with working_hours above this threshold are treated as full-day (workday=1.0)
-_FULL_DAY_HOURS_THRESHOLD = 5.5
+# Ngưỡng giờ làm của 1 ngày công đủ (1.0 công) — NGUỒN DUY NHẤT, dùng cho:
+#   - shift_workday(): ca có working_hours > ngưỡng -> 1.0 công, còn lại 0.5;
+#   - main_api (duyệt Quên chấm công / Lỗi máy chấm công): giờ vào–ra ghép lại >= ngưỡng -> 1.0 công.
+# Web đọc qua GET /api-hrm/system-rules/ (attendance.full_day_hours_threshold).
+FULL_DAY_HOURS_THRESHOLD = 5.5
 
 
 def shift_workday(shift_config) -> float:
@@ -31,7 +34,7 @@ def shift_workday(shift_config) -> float:
     fixed = getattr(shift_config, 'fixed_workday', None)
     if fixed is not None:
         return float(fixed)
-    return 1.0 if float(shift_config.working_hours or 0) > _FULL_DAY_HOURS_THRESHOLD else 0.5
+    return 1.0 if float(shift_config.working_hours or 0) > FULL_DAY_HOURS_THRESHOLD else 0.5
 
 
 def _employee_on_date(employee_code: str, ref_date, _cache: dict = None):

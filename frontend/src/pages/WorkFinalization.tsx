@@ -55,15 +55,6 @@ const formatDate = (val: string | null | undefined) => {
     : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 };
 
-const RESIGNED_RETENTION_DAYS = 46;
-
-const normalizeStatusText = (value: unknown) =>
-  String(value ?? '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim();
-
 const normalizeToken = (value: unknown) =>
   String(value ?? '')
     .toUpperCase()
@@ -97,68 +88,11 @@ const isProbationEffectiveInMonth = (emp: Employee, year: number, month: number)
   return probationEnd >= monthStart;
 };
 
-const isInactiveEmployee = (emp: Employee): boolean => {
-  const falseLike = ['false', '0', 'no', 'inactive', 'disabled'];
-  const data = emp as Employee & {
-    active?: unknown;
-    status?: unknown;
-    tinh_trang?: unknown;
-  };
-
-  const booleanCandidates = [emp.is_active, data.active];
-  if (booleanCandidates.some((value) => value === false)) return true;
-  if (booleanCandidates.some((value) => falseLike.includes(normalizeStatusText(value)))) return true;
-
-  const statusTexts = [data.tinh_trang, emp.employment_status, data.status]
-    .map(normalizeStatusText)
-    .filter(Boolean);
-
-  const inactiveKeywords = [
-    'inactive',
-    'disabled',
-    'terminated',
-    'resigned',
-    'quit',
-    'offboarded',
-    'da nghi',
-    'nghi viec',
-    'thoi viec',
-    'tam nghi',
-    'ngung lam',
-    'khong hoat dong',
-    'vo hieu',
-  ];
-
-  return statusTexts.some((status) => inactiveKeywords.some((keyword) => status.includes(keyword)));
-};
-
-const shouldShowInWorkFinalizationList = (emp: Employee): boolean => {
-  if (!isInactiveEmployee(emp)) return true;
-
-  const date = parseDateValue(emp.end_date);
-  if (!date) return true;
-
-  const cutoffDate = new Date();
-  cutoffDate.setHours(0, 0, 0, 0);
-  cutoffDate.setDate(cutoffDate.getDate() - RESIGNED_RETENTION_DAYS);
-  return date >= cutoffDate;
-};
-
-const shouldShowRecordInWorkFinalizationList = (rec: WorkFinalizationRecord): boolean => {
-  const status = normalizeStatusText(rec.on_off);
-  const isInactive = ['inactive', 'disabled', 'terminated', 'resigned', 'da nghi', 'nghi viec', 'thoi viec']
-    .some((keyword) => status.includes(keyword));
-
-  if (!isInactive) return true;
-
-  const date = parseDateValue(rec.ngay_nghi_viec);
-  if (!date) return true;
-
-  const cutoffDate = new Date();
-  cutoffDate.setHours(0, 0, 0, 0);
-  cutoffDate.setDate(cutoffDate.getDate() - RESIGNED_RETENTION_DAYS);
-  return date >= cutoffDate;
-};
+// Phạm vi nhân viên của tháng chốt công (ai còn làm trong tháng đang chọn) do BACKEND quyết định
+// (finalization_views._active_in_month_q — cùng tập finalize-all / finalize-department chốt):
+// danh sách NV gọi /employees/?active_in_month=YYYY-MM, bảng chốt công lấy nguyên từ
+// /work-finalization/. Web không tự đặt luật riêng (trước đây "nghỉ trong 46 ngày tính từ hôm nay").
+const monthScopeParam = (year: number, month: number) => `${year}-${String(month).padStart(2, '0')}`;
 
 const EmployeeListItem = React.memo(({
   emp,
@@ -565,22 +499,21 @@ const WorkFinalization: React.FC = () => {
     // Trưởng phòng: luôn thấy CHÍNH MÌNH trong danh sách kể cả khi chưa
     // chọn phòng ban/tìm kiếm gì (xem selfEmployee ở trên) — trước đây trả
     // rỗng hoàn toàn nếu chưa lọc gì, khiến họ không tìm thấy công của mình.
-    const selfEntry = isManagerRestricted && selfEmployee && shouldShowInWorkFinalizationList(selfEmployee)
-      ? selfEmployee
-      : null;
+    // Chính mình (Trưởng phòng đang đăng nhập) luôn là người đang làm việc -> không cần lọc theo tháng.
+    const selfEntry = isManagerRestricted && selfEmployee ? selfEmployee : null;
     if (!selectedDepartment && !debouncedSearchTerm) {
       setEmployees(selfEntry ? [selfEntry] : []);
       return;
     }
     setLoadingEmployees(true);
     try {
-      const params: any = { page_size: 1000 };
+      const params: any = { page_size: 1000, active_in_month: monthScopeParam(selectedYear, selectedMonth) };
       if (selectedDepartment && selectedDepartment !== 'all') {
         params.department = Number(selectedDepartment);
       }
       if (debouncedSearchTerm) params.search = debouncedSearchTerm;
       const res = await employeesAPI.list(params);
-      const list = res.results.filter(shouldShowInWorkFinalizationList);
+      const list = res.results;
       setEmployees(
         selfEntry && !list.some((e) => e.id === selfEntry.id) ? [selfEntry, ...list] : list
       );
@@ -589,7 +522,7 @@ const WorkFinalization: React.FC = () => {
     } finally {
       setLoadingEmployees(false);
     }
-  }, [selectedDepartment, debouncedSearchTerm, isManagerRestricted, selfEmployee]);
+  }, [selectedYear, selectedMonth, selectedDepartment, debouncedSearchTerm, isManagerRestricted, selfEmployee]);
 
   useEffect(() => {
     loadEmployees();
@@ -616,7 +549,7 @@ const WorkFinalization: React.FC = () => {
         params.search = debouncedSearchTerm;
       }
       const res = await workFinalizationService.list(params);
-      setRecords(res.results.filter(shouldShowRecordInWorkFinalizationList));
+      setRecords(res.results);
     } catch (err: any) {
       setError(
         err?.response?.data?.error ||
@@ -806,8 +739,11 @@ const WorkFinalization: React.FC = () => {
     setSuccessMsg(null);
     setFinalizeAllResult(null);
     try {
-      const employeesRes = await employeesAPI.list({ page_size: 1000 });
-      const eligibleEmployees = employeesRes.results.filter(shouldShowInWorkFinalizationList);
+      const employeesRes = await employeesAPI.list({
+        page_size: 1000,
+        active_in_month: monthScopeParam(selectedYear, selectedMonth),
+      });
+      const eligibleEmployees = employeesRes.results;
 
       const results: FinalizeAllResultItem[] = [];
       const errors: FinalizeAllErrorItem[] = [];
@@ -880,8 +816,9 @@ const WorkFinalization: React.FC = () => {
       const employeesRes = await employeesAPI.list({
         page_size: 1000,
         department: Number(selectedDepartment),
+        active_in_month: monthScopeParam(selectedYear, selectedMonth),
       });
-      const eligibleEmployees = employeesRes.results.filter(shouldShowInWorkFinalizationList);
+      const eligibleEmployees = employeesRes.results;
 
       const results: FinalizeAllResultItem[] = [];
       const errors: FinalizeAllErrorItem[] = [];

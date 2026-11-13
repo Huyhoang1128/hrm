@@ -212,6 +212,22 @@ class ShiftRegistrationViewSet(viewsets.ViewSet):
             "scope_departments": scope_departments,
         })
 
+    @action(detail=False, methods=["get"], url_path="registration-deadline")
+    def registration_deadline(self, request):
+        """Hạn đăng ký ca của 1 tuần (?week_start_date=YYYY-MM-DD, Thứ 2) — đúng hàm
+        shift_registration_deadline() mà create() dùng để chặn. Web hiển thị / khoá form theo
+        đây (kể cả tuần chưa có đăng ký nào) thay vì tự tính "hết Thứ 7 tuần trước"."""
+        try:
+            week_start = date.fromisoformat(str(request.query_params.get("week_start_date")))
+        except (TypeError, ValueError):
+            return Response({"error": "week_start_date không hợp lệ"}, status=status.HTTP_400_BAD_REQUEST)
+        if week_start.weekday() != 0:
+            return Response({"error": "week_start_date phải là Thứ 2"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            "week_start_date": week_start.isoformat(),
+            "registration_deadline": shift_registration_deadline(week_start).isoformat(),
+        })
+
     # ── Đăng ký Ca 2 theo NGÀY, cần quản lý trực tiếp duyệt trước 0h ────────
     # (chỉ áp dụng cho config có requires_manager_approval=True — khác hẳn
     # create() ở dưới, vốn đăng ký CẢ TUẦN và có hiệu lực ngay, không duyệt.)

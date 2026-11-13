@@ -299,6 +299,12 @@ def serialize_duyet_don_event(event: EmployeeEvent, violation_info: dict = None,
         # Giờ bắt đầu / kết thúc lấy từ event.check_in / check_out
         result["start_time"] = str(event.check_in) if event.check_in else None
         result["end_time"]   = str(event.check_out) if event.check_out else None
+        # Hạn QLTT được sửa giờ đơn tăng ca Tại Viện/VP — đúng hàm & điều kiện
+        # RegistrationRequestViewSet.update() dùng để chặn. Web dùng để hiện nút "Sửa giờ",
+        # giữ đơn trong tab Chờ duyệt của QLTT và hiện "Hạn sửa" — không tự tính lại.
+        if d.get("registration_type") == "OVERTIME" and d.get("ot_type") == "ONSITE":
+            from .deadline_utils import manager_attendance_fix_deadline
+            result["manager_hours_fix_deadline"] = manager_attendance_fix_deadline(event.event_date).isoformat()
 
     result["event_data"] = d
 

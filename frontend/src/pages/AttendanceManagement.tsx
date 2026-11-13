@@ -8,6 +8,7 @@ import {
   attendanceService,
   AttendanceRecord,
   AttendanceEvent,
+  type EmployeeShiftConfig,
 } from '../services/attendance.service';
 import shiftRegistrationService, { caLabels } from '../services/shiftRegistration.service';
 
@@ -40,6 +41,7 @@ import {
   TrashIcon,
 } from '@heroicons/react/24/outline';
 import { Employee, employeesAPI } from '@/utils/api';
+import { useSystemRules } from '../services/systemRules.service';
 
 /**
  * Trích xuất thông báo lỗi dễ đọc từ response lỗi của DRF (Django REST
@@ -72,20 +74,42 @@ function extractApiErrorMessage(error: any, fallback: string): string {
 
 
 
-/** Ngày `date` có rơi vào khung làm online KHÔNG tính hạn mức không — chỉ áp
- * cho phòng ban bật Department.online_weekend_unlimited (vd Kế toán): cả ngày
- * Chủ nhật, và buổi chiều thứ 7 tuần 2/4 (buổi sáng thứ 7 vẫn tính). Khớp
- * backend stats_utils.online_quota_amount(). */
-const onlineFreeSlot = (date: Date | null, unlimited?: boolean) => {
-  if (!date || !unlimited) return { sunday: false, satAfternoon: false };
-  const wd = date.getDay(); // 0 = Chủ nhật, 6 = Thứ 7
-  if (wd === 0) return { sunday: true, satAfternoon: false };
-  const occurrence = Math.floor((date.getDate() - 1) / 7) + 1;
-  return { sunday: false, satAfternoon: wd === 6 && (occurrence === 2 || occurrence === 4) };
+/** Số ngày mỗi buổi làm online (morning / afternoon / full_day — đúng id lựa chọn buổi) TÍNH VÀO
+ * hạn mức ở ngày `date`. Backend tính sẵn cho mọi ngày của tháng (API stats:
+ * online_quota_cost_by_date = stats_utils.online_quota_amount — xét lịch phòng ban THEO NGÀY,
+ * miễn Chủ nhật / chiều T7 tuần 2-4, NV làm chiều T7 mọi tuần...), web không tự suy luật.
+ * null = chưa có dữ liệu (đang tải / ngày ngoài tháng đang xem). */
+type OnlineQuotaCost = { morning: number; afternoon: number; full_day: number };
+const onlineQuotaCostOn = (
+  date: Date | null,
+  costByDate?: Record<string, OnlineQuotaCost> | null,
+): OnlineQuotaCost | null => {
+  if (!date || !costByDate) return null;
+  const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return costByDate[key] ?? null;
+};
+
+/** Lựa chọn giờ cho đơn Quên chấm công / Lỗi máy chấm công, dựng từ cấu hình ca đang áp dụng cho
+ * nhân viên (ShiftConfig — nguồn duy nhất của giờ vào/ra/nghỉ): giờ VÀO = giờ bắt đầu ca + giờ vào
+ * lại sau nghỉ giữa ca; giờ RA = giờ kết thúc ca + giờ ra nghỉ giữa ca. Đổi/thêm ca ở backend là
+ * lựa chọn theo, không còn danh sách giờ ghi cứng. Backend nhận giờ bất kỳ nên form vẫn có ô "Giờ khác". */
+const shiftTimeOptions = (shifts: EmployeeShiftConfig[] | null, kind: 'checkin' | 'checkout') => {
+  if (!shifts) return [];
+  const raw = shifts.flatMap((s) =>
+    kind === 'checkin' ? [s.start_time, s.break_end_time] : [s.end_time, s.break_start_time],
+  );
+  const values = Array.from(new Set(raw.filter((t): t is string => !!t).map((t) => t.slice(0, 5)))).sort();
+  return values.map((value) => {
+    const [h, m] = value.split(':').map(Number);
+    const desc = h < 12 ? 'Sáng' : h < 13 ? 'Trưa' : h < 18 ? 'Chiều' : 'Tối';
+    return { value, label: `${h}h${String(m).padStart(2, '0')}`, desc };
+  });
 };
 
 const AttendanceManagement: React.FC = () => {
   const { user } = useAuth();
+  // Quy định hệ thống (sàn tăng ca, giới hạn khoảng ngày...) — nguồn duy nhất là backend.
+  const systemRules = useSystemRules();
 
   // Tab "Bản thân" / "Nhân viên" — tab "Nhân viên" chỉ dành cho Admin/HR/
   // Trưởng phòng (is_manager) xem chấm công của người khác (quản lý trực
@@ -285,6 +309,8 @@ const AttendanceManagement: React.FC = () => {
   const [forgotPunchType, setForgotPunchType] = useState<'checkin' | 'checkout'>('checkin');
   const [forgotCheckinTime, setForgotCheckinTime] = useState<string | null>(null);
   const [forgotCheckoutTime, setForgotCheckoutTime] = useState<string | null>(null);
+  // Ca áp dụng cho nhân viên vào ngày đang chọn (để dựng lựa chọn giờ quên chấm công) — null khi chưa tải được.
+  const [employeeShifts, setEmployeeShifts] = useState<EmployeeShiftConfig[] | null>(null);
 
   // Confirmation modal state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -364,6 +390,15 @@ const AttendanceManagement: React.FC = () => {
   const nightShiftDuration = calculateNightShiftDuration();
   const liveDuration = calculateLiveDuration();
 
+  // Sàn thời lượng (giờ) của loại đơn đang chọn — backend chỉ áp sàn cho các loại trong
+  // overtime.min_applies_to (hiện chỉ Tăng ca), nên web cũng chỉ chặn đúng các loại đó. Chưa
+  // tải được quy định thì không chặn theo sàn (backend vẫn kiểm tra khi gửi).
+  const registrationMinHours = (reason: string | null | undefined): number => {
+    const rule = systemRules?.overtime;
+    if (!rule || !reason) return 0;
+    return rule.min_applies_to.includes(reason.toUpperCase()) ? rule.min_minutes / 60 : 0;
+  };
+
   // Validate registration time fields
   // - Must have start and end time
   // - Duration must be positive (end > start)
@@ -380,28 +415,28 @@ const AttendanceManagement: React.FC = () => {
 
     if (!selectedReason) return false;
 
-    const MIN_HOURS = 0.5; // Default minimum for most registrations (30 minutes)
+    const minHours = registrationMinHours(selectedReason);
 
     switch (selectedReason) {
       case 'overtime':
         return (
           !!(overtimeStartTime && overtimeEndTime) &&
-          overtimeDuration >= MIN_HOURS
+          overtimeDuration > 0 && overtimeDuration >= minHours
         );
       case 'extra_hours':
         return (
           !!(extraHoursStartTime && extraHoursEndTime) &&
-          extraHoursDuration >= MIN_HOURS
+          extraHoursDuration > 0 && extraHoursDuration >= minHours
         );
       case 'night_shift':
         // Cho phép Ca CheckPage không có giờ cố định
         if (!nightShiftStartTime && !nightShiftEndTime) return true;
         return (
           !!(nightShiftStartTime && nightShiftEndTime) &&
-          nightShiftDuration >= MIN_HOURS
+          nightShiftDuration > 0 && nightShiftDuration >= minHours
         );
       case 'live':
-        return !!(liveStartTime && liveEndTime) && liveDuration >= MIN_HOURS;
+        return !!(liveStartTime && liveEndTime) && liveDuration > 0 && liveDuration >= minHours;
       default:
         return true;
     }
@@ -411,7 +446,7 @@ const AttendanceManagement: React.FC = () => {
   const getRegistrationTimeError = (): string | null => {
     if (selectedContext !== 'registration') return null;
 
-    const MIN_HOURS = 0.5;
+    const minHours = registrationMinHours(selectedReason);
     let hasTime = false;
     let duration = 0;
 
@@ -438,7 +473,7 @@ const AttendanceManagement: React.FC = () => {
 
     if (!hasTime) return null; // Don't show error until user selects times
     if (duration <= 0) return 'Giờ kết thúc phải sau giờ bắt đầu';
-    if (duration < MIN_HOURS) return 'Tối thiểu 30 phút';
+    if (minHours > 0 && duration < minHours) return `Tối thiểu ${systemRules?.overtime?.min_minutes} phút`;
     return null;
   };
 
@@ -767,6 +802,21 @@ const AttendanceManagement: React.FC = () => {
 
     fetchAllData();
   }, [currentEmployee?.id, currentDate.getMonth(), currentDate.getFullYear()]);
+
+  // Ca áp dụng cho nhân viên vào NGÀY đang làm đơn -> lựa chọn giờ quên chấm công (xem shiftTimeOptions).
+  const selectedDateKey = selectedDate
+    ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
+    : null;
+  useEffect(() => {
+    if (!currentEmployee?.id || !selectedDateKey) return;
+    let alive = true;
+    setEmployeeShifts(null);
+    attendanceService
+      .getEmployeeShifts(currentEmployee.id, selectedDateKey)
+      .then((shifts) => { if (alive) setEmployeeShifts(shifts); })
+      .catch(() => { if (alive) setEmployeeShifts(null); });
+    return () => { alive = false; };
+  }, [currentEmployee?.id, selectedDateKey]);
 
   // Effect 3: Đồng bộ allExplanations và approvedRegistrations khi monthlyRequestHistory hoặc selectedDate thay đổi
   // Điều này đảm bảo khi nhấn Làm đơn bổ sung lần nữa (hoặc đang mở), dữ liệu lọc sẽ luôn mới nhất
@@ -1718,12 +1768,16 @@ const AttendanceManagement: React.FC = () => {
           // ShiftRegistrationDay (mô hình requires_manager_approval): mặc
           // định Ca 1, chỉ có hiệu lực Ca 2 khi quản lý trực tiếp duyệt
           // TRƯỚC 0h ngày áp dụng (duyệt ở trang Phê duyệt).
-          await shiftRegistrationService.registerCa2({
+          const ca2 = await shiftRegistrationService.registerCa2({
             employee_id: currentEmployee.id,
             date: dateStr,
           });
           await refreshAllData();
-          showNotify('success', 'Thành công', `Đã gửi đăng ký ${ca2RegLabel}, chờ quản lý trực tiếp duyệt trước 0h ngày áp dụng.`);
+          // Hạn duyệt do backend trả (day_registration_deadline) — không ghi cứng "trước 0h".
+          const ca2Deadline = ca2?.registration_deadline
+            ? ` trước ${new Date(ca2.registration_deadline).toLocaleString('vi-VN')}`
+            : '';
+          showNotify('success', 'Thành công', `Đã gửi đăng ký ${ca2RegLabel}, chờ quản lý trực tiếp duyệt${ca2Deadline}.`);
         } else if (selectedReason === 'overtime') {
           // 1. Phân đoạn gửi Đơn Tăng ca (Overtime)
           const overtimeData = {
@@ -2253,8 +2307,9 @@ const AttendanceManagement: React.FC = () => {
 
           {/* === Hạn mức còn lại === */}
           {(() => {
-            const maxMonthlyLeave = attendanceStats?.max_leave_per_month || 1;
-            const remainingMonthlyLeave = attendanceStats?.remaining_leave ?? 1;
+            // Hạn mức lấy từ API stats (CompanyConfig) — 0 là hợp lệ; đang tải thì hiện "—", không đoán số.
+            const maxMonthlyLeave = attendanceStats?.max_leave_per_month ?? '—';
+            const remainingMonthlyLeave = attendanceStats?.remaining_leave ?? '—';
 
             return (
               <div className="group bg-white p-4 rounded-xl border border-primary-100 hover:shadow-md transition-all duration-300">
@@ -2275,9 +2330,10 @@ const AttendanceManagement: React.FC = () => {
           })()}
 
           {(() => {
-              const maxOnline = attendanceStats?.max_online_work_per_month || 3;
-              const usedOnline = (attendanceStats?.max_online_work_per_month || 0) - (attendanceStats?.remaining_online_work || 0);
-              const remainingOnline = Math.max(0, maxOnline - usedOnline);
+              // Hạn mức online theo người (OnlineWorkQuotaOverride có thể = 0) do API stats tính —
+              // đang tải thì hiện "—", không đoán số.
+              const maxOnline = attendanceStats?.max_online_work_per_month ?? '—';
+              const remainingOnline = attendanceStats?.remaining_online_work ?? '—';
 
               return (
                 <div className="group bg-white p-4 rounded-xl border border-emerald-100 hover:shadow-md transition-all duration-300">
@@ -2350,7 +2406,12 @@ const AttendanceManagement: React.FC = () => {
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="flex h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></span>
                 <p className="text-[10px] text-red-500 font-bold uppercase tracking-widest leading-none">
-                  Cập nhật mới nhất • Hiệu lực từ 08/2024
+                  Cập nhật mới nhất
+                  {(() => {
+                    // Ngày hiệu lực của phiên bản chính sách chấm công đang áp dụng (backend)
+                    const eff = systemRules?.attendance?.penalty_policy.effective_from;
+                    return eff ? ` • Hiệu lực từ ${eff.slice(5, 7)}/${eff.slice(0, 4)}` : '';
+                  })()}
                 </p>
               </div>
             </div>
@@ -2370,16 +2431,57 @@ const AttendanceManagement: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium whitespace-pre-wrap">
-              {[
-                { nội_dung: 'Quên chấm công (In-Out) nhưng không chứng minh được đi làm đúng giờ', xử_lý: 'Trừ 1.0 công làm việc', ghi_chú: '' },
-                { nội_dung: 'Quên chấm công (In-Out) nhưng chứng minh được đi làm đúng giờ (nhưng quá 3 lỗi giải trình/tháng)', xử_lý: 'Trừ 0.5 công làm việc', ghi_chú: '' },
-                { nội_dung: 'Đi muộn / Về sớm < 10 phút', xử_lý: '50.000 VNĐ', ghi_chú: 'Từ lần vi phạm thứ 7: x2/lần vi phạm' },
-                { nội_dung: 'Đi muộn / Về sớm 11 - 30 phút', xử_lý: '100.000 VNĐ', ghi_chú: 'Từ lần vi phạm thứ 7: x2/lần vi phạm' },
-                { nội_dung: 'Đi muộn / Về sớm 31 - 60 phút', xử_lý: 'Quản lý: 150.000 VNĐ\nNhân viên: 120.000 VNĐ', ghi_chú: 'Từ lần vi phạm thứ 7: x2/lần vi phạm' },
-                { nội_dung: 'Đi muộn / Về sớm 61 - 120 phút', xử_lý: 'Quản lý: 250.000 VNĐ\nNhân viên: 200.000 VNĐ', ghi_chú: 'Từ lần vi phạm thứ 7: x2/lần vi phạm' },
-                { nội_dung: 'Đi muộn / Về sớm > 120 phút', xử_lý: 'Trừ 0.5 công làm việc', ghi_chú: 'Từ lần vi phạm thứ 7: x2/lần vi phạm' },
-                { nội_dung: 'Nghỉ không báo / Nghỉ không được duyệt', xử_lý: '500.000 VNĐ\nvà tùy mức độ vi phạm, sa thải...', ghi_chú: 'Hình thức xử lý cao nhất: Sa thải' },
-              ].map((item, idx) => (
+              {(() => {
+                // Bảng phạt dựng từ chính sách chấm công backend đang áp dụng (system-rules
+                // attendance.penalty_policy = PolicyLoader: PenaltyTierConfig + AttendancePolicyConfig,
+                // đúng nguồn engine dùng để phạt) — đổi cấu hình là bảng đổi theo, không ghi cứng số.
+                const policy = systemRules?.attendance?.penalty_policy;
+                if (!policy) return [];
+                const vnd = (n: number) => `${n.toLocaleString('vi-VN')} VNĐ`;
+                const cong = (n: number) => `Trừ ${Number.isInteger(n) ? n.toFixed(1) : n} công làm việc`;
+                const multiplierNote = `Từ lần vi phạm thứ ${policy.multiplier_threshold}: x${policy.multiplier_value}/lần vi phạm`;
+                // Hạn mức giải trình của rổ chứa Quên chấm công — theo đúng người đang xem (API stats)
+                const incompleteQuota =
+                  ((attendanceStats?.explanation_quota?.groups || []) as Array<{ types?: string[]; max: number }>)
+                    .find((g) => g.types?.includes('INCOMPLETE_ATTENDANCE'))?.max
+                  ?? attendanceStats?.max_explanations_per_month;
+                const rows = [
+                  { nội_dung: 'Quên chấm công (In-Out) nhưng không chứng minh được đi làm đúng giờ', xử_lý: cong(policy.incomplete_no_expl_deduction), ghi_chú: '' },
+                  {
+                    nội_dung: `Quên chấm công (In-Out) nhưng chứng minh được đi làm đúng giờ (nhưng quá ${incompleteQuota != null ? `${incompleteQuota} lỗi giải trình/tháng` : 'hạn mức giải trình/tháng'})`,
+                    // Engine: duyệt giải trình Quên chấm công khi đã hết hạn mức = trừ phần "được duyệt" + phần "vượt hạn mức"
+                    xử_lý: cong(policy.incomplete_approved_deduction + policy.incomplete_over_quota_deduction),
+                    ghi_chú: '',
+                  },
+                ];
+                let prevMax: number | null = null;
+                policy.tiers.forEach((t) => {
+                  const range = t.max_minutes == null
+                    ? `> ${prevMax ?? 0} phút`
+                    : prevMax == null ? `≤ ${t.max_minutes} phút` : `${prevMax + 1} - ${t.max_minutes} phút`;
+                  // Bậc trừ công (PenaltyRule): không phạt tiền, không nhân hệ số
+                  const isDeduction = t.work_deduction > 0;
+                  rows.push({
+                    nội_dung: `Đi muộn / Về sớm ${range}`,
+                    xử_lý: isDeduction
+                      ? cong(t.work_deduction)
+                      : t.fine_manager === t.fine_regular
+                        ? vnd(t.fine_regular)
+                        : `Quản lý: ${vnd(t.fine_manager)}\nNhân viên: ${vnd(t.fine_regular)}`,
+                    ghi_chú: isDeduction ? '' : multiplierNote,
+                  });
+                  if (t.max_minutes != null) prevMax = t.max_minutes;
+                });
+                const absencePenalty = systemRules?.attendance?.unreported_absence_penalty;
+                rows.push({
+                  nội_dung: 'Nghỉ không báo / Nghỉ không được duyệt',
+                  xử_lý: absencePenalty != null
+                    ? `${vnd(absencePenalty)}\nvà tùy mức độ vi phạm, sa thải...`
+                    : 'Tùy mức độ vi phạm, sa thải...',
+                  ghi_chú: 'Hình thức xử lý cao nhất: Sa thải',
+                });
+                return rows;
+              })().map((item, idx) => (
                 <tr key={idx} className="hover:bg-gray-50/40 transition-colors group">
                   <td className="px-3 sm:px-6 py-4 text-[13px] text-gray-600 border-r border-gray-50 group-hover:text-primary-600 transition-colors leading-relaxed">
                     {item.nội_dung}
@@ -2392,6 +2494,11 @@ const AttendanceManagement: React.FC = () => {
                   </td>
                 </tr>
               ))}
+              {!systemRules?.attendance && (
+                <tr>
+                  <td colSpan={3} className="px-3 sm:px-6 py-4 text-[13px] text-gray-400">Đang tải quy định…</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -3511,9 +3618,11 @@ const AttendanceManagement: React.FC = () => {
 
                               {/* Card 3: Nghỉ phép tháng */}
                               {showMonthlyLeaveCard && (() => {
-                                const maxLeave = attendanceStats?.max_leave_per_month || 1;
-                                const remainingLeave = attendanceStats?.remaining_leave ?? 1;
-                                const isQuotaExhausted = remainingLeave <= 0;
+                                // Hạn mức từ API stats (0 là hợp lệ). Chưa tải xong thì không khoá thẻ,
+                                // không hiện số — backend vẫn kiểm tra khi gửi đơn.
+                                const maxLeave: number | null = attendanceStats?.max_leave_per_month ?? null;
+                                const remainingLeave: number | null = attendanceStats?.remaining_leave ?? null;
+                                const isQuotaExhausted = remainingLeave != null && remainingLeave <= 0;
 
                                 return (
                                   <button
@@ -3539,7 +3648,9 @@ const AttendanceManagement: React.FC = () => {
                                         <p className="mt-1 text-sm text-gray-500">
                                           {isQuotaExhausted 
                                             ? 'Đã hết lượt nghỉ phép tháng này'
-                                            : `Đăng ký nghỉ phép (Còn ${remainingLeave}/${maxLeave} ngày)`}
+                                            : remainingLeave != null && maxLeave != null
+                                              ? `Đăng ký nghỉ phép (Còn ${remainingLeave}/${maxLeave} ngày)`
+                                              : 'Đăng ký nghỉ phép'}
                                         </p>
                                       </div>
                                     </div>
@@ -3558,12 +3669,18 @@ const AttendanceManagement: React.FC = () => {
 
                               {/* Card 4: Làm việc online */}
                               {showOnlineWorkCard && (() => {
-                                const maxOnline = attendanceStats?.max_online_work_per_month || 3;
-                                const remainingOnline = attendanceStats?.remaining_online_work || 0;
-                                const freeSlot = onlineFreeSlot(selectedDate, attendanceStats?.online_weekend_unlimited);
-                                // Chủ nhật / chiều T7 tuần 2-4 không tính hạn mức -> không khoá thẻ
+                                // Hạn mức online theo người (có thể = 0) từ API stats. Chưa tải xong thì
+                                // không khoá thẻ, không hiện số — backend vẫn kiểm tra khi gửi đơn.
+                                const maxOnline: number | null = attendanceStats?.max_online_work_per_month ?? null;
+                                const remainingOnline: number | null = attendanceStats?.remaining_online_work ?? null;
+                                const quotaCount = remainingOnline != null && maxOnline != null
+                                  ? `${remainingOnline}/${maxOnline} ngày` : null;
+                                const cost = onlineQuotaCostOn(selectedDate, attendanceStats?.online_quota_cost_by_date);
+                                // Khoá thẻ khi cả buổi "rẻ" nhất của ngày này vẫn vượt số còn lại — ngày/buổi
+                                // được miễn hạn mức có giá 0 nên không bao giờ bị khoá.
+                                const cheapest = cost ? Math.min(cost.morning, cost.afternoon, cost.full_day) : null;
                                 const isOnlineQuotaExhausted =
-                                  remainingOnline <= 0 && !freeSlot.sunday && !freeSlot.satAfternoon;
+                                  remainingOnline != null && cheapest != null && cheapest > remainingOnline;
                                 return (
                                   <button
                                     type="button"
@@ -3588,11 +3705,11 @@ const AttendanceManagement: React.FC = () => {
                                         <p className="mt-1 text-sm text-gray-500">
                                           {isOnlineQuotaExhausted
                                             ? 'Đã hết lượt làm online tháng này'
-                                            : freeSlot.sunday
-                                              ? 'Làm việc từ xa (Chủ nhật — không tính hạn mức)'
-                                              : freeSlot.satAfternoon
-                                                ? `Làm việc từ xa (buổi chiều không tính hạn mức · còn ${remainingOnline}/${maxOnline} ngày)`
-                                                : `Làm việc từ xa (Còn ${remainingOnline}/${maxOnline} ngày)`}
+                                            : cost?.full_day === 0
+                                              ? 'Làm việc từ xa (ngày này không tính hạn mức)'
+                                              : cost && (cost.morning === 0 || cost.afternoon === 0)
+                                                ? `Làm việc từ xa (buổi ${cost.afternoon === 0 ? 'chiều' : 'sáng'} không tính hạn mức${quotaCount ? ` · còn ${quotaCount}` : ''})`
+                                                : quotaCount ? `Làm việc từ xa (Còn ${quotaCount})` : 'Làm việc từ xa'}
                                         </p>
                                       </div>
                                     </div>
@@ -3689,23 +3806,27 @@ const AttendanceManagement: React.FC = () => {
                               // Lọc lý do cho Nghỉ phép tháng và Làm việc online
                               if (selectedContext === 'monthly_leave' || selectedContext === 'online_work') {
                                 const isLeave = selectedContext === 'monthly_leave';
-                                const remaining = isLeave 
-                                  ? (attendanceStats?.remaining_leave ?? 1)
-                                  : (attendanceStats?.remaining_online_work ?? 3);
+                                // Còn lại từ API stats; chưa có (đang tải) thì không lọc theo hạn mức —
+                                // backend vẫn kiểm tra khi gửi đơn, không đoán bằng số ghi cứng.
+                                const remaining: number | null = isLeave
+                                  ? (attendanceStats?.remaining_leave ?? null)
+                                  : (attendanceStats?.remaining_online_work ?? null);
                                 
                                 let filtered = [...reasons];
-                                const freeSlotReasons = isLeave
-                                  ? { sunday: false, satAfternoon: false }
-                                  : onlineFreeSlot(selectedDate, attendanceStats?.online_weekend_unlimited);
-                                if (freeSlotReasons.sunday) {
-                                  // Chủ nhật không tính hạn mức -> giữ đủ sáng/chiều/cả ngày
-                                } else if (freeSlotReasons.satAfternoon) {
-                                  // Chiều T7 tuần 2/4 miễn hạn mức; sáng & cả ngày đều chỉ tính 0.5
-                                  if (remaining < 0.5) {
-                                    filtered = filtered.filter(r => r.id === 'afternoon');
+                                if (isLeave) {
+                                  // Nghỉ phép: cả ngày = 1 ngày phép
+                                  if (remaining != null && remaining < 1.0) {
+                                    filtered = filtered.filter(r => r.id !== 'full_day');
                                   }
-                                } else if (remaining < 1.0) {
-                                  filtered = filtered.filter(r => r.id !== 'full_day');
+                                } else {
+                                  // Online: mỗi buổi tính bao nhiêu ở ngày này do backend trả — chỉ giữ buổi còn đủ hạn mức
+                                  const cost = onlineQuotaCostOn(selectedDate, attendanceStats?.online_quota_cost_by_date);
+                                  if (remaining != null && cost) {
+                                    filtered = filtered.filter(r => {
+                                      const c = cost[r.id as keyof OnlineQuotaCost];
+                                      return c == null || c <= remaining;
+                                    });
+                                  }
                                 }
 
                                 // Kiểm tra các ca đã có dữ liệu (chính xác hơn)
@@ -4471,8 +4592,10 @@ const AttendanceManagement: React.FC = () => {
                             </h4>
                             <div className="grid grid-cols-1 gap-2">
                               {(() => {
-                                const _TELESALE_CODES = ['NV_TELESALE', 'TP_TELESALE', 'LEADER_TELESALE'];
-                                const isTelesale = _TELESALE_CODES.includes(currentEmployee?.position?.code ?? '');
+                                // Mã vị trí Telesale lấy từ backend (shift.telesale_position_codes = đúng tập
+                                // main_api dùng khi tính công đơn Trực tối) — chưa tải thì ẩn preset riêng Telesale.
+                                const isTelesale = (systemRules?.shift?.telesale_position_codes ?? [])
+                                  .includes(currentEmployee?.position?.code ?? '');
                                 return [
                                   {
                                     label: 'Ca chiều tối',
@@ -4886,11 +5009,14 @@ const AttendanceManagement: React.FC = () => {
                       const startDateStr = selectedDate
                         ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
                         : '';
-                      // Giới hạn tối đa 30 ngày kể từ ngày bắt đầu (khớp giới hạn 31 ngày/đơn bên backend)
-                      const maxEndDate = selectedDate
+                      // Số ngày tối đa của 1 đơn lấy từ backend (attendance.unauthorized_absence_max_days =
+                      // RegistrationRequestCreateSerializer.MAX_UNAUTHORIZED_ABSENCE_RANGE_DAYS, tính cả ngày
+                      // bắt đầu) — chưa tải được thì không giới hạn ở web, backend vẫn chặn khi gửi.
+                      const maxDays = systemRules?.attendance?.unauthorized_absence_max_days;
+                      const maxEndDate = selectedDate && maxDays != null
                         ? (() => {
                             const d = new Date(selectedDate);
-                            d.setDate(d.getDate() + 30);
+                            d.setDate(d.getDate() + maxDays - 1);
                             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                           })()
                         : undefined;
@@ -5078,33 +5204,34 @@ const AttendanceManagement: React.FC = () => {
                                 </svg>
                                 <span className="text-xs font-bold text-white tracking-wide uppercase">{selectedReason === 'machine_error' ? 'Giờ check-in đã chấm' : 'Giờ check-in bị quên'}</span>
                               </div>
-                              <div className="bg-violet-50 p-3 flex gap-2">
-                                {[
-                                  { value: '07:30', label: '7h30', desc: 'Sáng' },
-                                  { value: '08:00', label: '8h00', desc: 'Sáng' },
-                                  { value: '08:30', label: '8h30', desc: 'Sáng' },
-                                  { value: '09:00', label: '9h00', desc: 'Sáng' },
-                                  // Giờ bắt đầu Ca 2 (Điều dưỡng BS A, 09:30-13:30/
-                                  // 14:30-18:30) — thêm 2026-09-18 cùng đợt với giờ check-out
-                                  // 18h30, cho đủ cặp giờ vào/ra của Ca 2 trong form này.
-                                  { value: '09:30', label: '9h30', desc: 'Sáng' },
-                                  { value: '13:00', label: '13h00', desc: 'Chiều' },
-                                  { value: '14:30', label: '14h30', desc: 'Chiều' },
-                                  { value: '17:30', label: '17h30', desc: 'Tối' },
-                                ].map((opt) => {
+                              {/* Giờ vào của các ca đang áp dụng cho NV (ShiftConfig) — xem shiftTimeOptions */}
+                              {shiftTimeOptions(employeeShifts, 'checkin').length > 0 && (
+                              <div className="bg-violet-50 p-3 flex flex-wrap gap-2">
+                                {shiftTimeOptions(employeeShifts, 'checkin').map((opt) => {
                                   const sel = forgotCheckinTime === opt.value;
                                   return (
                                     <button
                                       key={opt.value}
                                       type="button"
                                       onClick={() => setForgotCheckinTime(sel ? null : opt.value)}
-                                      className={`flex-1 flex flex-col items-center py-2.5 rounded-xl border-2 transition-all duration-150 ${sel ? 'bg-violet-600 border-violet-600 shadow-md scale-[1.04]' : 'bg-white border-violet-200 hover:border-violet-400 hover:bg-violet-50'}`}
+                                      className={`flex-1 min-w-[4.5rem] flex flex-col items-center py-2.5 rounded-xl border-2 transition-all duration-150 ${sel ? 'bg-violet-600 border-violet-600 shadow-md scale-[1.04]' : 'bg-white border-violet-200 hover:border-violet-400 hover:bg-violet-50'}`}
                                     >
                                       <span className={`text-sm font-extrabold ${sel ? 'text-white' : 'text-violet-700'}`}>{opt.label}</span>
                                       <span className={`text-[10px] mt-0.5 font-medium ${sel ? 'text-violet-200' : 'text-gray-400'}`}>{opt.desc}</span>
                                     </button>
                                   );
                                 })}
+                              </div>
+                              )}
+                              {/* Backend nhận giờ bất kỳ -> cho nhập giờ khác ngoài giờ ca */}
+                              <div className="bg-violet-50 px-3 pb-3 flex items-center gap-2">
+                                <span className="text-xs font-medium text-gray-500">Giờ khác</span>
+                                <input
+                                  type="time"
+                                  value={forgotCheckinTime ?? ''}
+                                  onChange={(e) => setForgotCheckinTime(e.target.value || null)}
+                                  className="text-sm border border-violet-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-violet-400"
+                                />
                               </div>
                             </div>
                           )}
@@ -5118,31 +5245,34 @@ const AttendanceManagement: React.FC = () => {
                                 </svg>
                                 <span className="text-xs font-bold text-white tracking-wide uppercase">{selectedReason === 'machine_error' ? 'Giờ check-out đã chấm' : 'Giờ check-out bị quên'}</span>
                               </div>
-                              <div className="bg-amber-50 p-3 flex gap-2">
-                                {[
-                                  { value: '12:00', label: '12h00', desc: 'Trưa' },
-                                  { value: '16:30', label: '16h30', desc: 'Chiều' },
-                                  { value: '17:00', label: '17h00', desc: 'Chiều' },
-                                  { value: '17:30', label: '17h30', desc: 'Chiều' },
-                                  // Giờ kết thúc Ca 2 chiều (Điều dưỡng BS A,
-                                  // 14:30-18:30) — thêm 2026-09-18 vì thiếu mốc này khiến
-                                  // NV làm Ca 2 quên chấm công không chọn được đúng giờ về.
-                                  { value: '18:30', label: '18h30', desc: 'Chiều' },
-                                  { value: '21:00', label: '21h00', desc: 'Tối' },
-                                ].map((opt) => {
+                              {/* Giờ ra của các ca đang áp dụng cho NV (ShiftConfig) — xem shiftTimeOptions */}
+                              {shiftTimeOptions(employeeShifts, 'checkout').length > 0 && (
+                              <div className="bg-amber-50 p-3 flex flex-wrap gap-2">
+                                {shiftTimeOptions(employeeShifts, 'checkout').map((opt) => {
                                   const sel = forgotCheckoutTime === opt.value;
                                   return (
                                     <button
                                       key={opt.value}
                                       type="button"
                                       onClick={() => setForgotCheckoutTime(sel ? null : opt.value)}
-                                      className={`flex-1 flex flex-col items-center py-2.5 rounded-xl border-2 transition-all duration-150 ${sel ? 'bg-amber-500 border-amber-500 shadow-md scale-[1.04]' : 'bg-white border-amber-200 hover:border-amber-400 hover:bg-amber-50'}`}
+                                      className={`flex-1 min-w-[4.5rem] flex flex-col items-center py-2.5 rounded-xl border-2 transition-all duration-150 ${sel ? 'bg-amber-500 border-amber-500 shadow-md scale-[1.04]' : 'bg-white border-amber-200 hover:border-amber-400 hover:bg-amber-50'}`}
                                     >
                                       <span className={`text-sm font-extrabold ${sel ? 'text-white' : 'text-amber-600'}`}>{opt.label}</span>
                                       <span className={`text-[10px] mt-0.5 font-medium ${sel ? 'text-amber-200' : 'text-gray-400'}`}>{opt.desc}</span>
                                     </button>
                                   );
                                 })}
+                              </div>
+                              )}
+                              {/* Backend nhận giờ bất kỳ -> cho nhập giờ khác ngoài giờ ca */}
+                              <div className="bg-amber-50 px-3 pb-3 flex items-center gap-2">
+                                <span className="text-xs font-medium text-gray-500">Giờ khác</span>
+                                <input
+                                  type="time"
+                                  value={forgotCheckoutTime ?? ''}
+                                  onChange={(e) => setForgotCheckoutTime(e.target.value || null)}
+                                  className="text-sm border border-amber-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                                />
                               </div>
                             </div>
                           )}

@@ -682,6 +682,22 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             if not is_admin_or_hr and request_employee and request_employee.position and request_employee.position.is_management:
                 queryset = queryset.filter(manager_id=request_employee.id)
 
+            # active_in_month=YYYY-MM: chỉ người thuộc phạm vi chốt công của tháng đó —
+            # ĐÚNG tập backend chốt ở finalize-all / finalize-department
+            # (finalization_views._active_in_month_q). Trang Chốt công dùng tham số này
+            # thay vì tự đặt luật riêng ở web (trước đây "nghỉ việc trong 46 ngày tính từ
+            # HÔM NAY" — lệch với tháng đang chọn).
+            active_in_month = self.request.query_params.get('active_in_month')
+            if active_in_month:
+                from rest_framework.exceptions import ValidationError as DRFValidationError
+                from .finalization_views import _active_in_month_q
+                try:
+                    _y, _m = (int(part) for part in active_in_month.split('-'))
+                    month_q = _active_in_month_q(_y, _m)
+                except (TypeError, ValueError):
+                    raise DRFValidationError({'active_in_month': 'Định dạng phải là YYYY-MM.'})
+                queryset = queryset.filter(month_q)
+
         # Filter theo employment_status computed:
         #   - SUSPENDED: stored_status in (SUSPENDED, PAUSED) (manual override)
         #   - INACTIVE : không thuộc nhóm SUSPENDED, end_date <= today
