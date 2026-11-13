@@ -89,11 +89,12 @@ class RankNormalizationTests(TestCase):
 
     def test_employee_serializer_stores_code(self):
         emp = Employee.objects.create(user=_user('rank-ser'), employee_id='RK001', full_name='NV RK')
-        serializer = EmployeeSerializer(emp, data={'rank': 'Phó phòng'}, partial=True)
+        serializer = EmployeeSerializer(emp, data={'rank': 'Phó phòng', 'education_level': 'Cử nhân đại học'},
+                                        partial=True)
         self.assertTrue(serializer.is_valid(), serializer.errors)
         serializer.save()
         emp.refresh_from_db()
-        self.assertEqual(emp.rank, 'DEPUTY_MANAGER')
+        self.assertEqual((emp.rank, emp.education_level), ('DEPUTY_MANAGER', 'BACHELOR'))
 
     def test_data_migration_converts_known_labels_only(self):
         migration = importlib.import_module('employee.migrations.0005_rank_labels_to_codes')
@@ -267,6 +268,13 @@ class OnboardingSubmitRulesTests(TestCase):
         serializer = self._serializer(position='Vị trí lạ')
         self.assertFalse(serializer.is_valid())
         self.assertIn('position', serializer.errors)
+
+    def test_hr_create_uses_same_name_rule(self):
+        from hrm.serializers import OnboardingProcessCreateSerializer
+        data = {'candidate_name': 'Nguyen 1', 'candidate_email': 'new@example.com', 'start_date': '2026-01-01'}
+        serializer = OnboardingProcessCreateSerializer(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('candidate_name', serializer.errors)
 
     def test_file_rules_shared(self):
         too_big = SimpleUploadedFile('cccd.pdf', b'0' * (onboarding_rules.CITIZEN_ID_FILE_MAX_BYTES + 1),

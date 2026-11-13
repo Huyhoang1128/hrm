@@ -21,6 +21,7 @@ import Pagination from '../components/Pagination';
 import { SelectBox } from '../components/LandingLayout/SelectBox';
 import { useDebounce } from '../hooks/useDebounce';
 import FeedbackDialog, { FeedbackVariant } from '../components/FeedbackDialog';
+import { useSystemRules } from '../services/systemRules.service';
 
 // ============================================
 // TYPES
@@ -102,6 +103,15 @@ type CreateModalProps = {
 };
 
 const CreateOnboardingModal: React.FC<CreateModalProps> = ({ onClose, onSuccess, initial }) => {
+  // Độ dài tối đa / mẫu họ tên theo backend (system-rules "onboarding") — cùng quy định form nhận việc.
+  const formRules = useSystemRules()?.onboarding ?? null;
+  const nameMaxLength = formRules?.text_max_length.candidate_name;
+  const nameRegex = formRules ? new RegExp(formRules.name_pattern) : null;
+  const nameError = (v: string): string => {
+    if (nameRegex && !nameRegex.test(v)) return 'Không được chứa số hoặc ký tự đặc biệt';
+    if (nameMaxLength !== undefined && v.length > nameMaxLength) return `Tối đa ${nameMaxLength} ký tự`;
+    return '';
+  };
   const [submitting, setSubmitting] = useState(false);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
@@ -176,8 +186,7 @@ const CreateOnboardingModal: React.FC<CreateModalProps> = ({ onClose, onSuccess,
   const validate = (): boolean => {
     const errs: Partial<Record<keyof CreateOnboardingForm, string>> = {};
     if (!form.candidate_name.trim()) errs.candidate_name = 'Vui lòng nhập họ và tên';
-    else if (!/^[a-zA-ZÀ-ỹ\s]+$/.test(form.candidate_name.trim())) errs.candidate_name = 'Họ tên không được chứa số hoặc ký tự đặc biệt';
-    else if (form.candidate_name.trim().length > 50) errs.candidate_name = 'Họ tên tối đa 50 ký tự';
+    else if (nameError(form.candidate_name.trim())) errs.candidate_name = `Họ tên ${nameError(form.candidate_name.trim()).toLowerCase()}`;
     if (!form.candidate_email.trim()) errs.candidate_email = 'Vui lòng nhập email';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.candidate_email))
       errs.candidate_email = 'Email không hợp lệ';
@@ -271,15 +280,15 @@ const CreateOnboardingModal: React.FC<CreateModalProps> = ({ onClose, onSuccess,
           {field('candidate_name', 'Họ và tên', true,
             <input
               type="text"
-              maxLength={50}
+              maxLength={nameMaxLength}
               className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${errors.candidate_name ? 'border-red-400' : 'border-gray-200'}`}
               placeholder="Nguyễn Văn A"
               value={form.candidate_name}
               onChange={(e) => {
                 const v = e.target.value;
                 setForm({ ...form, candidate_name: v });
-                if (v && !/^[a-zA-ZÀ-ỹ\s]+$/.test(v)) setErrors(prev => ({ ...prev, candidate_name: 'Không được chứa số hoặc ký tự đặc biệt' }));
-                else if (v.length > 50) setErrors(prev => ({ ...prev, candidate_name: 'Tối đa 50 ký tự' }));
+                const err = v ? nameError(v) : '';
+                if (err) setErrors(prev => ({ ...prev, candidate_name: err }));
                 else setErrors(prev => { const { candidate_name, ...rest } = prev; return rest; });
               }}
             />
@@ -350,7 +359,7 @@ const CreateOnboardingModal: React.FC<CreateModalProps> = ({ onClose, onSuccess,
             Hủy
           </button>
           {(() => {
-            const nameValid = form.candidate_name.trim().length > 0 && /^[a-zA-ZÀ-ỹ\s]+$/.test(form.candidate_name.trim()) && form.candidate_name.trim().length <= 50;
+            const nameValid = form.candidate_name.trim().length > 0 && !nameError(form.candidate_name.trim());
             const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.candidate_email.trim());
             const unitValid = !!form.company_unit;
             const isFormValid = nameValid && emailValid && unitValid && Object.keys(errors).length === 0;

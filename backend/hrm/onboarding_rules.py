@@ -141,6 +141,11 @@ def validate_vneid_screenshot(value):
     return value
 
 
+def is_valid_name(value):
+    """Họ tên / mối quan hệ chỉ gồm chữ cái và khoảng trắng (NAME_PATTERN)."""
+    return bool(re.match(NAME_PATTERN, value or ''))
+
+
 def age_on(born, today):
     return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
 
@@ -158,7 +163,6 @@ def validate_submit(attrs, today=None):
     """Kiểm tra dữ liệu form nhận việc lúc nộp — cùng quy tắc với web. Trả {field: lỗi}."""
     today = today or date.today()
     errors = {}
-    name_re = re.compile(NAME_PATTERN)
 
     for field, label in (
         ('candidate_name', 'Họ và tên'),
@@ -166,7 +170,7 @@ def validate_submit(attrs, today=None):
         ('emergency_contact_relationship', 'Mối quan hệ'),
     ):
         value = attrs.get(field)
-        if value and not name_re.match(value):
+        if value and not is_valid_name(value):
             errors[field] = f'{label} không được chứa số hoặc ký tự đặc biệt'
 
     digit_rules = (

@@ -274,6 +274,10 @@ class EmployeeSerializer(serializers.ModelSerializer):
         # Cấp bậc lưu mã (employee.models.RANK_CHOICES); web / client cũ gửi nhãn vẫn nhận.
         return normalize_rank(value)
 
+    def validate_education_level(self, value):
+        # Học vấn lưu mã EDUCATION_LEVEL; nhãn (kể cả nhãn cũ của form nhận việc) đổi sang mã, giá trị lạ giữ nguyên.
+        return normalize_education_level(value) or value
+
     def validate_social_insurance_contribution_level(self, value):
         # BHXH theo kỳ (employee/social_insurance.py): mức đóng trên hồ sơ tự cập nhật theo kỳ
         # hiện hành, sửa trực tiếp sẽ bị ghi đè và bảng lương cũng không dùng.
@@ -4199,6 +4203,10 @@ class OnboardingProcessCreateSerializer(serializers.ModelSerializer):
         if 'employee_id' in attrs:
             attrs['desired_employee_id'] = attrs.pop('employee_id')
 
+        # Cùng mẫu họ tên với form nhận việc (hrm/onboarding_rules.py) — web kiểm tra theo cùng quy định.
+        if attrs.get('candidate_name') and not onboarding_rules.is_valid_name(attrs['candidate_name']):
+            raise serializers.ValidationError({'candidate_name': 'Họ và tên không được chứa số hoặc ký tự đặc biệt'})
+
         company_unit_raw = attrs.get('company_unit')
         if company_unit_raw not in (None, ''):
             resolved_company_unit = Employee.resolve_company_unit(company_unit_raw)
@@ -4904,6 +4912,10 @@ class OnboardingProcessUpdateSerializer(serializers.ModelSerializer):
     def validate_rank(self, value):
         # Cấp bậc lưu mã (employee.models.RANK_CHOICES); nhãn cũ vẫn nhận.
         return normalize_rank(value)
+
+    def validate_education_level(self, value):
+        # Học vấn lưu mã EDUCATION_LEVEL; nhãn cũ đổi sang mã, giá trị lạ giữ nguyên.
+        return normalize_education_level(value) or value
 
     def update(self, instance, validated_data):
         # citizen_id_file là CharField trên model (lưu S3 key) nên cần upload file

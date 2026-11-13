@@ -62,32 +62,8 @@ export const NATIONALITY_OPTIONS = [
   'Quần đảo Solomon', 'Kiribati', 'Palau',
 ];
 
-export const SECTION_OPTIONS = [
-  { value: 'ADS', label: 'ADS' },
-  { value: 'BENH_VIEN_HA_THANH', label: 'Bệnh viện Hà Thành' },
-  { value: 'BENH_VIEN_30_4', label: 'Bệnh viện 30/4' },
-  { value: 'BENH_VIEN_AN_VIET', label: 'Bệnh viện An Việt' },
-  { value: 'BENH_VIEN_HONG_HA', label: 'Bệnh viện Hồng Hà' },
-  { value: 'BENH_VIEN_TAN_HUNG', label: 'Bệnh Viện Tân Hưng' },
-  { value: 'BENH_VIEN_SAO_HAN', label: 'Bệnh viện Sao Hàn' },
-  { value: 'BENH_VIEN_VAN_HANH', label: 'Bệnh viện Vạn Hạnh' },
-  { value: 'CHECK_PAGE', label: 'Check page' },
-  { value: 'XAY_GROUP', label: 'Xây Group' },
-  { value: 'TIKTOK', label: 'Tiktok' },
-  { value: 'GIAM_SAT_CHAT_LUONG', label: 'Giám sát chất lượng' },
-  { value: 'GIAM_SAT_NOI_BO', label: 'Giám sát nội bộ' },
-  { value: 'MEDIA', label: 'Media' },
-  { value: 'NOI_DUNG_01', label: 'Nội dung 01' },
-  { value: 'PHONG_HCNS', label: 'Phòng HCNS' },
-  { value: 'PHONG_KE_TOAN', label: 'Phòng kế toán' },
-  { value: 'PHONG_TTTH', label: 'Phòng TTTH' },
-  { value: 'KINH_DOANH_VP_MIEN_BAC', label: 'Kinh doanh - VP miền Bắc' },
-  { value: 'KINH_DOANH_VP_MIEN_NAM', label: 'Kinh doanh - VP miền Nam' },
-  { value: 'PHAP_CHE', label: 'Pháp chế' },
-  { value: 'MUA_HANG', label: 'Mua hàng' },
-  { value: 'BO_PHAN_AI', label: 'Bộ phận AI' },
-  { value: 'BO_PHAN_IT', label: 'Bộ phận IT' },
-];
+// Danh sách bộ phận / phòng ban / vị trí / cấp bậc / vùng / khối / học vấn: lấy từ backend
+// (API danh mục + GET /api-hrm/system-rules/ section "choices"), không ghi cứng ở đây.
 
 export const WORK_FORM_OPTIONS = [
   { value: 'FULL_TIME', label: 'Full-time' },
@@ -103,49 +79,6 @@ export const CITIZEN_ID_ISSUE_PLACE_OPTIONS = [
   { value: 'POLICE_ADMIN', label: 'Cục cảnh sát Quản lý hành chính về Trật tự xã hội' },
   { value: 'MINISTRY_PUBLIC_SECURITY', label: 'Bộ Công An' },
 ];
-
-export const EDUCATION_LEVEL_OPTIONS = ['Thạc sĩ', 'Cử nhân đại học', 'Cử nhân cao đẳng', 'Trung cấp', 'Khác'];
-
-export const SUB_DEPARTMENT_OPTIONS = [
-  'ADS', 'ADS2', 'KD 1', 'KD 2', 'KD 3', 'KD 4', 'KD MN',
-  'CSKH MB', 'CSKH MN', 'Media', 'Giám sát nội bộ',
-  'HCNS', 'Kế toán', 'Truyền thông',
-  'TTTH 01', 'TTTH 02', 'TTTH 03', 'TTTH 04', 'TTTH 06',
-  'Xây group', 'TTTH 08', 'TTTH 05', 'TTTH 07', 'TTTH 09',
-  'TTTH 10', 'TTTH 11', 'Tiktok 1', 'Tiktok 2', 'Tiktok 3',
-  'Tiktok 5', 'TTTH 15', 'Pháp chế', 'Tiktok 4', 'KD 5',
-  'Mua hàng', 'Công nghệ thông tin', 'Tiktok 6', 'Tiktok 7',
-  'Tiktok 8', 'Tiktok 9', 'Tiktok 10',
-];
-
-export const RANK_OPTIONS = [
-  'Nhân viên', 'Leader', 'Quản lý', 'Trưởng phòng tập sự', 'Phó phòng',
-  'Trưởng phòng', 'Phó Giám đốc', 'Giám đốc', 'Chủ tịch',
-];
-
-export const POSITION_OPTIONS = [
-  'Nhân viên Sale', 'Nhân viên Kinh doanh', 'Nhân viên Telesale', 'Trưởng phòng Telesale',
-  'Nhân viên CSKH', 'Trưởng phòng CSKH', 'Nhân viên Tư vấn',
-  'Chăm sóc, tiếp nhận khách', 'Chăm sóc hậu phẫu',
-  'Nhân viên Marketing', 'Nhân viên ADS', 'Trưởng phòng ADS', 'Nhân viên Content', 'Trưởng phòng Content',
-  'Nhân viên Seeding', 'Trưởng phòng Seeding', 'Nhân viên Truyền thông thương hiệu', 'Trưởng phòng Truyền thông thương hiệu',
-  'Truyền thông nội bộ',
-  'Nhân viên Media', 'Trưởng phòng Media', 'Nhân viên TikTok', 'Xây group',
-  'Nhân viên Thiết kế', 'Nhân viên Editor/Dựng phim', 'Biên tập viên', 'Biên kịch', 'Checkpage', 'Trợ lý hình ảnh', 'Quay - Chụp', 'Tổ chức sản xuất',
-  'Bác sĩ', 'Trợ lý bác sĩ', 'Điều dưỡng', 'Y tá', 'Kỹ thuật viên', 'Phụ tá',
-  'Nhân viên Hành chính - Nhân sự', 'Trưởng phòng Hành chính - Nhân sự', 'Giám đốc Hành chính - Nhân sự',
-  'Nhân viên C&B', 'Nhân viên Tuyển dụng', 'Trưởng phòng Tuyển dụng',
-  'Nhân viên Pháp chế', 'Trưởng phòng Pháp chế', 'Giám đốc Pháp chế',
-  'Phiên dịch viên', 'Nhân viên IT', 'Nhân viên AI', 'Trưởng phòng IT', 'Trưởng phòng AI',
-  'Nhân viên Kế toán', 'Kế toán trưởng', 'Thủ quỹ', 'Thực tập sinh', 'Lễ tân', 'Giám sát nội bộ', 'Giám sát chất lượng', 'Trưởng phòng Giám sát',
-  'Lái xe', 'Tạp vụ', 'Bảo vệ',
-  'Phó phòng',
-  'Giám đốc', 'Phó Giám đốc',
-];
-
-
-export const REGION_OPTIONS = ['Miền Bắc', 'Miền Nam'];
-export const BLOCK_OPTIONS = ['Khối Back office', 'Khối Marketing', 'Khối Kinh doanh'];
 
 export const MARITAL_STATUS_OPTIONS = [
   { value: 'SINGLE', label: 'Độc thân' },
