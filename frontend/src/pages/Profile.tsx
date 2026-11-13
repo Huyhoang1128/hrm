@@ -150,9 +150,8 @@ const Profile: React.FC = () => {
   const [viewingDoc, setViewingDoc] = useState<OnboardingDocument | null>(null);
   const [docReadable, setDocReadable] = useState(false);
   const [markingReadId, setMarkingReadId] = useState<number | null>(null);
-  // Giới hạn ảnh đại diện + thời gian đọc tối thiểu tài liệu quy định: lấy từ backend (system-rules),
-  // backend kiểm tra cùng con số — không ghi cứng ở web.
-  const systemRules = useSystemRules();
+  // Giới hạn ảnh đại diện + thời gian đọc tối thiểu tài liệu quy định: lấy từ backend (system-rules,
+  // `systemRules` khai báo ở đầu component), backend kiểm tra cùng con số — không ghi cứng ở web.
   const avatarRules = systemRules?.uploads?.avatar ?? null;
   const minReadSeconds = systemRules?.regulation?.min_read_seconds ?? null;
 

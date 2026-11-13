@@ -9,7 +9,6 @@ import { useLockBodyScroll } from '../hooks/useLockBodyScroll';
 import { useSystemRules } from '../services/systemRules.service';
 import { CITIZEN_ID_ISSUE_PLACE_OPTIONS } from '../constants/onboarding';
 import { UsersIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import { useSystemRules } from '../services/systemRules.service';
 import { choiceLabel, pickChoices } from '../utils/hrChoices';
 
 const getGenderLabel = (gender?: string) => {
