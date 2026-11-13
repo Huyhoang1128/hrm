@@ -184,11 +184,8 @@ export const PAYMENT_METHOD_LABELS: Record<Exclude<PaymentMethod, ''>, string> =
   TRANSFER: 'Chuyển khoản',
 };
 
-export const ALLOWED_ATTACHMENT_EXTENSIONS = [
-  'pdf', 'jpg', 'jpeg', 'png', 'webp', 'heic', 'heif',
-  'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'zip', 'rar',
-];
-export const MAX_ATTACHMENT_SIZE = 20 * 1024 * 1024;
+// Định dạng + dung lượng file đính kèm: lấy từ backend (system-rules "uploads".payment_document_attachment,
+// nguồn hrm/payment_document_views.py) — không ghi cứng ở web.
 
 // ── Tiện ích số tiền ──────────────────────────────────────────────────────
 /** "1500000" | 1500000 → "1.500.000" (rỗng nếu không có) */

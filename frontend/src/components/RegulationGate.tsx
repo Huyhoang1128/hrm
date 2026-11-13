@@ -10,6 +10,7 @@ import {
 import onboardingService from '../services/onboarding.service';
 import { useLockBodyScroll } from '../hooks/useLockBodyScroll';
 import PdfFrame from './Common/PdfFrame';
+import { useSystemRules } from '../services/systemRules.service';
 
 /**
  * Blocking gate: ép nhân viên đọc xong các tài liệu REGULATION bắt buộc
@@ -26,6 +27,8 @@ const RegulationGate: React.FC<RegulationGateProps> = ({ userId }) => {
   const [docReadable, setDocReadable] = useState(false);
   const [markingReadId, setMarkingReadId] = useState<number | null>(null);
   const [showGate, setShowGate] = useState(false);
+  // Thời gian đọc tối thiểu do backend cấu hình (REGULATION_MIN_READ_SECONDS, system-rules "regulation").
+  const minReadSeconds = useSystemRules()?.regulation?.min_read_seconds ?? null;
   const dismissalKey = `regulation-gate-dismissed:${userId}`;
 
   const dismissGate = () => {
@@ -166,7 +169,11 @@ const RegulationGate: React.FC<RegulationGateProps> = ({ userId }) => {
                   src={viewingDoc.file_url || viewingDoc.file}
                   className="w-full h-full border-0"
                   title={viewingDoc.document_name}
-                  onLoad={() => { setTimeout(() => setDocReadable(true), 10000); }}
+                  onLoad={() => {
+                    // Chưa tải được quy định thì không chặn bằng số đoán.
+                    if (minReadSeconds == null) setDocReadable(true);
+                    else setTimeout(() => setDocReadable(true), minReadSeconds * 1000);
+                  }}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-500">Không có file đính kèm</div>
@@ -177,7 +184,9 @@ const RegulationGate: React.FC<RegulationGateProps> = ({ userId }) => {
               <p className="text-xs text-gray-500">
                 {viewingDoc.is_read ? '✓ Bạn đã đọc tài liệu này'
                   : docReadable ? '✓ Có thể xác nhận đã đọc'
-                    : '⏳ Vui lòng đọc hết tài liệu (tối thiểu 10 giây)...'}
+                    : minReadSeconds
+                      ? `⏳ Vui lòng đọc hết tài liệu (tối thiểu ${minReadSeconds} giây)...`
+                      : '⏳ Vui lòng đọc hết tài liệu...'}
               </p>
               {!viewingDoc.is_read && (
                 <button

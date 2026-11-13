@@ -16,12 +16,10 @@ import type { SelectOption } from '../LandingLayout/SelectBox';
 import { departmentsAPI, employeesAPI } from '../../utils/api/hrm.api';
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll';
 import paymentDocumentService, {
-  ALLOWED_ATTACHMENT_EXTENSIONS,
   COMPLETED_DATE_LABELS,
   DOC_TYPES,
   DOC_TYPE_LABELS,
   DUE_DATE_LABELS,
-  MAX_ATTACHMENT_SIZE,
   PAYEE_LABELS,
   STATUSES,
   digitsOnly,
@@ -37,6 +35,7 @@ import type {
   PaymentMethod,
 } from '../../services/paymentDocument.service';
 import { fmtDateTime, fmtFileSize, fmtMoney, todayISO } from './shared';
+import { formatBytes, useSystemRules } from '../../services/systemRules.service';
 
 // ── Kiểu dữ liệu nội bộ ───────────────────────────────────────────────────
 interface EmployeeOption {
@@ -295,6 +294,8 @@ interface Props {
 
 const PaymentDocumentFormModal: React.FC<Props> = ({ initial, defaultType, onClose, onSaved }) => {
   useLockBodyScroll(true);
+  // Giới hạn file đính kèm do backend quy định (cùng hằng số backend kiểm tra khi lưu).
+  const attachmentRules = useSystemRules()?.uploads?.payment_document_attachment ?? null;
   const isEdit = !!initial;
 
   const [docType, setDocType] = useState<PaymentDocType>(initial?.doc_type || defaultType || 'PAYMENT_REQUEST');
@@ -442,10 +443,11 @@ const PaymentDocumentFormModal: React.FC<Props> = ({ initial, defaultType, onClo
     const rejected: string[] = [];
     const accepted: File[] = [];
     incoming.forEach((f) => {
-      if (!ALLOWED_ATTACHMENT_EXTENSIONS.includes(fileExt(f.name))) {
+      // Chưa tải được quy định thì để backend kiểm tra khi lưu.
+      if (attachmentRules && !attachmentRules.extensions.includes(fileExt(f.name))) {
         rejected.push(`"${f.name}": định dạng không được hỗ trợ`);
-      } else if (f.size > MAX_ATTACHMENT_SIZE) {
-        rejected.push(`"${f.name}": vượt quá 20MB`);
+      } else if (attachmentRules && f.size > attachmentRules.max_bytes) {
+        rejected.push(`"${f.name}": vượt quá ${formatBytes(attachmentRules.max_bytes)}`);
       } else if (
         !newFiles.some((x) => x.name === f.name && x.size === f.size) &&
         !accepted.some((x) => x.name === f.name && x.size === f.size)
@@ -1052,12 +1054,14 @@ const PaymentDocumentFormModal: React.FC<Props> = ({ initial, defaultType, onClo
               <p className="text-sm text-gray-700">
                 <span className="font-medium text-primary-700">Chọn file</span> hoặc kéo thả vào đây
               </p>
-              <p className="mt-0.5 text-xs text-gray-500">PDF, ảnh, Word, Excel, ZIP… tối đa 20MB/file</p>
+              <p className="mt-0.5 text-xs text-gray-500">
+                PDF, ảnh, Word, Excel, ZIP…{attachmentRules && ` tối đa ${formatBytes(attachmentRules.max_bytes)}/file`}
+              </p>
               <input
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept={ALLOWED_ATTACHMENT_EXTENSIONS.map((x) => `.${x}`).join(',')}
+                accept={attachmentRules?.extensions.map((x) => `.${x}`).join(',')}
                 className="hidden"
                 onChange={(e) => {
                   addFiles(e.target.files);
