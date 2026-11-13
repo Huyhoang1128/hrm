@@ -962,16 +962,18 @@ class ShiftAssignmentView(APIView):
         emp_id  = request.query_params.get("employee_id")
         dept_id = request.query_params.get("department_id")
 
+        # "Ca chung công ty" = ca mặc định (is_default) — ShiftConfig không còn field apply_to_all
+        # (lọc theo field đó làm API này luôn lỗi 500).
         qs = ShiftConfig.objects.filter(is_active=True)
         if emp_id:
             qs = qs.filter(
                 Q(apply_to_employees__id=emp_id) |
                 Q(apply_to_departments__employees__id=emp_id) |
-                Q(apply_to_all=True)
+                Q(is_default=True)
             ).distinct()
         elif dept_id:
             qs = qs.filter(
-                Q(apply_to_departments__id=dept_id) | Q(apply_to_all=True)
+                Q(apply_to_departments__id=dept_id) | Q(is_default=True)
             ).distinct()
 
         data = [
@@ -997,7 +999,7 @@ class ShiftAssignmentView(APIView):
 class ShiftConfigForDepartmentView(APIView):
     """
     GET /shifts/department/<dept_id>/
-    Trả về tất cả ca đang áp dụng cho phòng ban (kể cả ca chung apply_to_all).
+    Trả về tất cả ca đang áp dụng cho phòng ban (kể cả ca mặc định công ty — is_default).
     """
     permission_classes = [IsAuthenticated]
 
@@ -1005,8 +1007,9 @@ class ShiftConfigForDepartmentView(APIView):
         dept = get_object_or_404(Department, pk=dept_id)
         today = datetime.date.today()
 
+        # Ca mặc định công ty = is_default (field apply_to_all không còn -> trước đây luôn lỗi 500).
         qs = ShiftConfig.objects.filter(is_active=True).filter(
-            Q(apply_to_departments=dept) | Q(apply_to_all=True)
+            Q(apply_to_departments=dept) | Q(is_default=True)
         ).filter(
             Q(effective_from__isnull=True) | Q(effective_from__lte=today)
         ).filter(
