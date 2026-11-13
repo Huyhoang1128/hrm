@@ -9714,7 +9714,8 @@ def send_account_emails(request):
             employee.user.password = make_password(new_password)
             employee.user.save(update_fields=['password'])
             reset_count += 1
-            logger.info(f"🔑 Reset password for {employee.user.username} -> {new_password}")
+            # KHÔNG ghi mật khẩu vào log (bảo mật) — chỉ ghi tài khoản đã được cấp lại.
+            logger.info(f"🔑 Reset password for {employee.user.username}")
             
             email_queue_objects.append(
                 EmailQueue(

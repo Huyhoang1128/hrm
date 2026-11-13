@@ -60,6 +60,16 @@ class HrmPasswordPathsTests(TestCase):
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(len(sent.call_args.kwargs['new_password']), RESET_PASSWORD_LENGTH)
 
+    def test_send_account_emails_does_not_log_password(self):
+        with self.assertLogs('hrm.views', level='INFO') as logs:
+            response = self.client.post('/api-hrm/employees/send-account-emails/', {'employee_ids': [self.staff.id]}, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        from hrm.models import EmailQueue
+        new_password = EmailQueue.objects.get(employee=self.staff).new_password
+        self.assertTrue(new_password)
+        self.assertFalse(any(new_password in line for line in logs.output))
+        self.assertTrue(any('pw-staff' in line for line in logs.output))
+
     def test_employee_create_validates_password(self):
         payload = {'employee_id': 'PW-NEW', 'full_name': 'Người mới', 'username': 'pw-new'}
         weak = self.client.post('/api-hrm/employees/', {**payload, 'password': '12345678'}, format='json')
