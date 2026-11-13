@@ -2385,11 +2385,17 @@ class MonthlyLeaveViewSet(AttendanceExplanationViewSet):
     @action(detail=False, methods=['post'])
     def bulk_approve(self, request):
         """
-        Duyệt hàng loạt đơn nghỉ phép tháng với quota check (tối đa 1 ngày/tháng).
+        Duyệt hàng loạt đơn nghỉ phép tháng với quota check (hạn mức CompanyConfig).
         Đơn vượt hạn mức sẽ bị từ chối tự động.
+
+        dry_run=true: chỉ XEM TRƯỚC — chạy đúng vòng duyệt + hạn mức bên dưới nhưng KHÔNG lưu gì,
+        trả về đơn nào sẽ duyệt / bị từ chối vì vượt hạn mức. Trang Phê duyệt dùng để hiện hộp
+        xác nhận thay vì tự xếp đơn & tự tính hạn mức ở web.
         """
         ids = request.data.get('ids', [])
         approval_note = request.data.get('approval_note', 'Đã duyệt hàng loạt')
+        dry_run = str(request.data.get('dry_run', '')).lower() in ('1', 'true', 'yes')
+        preview = {'approved': [], 'rejected': []}
 
         if not ids:
             return Response({'error': 'Danh sách ID không được để trống'}, status=status.HTTP_400_BAD_REQUEST)
@@ -2444,6 +2450,9 @@ class MonthlyLeaveViewSet(AttendanceExplanationViewSet):
                 leave_quota_cache[key] = max(0.0, MAX_LEAVE_PER_MONTH - used)
             leave_amount = 0.5 if d.get('expected_status') == 'HALF_DAY' else 1.0
             if leave_quota_cache[key] < leave_amount:
+                if dry_run:
+                    preview['rejected'].append({'id': event.id, 'note': quota_exceeded_note})
+                    continue
                 d.update({
                     'status': 'REJECTED',
                     'approval_note': quota_exceeded_note,
@@ -2501,6 +2510,12 @@ class MonthlyLeaveViewSet(AttendanceExplanationViewSet):
                 d['approved_by_name'] = approver.full_name
                 d['approved_at'] = now_str
 
+            if dry_run:
+                preview['approved'].append(event.id)
+                if d.get('status') == 'APPROVED':
+                    leave_quota_cache[key] -= leave_amount
+                continue
+
             if approval_note:
                 d['approval_note'] = approval_note
 
@@ -2513,6 +2528,8 @@ class MonthlyLeaveViewSet(AttendanceExplanationViewSet):
             if d.get('status') == 'APPROVED':
                 leave_quota_cache[key] -= leave_amount
 
+        if dry_run:
+            return Response({'dry_run': True, **preview, 'errors': errors})
         return Response({
             'success_count': len(results),
             'error_count': len(errors),
@@ -2522,7 +2539,7 @@ class MonthlyLeaveViewSet(AttendanceExplanationViewSet):
 
     @action(detail=False, methods=['get'])
     def remaining_quota(self, request):
-        """Lấy hạn mức nghỉ phép tháng còn lại (tối đa 1 ngày/tháng)"""
+        """Lấy hạn mức nghỉ phép tháng còn lại (hạn mức CompanyConfig — cùng nguồn bulk_approve)"""
         emp = self._get_current_employee(request)
         if not emp:
             return Response({'error': 'Employee profile not found'}, status=400)
@@ -2542,11 +2559,14 @@ class MonthlyLeaveViewSet(AttendanceExplanationViewSet):
             0.5 if (e.data or {}).get('expected_status') == 'HALF_DAY' else 1.0 
             for e in existing_leaves
         )
-        
+        # Trước đây ghi cứng 1.0 — lệch với hạn mức thật bulk_approve / stats dùng.
+        _cfg = CompanyConfig.objects.filter(is_active=True).order_by('-effective_from').first()
+        total_quota = float(_cfg.max_leave_count_per_month) if _cfg else 1.0
+
         return Response({
-            'total_quota': 1.0,
+            'total_quota': total_quota,
             'used': total_used,
-            'remaining': max(0, 1.0 - total_used)
+            'remaining': max(0, total_quota - total_used)
         })
 
 

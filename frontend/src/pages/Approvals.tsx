@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useDebounce } from '../hooks/useDebounce';
-import { approvalService } from '../services/approval.service';
+import { approvalService, type BulkApprovePreview } from '../services/approval.service';
 import { attendanceService } from '../services/attendance.service';
 import FinalizationLockBanner from '../components/FinalizationLockBanner';
 import { workFinalizationApprovalService } from '../services/workFinalizationApproval.service';
@@ -1222,9 +1222,11 @@ const Approvals: React.FC = () => {
     // Hạn mức của rổ chứa loại đơn này — backend tính (duyet-don max_explanation_quota).
     const mExp = Number(item.max_explanation_quota ?? 0);
     const owUsed = item.online_work_used ?? 0;
-    const mOnl = item.max_online_quota ?? 3;
+    // Hạn mức online / nghỉ phép của người này — backend tính (OnlineWorkQuotaOverride /
+    // CompanyConfig, có thể = 0). Không có thì không hiện badge, không đoán số.
+    const mOnl = item.max_online_quota;
     const lUsed = item.leave_used ?? 0;
-    const mLea = item.max_leave_quota ?? 1;
+    const mLea = item.max_leave_quota;
 
     let used = 0;
     let max = 0;
@@ -1246,6 +1248,7 @@ const Approvals: React.FC = () => {
       label = 'Giải trình';
     }
 
+    if (max == null) return null;
     const ratio = max > 0 ? used / max : 0;
 
     // Premium color palette based on ratio
@@ -2315,21 +2318,6 @@ const Approvals: React.FC = () => {
       }
     });
 
-    // Helper gom nhóm theo nhân viên + tháng
-    const groupByEmpMonth = (list: any[]): Record<string, any[]> => {
-      const groups: Record<string, any[]> = {};
-      list.forEach(item => {
-        const empId = Number(item.employee_id || (typeof item.employee === 'object' ? item.employee.id : item.employee));
-        const dateStr = item.event_date || item.attendance_date || item.date || item.created_at;
-        const d = new Date(dateStr);
-        // Hạn mức theo từng loại: tách thêm theo giỏ (quota_bucket = null khi dùng chung 1 giỏ)
-        const key = `${empId}-${d.getFullYear()}-${d.getMonth() + 1}-${item.quota_bucket ?? ''}`;
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(item);
-      });
-      return groups;
-    };
-
     // 1. Đơn Giải trình tính hạn mức (LATE, EARLY_LEAVE, LATE_EARLY, INCOMPLETE_ATTENDANCE):
     // hỏi backend XEM TRƯỚC (smart_bulk_approve dry_run) — đúng thuật toán + hạn mức backend
     // dùng khi duyệt thật (rổ chung / từng giỏ / rổ gộp tách Quên chấm công; Quên chấm công
@@ -2355,66 +2343,34 @@ const Approvals: React.FC = () => {
       });
     }
 
-    // 2. Đơn Nghỉ phép (LEAVE) — check quota từ item.max_leave_quota & item.leave_used
-    if (leaveItems.length > 0) {
-      Object.entries(groupByEmpMonth(leaveItems)).forEach(([_key, group]) => {
-        const firstItem = group[0];
-        const maxLeave = Number(firstItem.max_leave_quota ?? 1);
-        const leaveUsed = Number(firstItem.leave_used ?? 0);
-        let remaining = Math.max(0, maxLeave - leaveUsed);
-
-        // FCFS: đơn tạo sớm nhất được ưu tiên duyệt trước
-        const sorted = [...group].sort((a, b) => {
-          const tsA = a.created_at ? new Date(a.created_at).getTime() : 0;
-          const tsB = b.created_at ? new Date(b.created_at).getTime() : 0;
-          return tsA - tsB;
-        });
-
-        sorted.forEach(item => {
-          // Ưu tiên số ngày backend tính (0 với chiều T7 tuần 2/4 / Chủ nhật của
-          // phòng được miễn); backend cũ chưa trả thì tự tính như trước.
-          const amount = typeof item.online_quota_amount === 'number'
-            ? item.online_quota_amount
-            : (item.expected_status === 'HALF_DAY' ? 0.5 : 1.0);
-          if (amount === 0 || remaining >= amount) {
+    // 2 + 3. Đơn Nghỉ phép tháng / Làm việc online: hỏi backend XEM TRƯỚC (bulk_approve dry_run) —
+    // đúng thứ tự xét đơn, hạn mức theo người (CompanyConfig / OnlineWorkQuotaOverride) và số ngày
+    // mỗi đơn tính vào hạn mức mà backend dùng khi duyệt thật. Web không tự xếp đơn / tự tính hạn mức.
+    if (leaveItems.length > 0 || onlineWorkItems.length > 0) {
+      const applyPreview = (list: any[], preview: BulkApprovePreview | null) => {
+        if (!preview) return;
+        const approvedIds = new Set(preview.approved);
+        const rejectNotes = new Map(preview.rejected.map(r => [r.id, r.note]));
+        list.forEach(item => {
+          if (approvedIds.has(item.id)) {
             approvalItems.push(item);
-            remaining -= amount;
-          } else {
-            rejectionItems.push(item);
+          } else if (rejectNotes.has(item.id)) {
+            rejectionItems.push({ ...item, reject_note: rejectNotes.get(item.id) });
           }
         });
-      });
-    }
-
-    // 3. Đơn Online Work — check quota từ item.max_online_quota & item.online_work_used
-    if (onlineWorkItems.length > 0) {
-      Object.entries(groupByEmpMonth(onlineWorkItems)).forEach(([_key, group]) => {
-        const firstItem = group[0];
-        const maxOnline = Number(firstItem.max_online_quota ?? 3);
-        const onlineUsed = Number(firstItem.online_work_used ?? 0);
-        let remaining = Math.max(0, maxOnline - onlineUsed);
-
-        // FCFS: đơn tạo sớm nhất được ưu tiên duyệt trước
-        const sorted = [...group].sort((a, b) => {
-          const tsA = a.created_at ? new Date(a.created_at).getTime() : 0;
-          const tsB = b.created_at ? new Date(b.created_at).getTime() : 0;
-          return tsA - tsB;
-        });
-
-        sorted.forEach(item => {
-          // Ưu tiên số ngày backend tính (0 với chiều T7 tuần 2/4 / Chủ nhật của
-          // phòng được miễn); backend cũ chưa trả thì tự tính như trước.
-          const amount = typeof item.online_quota_amount === 'number'
-            ? item.online_quota_amount
-            : (item.expected_status === 'HALF_DAY' ? 0.5 : 1.0);
-          if (amount === 0 || remaining >= amount) {
-            approvalItems.push(item);
-            remaining -= amount;
-          } else {
-            rejectionItems.push(item);
-          }
-        });
-      });
+      };
+      try {
+        const [leavePreview, onlinePreview] = await Promise.all([
+          leaveItems.length > 0 ? approvalService.previewBulkApproveMonthlyLeaveRequests(leaveItems.map(i => i.id)) : null,
+          onlineWorkItems.length > 0 ? approvalService.previewBulkApproveOnlineWorkRequests(onlineWorkItems.map(i => i.id)) : null,
+        ]);
+        applyPreview(leaveItems, leavePreview);
+        applyPreview(onlineWorkItems, onlinePreview);
+      } catch (error: any) {
+        setErrorMessage('Không tính được hạn mức nghỉ phép / làm online để duyệt nhanh: ' + (error.response?.data?.error || error.message));
+        setErrorModalOpen(true);
+        return;
+      }
     }
 
     // 4. Đơn tự do (Đăng ký OT, Live...) — approve hết, không tính quota
