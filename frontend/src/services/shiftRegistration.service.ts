@@ -148,6 +148,17 @@ class ShiftRegistrationService {
   }
 
   /**
+   * Hạn đăng ký ca của 1 tuần (week_start_date = Thứ 2) — backend tính (shift_registration_deadline,
+   * đúng hàm dùng để chặn khi lưu), kể cả tuần chưa có đăng ký nào. ISO datetime.
+   */
+  async getRegistrationDeadline(weekStartDate: string): Promise<string> {
+    const response = await managementApi.get('/api-hrm/shift-registrations/registration-deadline/', {
+      params: { week_start_date: weekStartDate },
+    });
+    return response.data.registration_deadline;
+  }
+
+  /**
    * Lưới đăng ký ca của cả nhóm trong 1 tuần — CHỈ XEM.
    * HR/Admin: toàn bộ NV trong phạm vi (lọc thêm được theo department_id).
    * Quản lý trực tiếp: chỉ cấp dưới trực tiếp đang trong phạm vi.

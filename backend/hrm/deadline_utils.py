@@ -452,10 +452,15 @@ def overtime_deadline_for(attendance_date: _dt.date, start_time, employee):
 # với `_leave_deadline_cutoff` ở trên.
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Giờ chốt hạn QLTT sửa giờ (ngày lịch kế tiếp) — web không tự tính: /api-hrm/duyet-don/ trả sẵn
+# hạn của từng đơn (manager_hours_fix_deadline).
+MANAGER_ATTENDANCE_FIX_TIME = _dt.time(10, 0)
+
+
 def manager_attendance_fix_deadline(event_date: _dt.date):
     """10h00 sáng NGÀY LỊCH kế tiếp sau event_date; riêng khi ngày đó rơi vào
     Chủ nhật thì nới tới hết ngày (23:59:59)."""
     d = event_date + _dt.timedelta(days=1)
     if d.weekday() == 6:  # Chủ nhật
         return _end_of_day(d)
-    return _combine_aware(d, _dt.time(10, 0))
+    return _combine_aware(d, MANAGER_ATTENDANCE_FIX_TIME)

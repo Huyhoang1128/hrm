@@ -1422,23 +1422,19 @@ const Approvals: React.FC = () => {
   };
 
   /**
-   * Hạn để QUẢN LÝ TRỰC TIẾP vào sửa giờ đơn tăng ca của nhân viên: 10h sáng
-   * ngày lịch kế tiếp, riêng khi ngày đó là Chủ nhật thì tới hết ngày
-   * (23:59:59) — PHẢI khớp đúng backend `manager_attendance_fix_deadline()`
-   * ở hrm/deadline_utils.py, backend vẫn là chỗ chặn thật.
+   * Hạn để QUẢN LÝ TRỰC TIẾP vào sửa giờ đơn tăng ca Tại Viện/VP của nhân viên — backend
+   * trả sẵn theo từng đơn (/api-hrm/duyet-don/: manager_hours_fix_deadline, tính bằng
+   * deadline_utils.manager_attendance_fix_deadline — đúng hàm backend dùng để chặn), web không
+   * tự tính lại. null = đơn không thuộc diện QLTT sửa giờ.
    */
-  const getManagerFixDeadline = (dateStr?: string | null): Date | null => {
-    if (!dateStr) return null;
-    const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (!m) return null;
-    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + 1);
-    if (d.getDay() === 0) {            // Chủ nhật -> hết ngày
-      d.setHours(23, 59, 59, 999);
-    } else {
-      d.setHours(10, 0, 0, 0);
-    }
-    return d;
+  const getManagerFixDeadline = (req: any): Date | null => {
+    const raw = req?.manager_hours_fix_deadline;
+    if (!raw) return null;
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d;
   };
+  const formatFixDeadline = (d: Date) =>
+    d.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
 
   /**
    * Quản lý trực tiếp (hoặc HCNS/Admin) có được sửa giờ đơn tăng ca Tại Viện/VP
@@ -1459,9 +1455,7 @@ const Approvals: React.FC = () => {
     ).toUpperCase();
     if (type !== 'OVERTIME') return false;
     if (String(req.ot_type || ev.ot_type || '').toUpperCase() !== 'ONSITE') return false;
-    const deadline = getManagerFixDeadline(
-      req.attendance_date || req.registration_date || req.event_date || req.start_date || req.date,
-    );
+    const deadline = getManagerFixDeadline(req);
     return !!deadline && new Date() <= deadline;
   };
 
@@ -4727,7 +4721,7 @@ const Approvals: React.FC = () => {
                                                             <button
                                                               onClick={() => openOtEditModal(item)}
                                                               className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white rounded-md border border-indigo-200 transition-colors"
-                                                              title="Sửa lại giờ tăng ca thực tế cho nhân viên (hạn 10h sáng hôm sau, Chủ nhật tới hết ngày)"
+                                                              title={`Sửa lại giờ tăng ca thực tế cho nhân viên${!(isAdmin || isHR) && getManagerFixDeadline(item) ? ` (hạn ${formatFixDeadline(getManagerFixDeadline(item)!)})` : ''}`}
                                                             >
                                                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                                               <span className="text-xs font-semibold uppercase tracking-wider">Sửa giờ</span>
@@ -4873,7 +4867,7 @@ const Approvals: React.FC = () => {
                                                     <button
                                                       onClick={() => openOtEditModal(item)}
                                                       className="flex-1 h-9 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
-                                                      title="Sửa lại giờ tăng ca thực tế (hạn 10h sáng hôm sau, Chủ nhật tới hết ngày)"
+                                                      title={`Sửa lại giờ tăng ca thực tế${!(isAdmin || isHR) && getManagerFixDeadline(item) ? ` (hạn ${formatFixDeadline(getManagerFixDeadline(item)!)})` : ''}`}
                                                     >
                                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                                       Sửa giờ
@@ -5118,12 +5112,10 @@ const Approvals: React.FC = () => {
                 {systemRules?.overtime?.min_applies_to.includes('OVERTIME') &&
                   ` Tối thiểu ${systemRules.overtime.min_minutes} phút mới được tính tăng ca — nếu thực tế làm dưới ${systemRules.overtime.min_minutes} phút thì huỷ đơn thay vì sửa giờ.`}
                 {!(isAdmin || isHR) && (() => {
-                  const dl = getManagerFixDeadline(
-                    otEditItem.attendance_date || otEditItem.registration_date || otEditItem.event_date || otEditItem.start_date,
-                  );
+                  const dl = getManagerFixDeadline(otEditItem);
                   return dl ? (
                     <div className="mt-1 font-semibold">
-                      Hạn sửa: {dl.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      Hạn sửa: {formatFixDeadline(dl)}
                     </div>
                   ) : null;
                 })()}
