@@ -8,6 +8,7 @@ import {
   attendanceService,
   AttendanceRecord,
   AttendanceEvent,
+  type EmployeeShiftConfig,
 } from '../services/attendance.service';
 import shiftRegistrationService, { caLabels } from '../services/shiftRegistration.service';
 
@@ -83,6 +84,23 @@ const onlineFreeSlot = (date: Date | null, unlimited?: boolean) => {
   if (wd === 0) return { sunday: true, satAfternoon: false };
   const occurrence = Math.floor((date.getDate() - 1) / 7) + 1;
   return { sunday: false, satAfternoon: wd === 6 && (occurrence === 2 || occurrence === 4) };
+};
+
+/** Lựa chọn giờ cho đơn Quên chấm công / Lỗi máy chấm công, dựng từ cấu hình ca đang áp dụng cho
+ * nhân viên (ShiftConfig — nguồn duy nhất của giờ vào/ra/nghỉ): giờ VÀO = giờ bắt đầu ca + giờ vào
+ * lại sau nghỉ giữa ca; giờ RA = giờ kết thúc ca + giờ ra nghỉ giữa ca. Đổi/thêm ca ở backend là
+ * lựa chọn theo, không còn danh sách giờ ghi cứng. Backend nhận giờ bất kỳ nên form vẫn có ô "Giờ khác". */
+const shiftTimeOptions = (shifts: EmployeeShiftConfig[] | null, kind: 'checkin' | 'checkout') => {
+  if (!shifts) return [];
+  const raw = shifts.flatMap((s) =>
+    kind === 'checkin' ? [s.start_time, s.break_end_time] : [s.end_time, s.break_start_time],
+  );
+  const values = Array.from(new Set(raw.filter((t): t is string => !!t).map((t) => t.slice(0, 5)))).sort();
+  return values.map((value) => {
+    const [h, m] = value.split(':').map(Number);
+    const desc = h < 12 ? 'Sáng' : h < 13 ? 'Trưa' : h < 18 ? 'Chiều' : 'Tối';
+    return { value, label: `${h}h${String(m).padStart(2, '0')}`, desc };
+  });
 };
 
 const AttendanceManagement: React.FC = () => {
@@ -288,6 +306,8 @@ const AttendanceManagement: React.FC = () => {
   const [forgotPunchType, setForgotPunchType] = useState<'checkin' | 'checkout'>('checkin');
   const [forgotCheckinTime, setForgotCheckinTime] = useState<string | null>(null);
   const [forgotCheckoutTime, setForgotCheckoutTime] = useState<string | null>(null);
+  // Ca áp dụng cho nhân viên vào ngày đang chọn (để dựng lựa chọn giờ quên chấm công) — null khi chưa tải được.
+  const [employeeShifts, setEmployeeShifts] = useState<EmployeeShiftConfig[] | null>(null);
 
   // Confirmation modal state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -779,6 +799,21 @@ const AttendanceManagement: React.FC = () => {
 
     fetchAllData();
   }, [currentEmployee?.id, currentDate.getMonth(), currentDate.getFullYear()]);
+
+  // Ca áp dụng cho nhân viên vào NGÀY đang làm đơn -> lựa chọn giờ quên chấm công (xem shiftTimeOptions).
+  const selectedDateKey = selectedDate
+    ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
+    : null;
+  useEffect(() => {
+    if (!currentEmployee?.id || !selectedDateKey) return;
+    let alive = true;
+    setEmployeeShifts(null);
+    attendanceService
+      .getEmployeeShifts(currentEmployee.id, selectedDateKey)
+      .then((shifts) => { if (alive) setEmployeeShifts(shifts); })
+      .catch(() => { if (alive) setEmployeeShifts(null); });
+    return () => { alive = false; };
+  }, [currentEmployee?.id, selectedDateKey]);
 
   // Effect 3: Đồng bộ allExplanations và approvedRegistrations khi monthlyRequestHistory hoặc selectedDate thay đổi
   // Điều này đảm bảo khi nhấn Làm đơn bổ sung lần nữa (hoặc đang mở), dữ liệu lọc sẽ luôn mới nhất
@@ -5102,33 +5137,34 @@ const AttendanceManagement: React.FC = () => {
                                 </svg>
                                 <span className="text-xs font-bold text-white tracking-wide uppercase">{selectedReason === 'machine_error' ? 'Giờ check-in đã chấm' : 'Giờ check-in bị quên'}</span>
                               </div>
-                              <div className="bg-violet-50 p-3 flex gap-2">
-                                {[
-                                  { value: '07:30', label: '7h30', desc: 'Sáng' },
-                                  { value: '08:00', label: '8h00', desc: 'Sáng' },
-                                  { value: '08:30', label: '8h30', desc: 'Sáng' },
-                                  { value: '09:00', label: '9h00', desc: 'Sáng' },
-                                  // Giờ bắt đầu Ca 2 (Điều dưỡng BS A, 09:30-13:30/
-                                  // 14:30-18:30) — thêm 2026-09-18 cùng đợt với giờ check-out
-                                  // 18h30, cho đủ cặp giờ vào/ra của Ca 2 trong form này.
-                                  { value: '09:30', label: '9h30', desc: 'Sáng' },
-                                  { value: '13:00', label: '13h00', desc: 'Chiều' },
-                                  { value: '14:30', label: '14h30', desc: 'Chiều' },
-                                  { value: '17:30', label: '17h30', desc: 'Tối' },
-                                ].map((opt) => {
+                              {/* Giờ vào của các ca đang áp dụng cho NV (ShiftConfig) — xem shiftTimeOptions */}
+                              {shiftTimeOptions(employeeShifts, 'checkin').length > 0 && (
+                              <div className="bg-violet-50 p-3 flex flex-wrap gap-2">
+                                {shiftTimeOptions(employeeShifts, 'checkin').map((opt) => {
                                   const sel = forgotCheckinTime === opt.value;
                                   return (
                                     <button
                                       key={opt.value}
                                       type="button"
                                       onClick={() => setForgotCheckinTime(sel ? null : opt.value)}
-                                      className={`flex-1 flex flex-col items-center py-2.5 rounded-xl border-2 transition-all duration-150 ${sel ? 'bg-violet-600 border-violet-600 shadow-md scale-[1.04]' : 'bg-white border-violet-200 hover:border-violet-400 hover:bg-violet-50'}`}
+                                      className={`flex-1 min-w-[4.5rem] flex flex-col items-center py-2.5 rounded-xl border-2 transition-all duration-150 ${sel ? 'bg-violet-600 border-violet-600 shadow-md scale-[1.04]' : 'bg-white border-violet-200 hover:border-violet-400 hover:bg-violet-50'}`}
                                     >
                                       <span className={`text-sm font-extrabold ${sel ? 'text-white' : 'text-violet-700'}`}>{opt.label}</span>
                                       <span className={`text-[10px] mt-0.5 font-medium ${sel ? 'text-violet-200' : 'text-gray-400'}`}>{opt.desc}</span>
                                     </button>
                                   );
                                 })}
+                              </div>
+                              )}
+                              {/* Backend nhận giờ bất kỳ -> cho nhập giờ khác ngoài giờ ca */}
+                              <div className="bg-violet-50 px-3 pb-3 flex items-center gap-2">
+                                <span className="text-xs font-medium text-gray-500">Giờ khác</span>
+                                <input
+                                  type="time"
+                                  value={forgotCheckinTime ?? ''}
+                                  onChange={(e) => setForgotCheckinTime(e.target.value || null)}
+                                  className="text-sm border border-violet-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-violet-400"
+                                />
                               </div>
                             </div>
                           )}
@@ -5142,31 +5178,34 @@ const AttendanceManagement: React.FC = () => {
                                 </svg>
                                 <span className="text-xs font-bold text-white tracking-wide uppercase">{selectedReason === 'machine_error' ? 'Giờ check-out đã chấm' : 'Giờ check-out bị quên'}</span>
                               </div>
-                              <div className="bg-amber-50 p-3 flex gap-2">
-                                {[
-                                  { value: '12:00', label: '12h00', desc: 'Trưa' },
-                                  { value: '16:30', label: '16h30', desc: 'Chiều' },
-                                  { value: '17:00', label: '17h00', desc: 'Chiều' },
-                                  { value: '17:30', label: '17h30', desc: 'Chiều' },
-                                  // Giờ kết thúc Ca 2 chiều (Điều dưỡng BS A,
-                                  // 14:30-18:30) — thêm 2026-09-18 vì thiếu mốc này khiến
-                                  // NV làm Ca 2 quên chấm công không chọn được đúng giờ về.
-                                  { value: '18:30', label: '18h30', desc: 'Chiều' },
-                                  { value: '21:00', label: '21h00', desc: 'Tối' },
-                                ].map((opt) => {
+                              {/* Giờ ra của các ca đang áp dụng cho NV (ShiftConfig) — xem shiftTimeOptions */}
+                              {shiftTimeOptions(employeeShifts, 'checkout').length > 0 && (
+                              <div className="bg-amber-50 p-3 flex flex-wrap gap-2">
+                                {shiftTimeOptions(employeeShifts, 'checkout').map((opt) => {
                                   const sel = forgotCheckoutTime === opt.value;
                                   return (
                                     <button
                                       key={opt.value}
                                       type="button"
                                       onClick={() => setForgotCheckoutTime(sel ? null : opt.value)}
-                                      className={`flex-1 flex flex-col items-center py-2.5 rounded-xl border-2 transition-all duration-150 ${sel ? 'bg-amber-500 border-amber-500 shadow-md scale-[1.04]' : 'bg-white border-amber-200 hover:border-amber-400 hover:bg-amber-50'}`}
+                                      className={`flex-1 min-w-[4.5rem] flex flex-col items-center py-2.5 rounded-xl border-2 transition-all duration-150 ${sel ? 'bg-amber-500 border-amber-500 shadow-md scale-[1.04]' : 'bg-white border-amber-200 hover:border-amber-400 hover:bg-amber-50'}`}
                                     >
                                       <span className={`text-sm font-extrabold ${sel ? 'text-white' : 'text-amber-600'}`}>{opt.label}</span>
                                       <span className={`text-[10px] mt-0.5 font-medium ${sel ? 'text-amber-200' : 'text-gray-400'}`}>{opt.desc}</span>
                                     </button>
                                   );
                                 })}
+                              </div>
+                              )}
+                              {/* Backend nhận giờ bất kỳ -> cho nhập giờ khác ngoài giờ ca */}
+                              <div className="bg-amber-50 px-3 pb-3 flex items-center gap-2">
+                                <span className="text-xs font-medium text-gray-500">Giờ khác</span>
+                                <input
+                                  type="time"
+                                  value={forgotCheckoutTime ?? ''}
+                                  onChange={(e) => setForgotCheckoutTime(e.target.value || null)}
+                                  className="text-sm border border-amber-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                                />
                               </div>
                             </div>
                           )}
